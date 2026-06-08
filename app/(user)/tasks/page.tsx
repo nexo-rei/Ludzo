@@ -38,6 +38,9 @@ export default function TasksPage() {
   };
 
   const filteredTasks = tasks.filter(t => filter === 'all' || t.type === filter);
+  console.log('USER IN TASKS:', user);
+console.log('TASKS:', tasks);
+console.log('FILTERED TASKS:', filteredTasks);
 
   const handleGo = (task: any) => {
     if (task.target_link) {
