@@ -53,9 +53,11 @@ export async function GET(req: NextRequest) {
     }) || [];
 
     return NextResponse.json({
-      tasks: tasksWithStatus,
-      adsWatchedToday: adLogs?.length || 0,
-    });
+  success: true,
+  tasksCount: tasksWithStatus.length,
+  tasks: tasksWithStatus,
+  adsWatchedToday: adLogs?.length || 0,
+});
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
