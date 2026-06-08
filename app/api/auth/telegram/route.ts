@@ -1,3 +1,4 @@
+export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
 import { validateTelegramInitData } from '@/lib/telegram/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
@@ -11,7 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing init data or bot token' }, { status: 400 });
     }
 
-    const { valid, user } = validateTelegramInitData(initData, botToken);
+    const { valid, user } = await validateTelegramInitData(initData, botToken);
     if (!valid || !user) {
       return NextResponse.json({ error: 'Invalid Telegram data' }, { status: 401 });
     }
