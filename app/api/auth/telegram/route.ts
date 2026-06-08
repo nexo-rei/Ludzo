@@ -68,7 +68,15 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (userError || !newUser) {
-        return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
+  console.error('USER CREATE ERROR:', userError);
+
+  return NextResponse.json(
+    {
+      error: 'Failed to create user',
+      details: userError,
+    },
+    { status: 500 }
+  );
       }
 
       // Create wallet
@@ -163,6 +171,11 @@ export async function POST(req: NextRequest) {
       isNewUser,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Authentication failed' }, { status: 500 });
+  return NextResponse.json(
+    {
+      error: error.message || 'Authentication failed',
+      stack: String(error),
+    },
+    { status: 500 }
+  );
   }
-}
