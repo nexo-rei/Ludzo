@@ -4,7 +4,7 @@ compatibility_flags = ["nodejs_compat"]
 
 # Cloudflare Pages with Next.js
 # Build command: npx @cloudflare/next-on-pages
-# Output directory: .vercel/output/static
+# Build output directory: .vercel/output/static
 
 [vars]
 NEXT_PUBLIC_TELEGRAM_BOT_USERNAME = "LudzoBot"
