@@ -27,8 +27,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (!tgUser) {
-      return NextResponse.json({ success: false, error: "Invalid Telegram auth" }, { status: 401 });
-    }
+  console.log("INIT DATA:", initData);
+  console.log("BOT TOKEN EXISTS:", !!process.env.TELEGRAM_BOT_TOKEN);
+
+  return NextResponse.json(
+    { success: false, error: "Invalid Telegram auth" },
+    { status: 401 }
+  );
+}
 
     const supabase = createAdminClient();
     const settings = await getSettings(supabase);
