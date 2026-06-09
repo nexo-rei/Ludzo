@@ -36,6 +36,10 @@ export async function POST(req: NextRequest) {
   );
 }
 
+console.log("URL:", !!process.env.NEXT_PUBLIC_SUPABASE_URL);
+console.log("SERVICE:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+console.log("TOKEN:", !!process.env.TELEGRAM_BOT_TOKEN);
+
     const supabase = createAdminClient();
     const settings = await getSettings(supabase);
     const telegramId = String(tgUser.id);
