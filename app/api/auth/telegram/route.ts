@@ -140,13 +140,14 @@ console.log("TOKEN:", !!process.env.TELEGRAM_BOT_TOKEN);
       },
     });
   } catch (err) {
-  console.error("[auth/telegram ERROR]", err);
+    console.error("[auth/telegram ERROR]", err);
 
-  return NextResponse.json(
-    {
-      success: false,
-      error: String(err),
-    },
-    { status: 500 }
-  );
+    return NextResponse.json(
+      {
+        success: false,
+        error: String(err),
+      },
+      { status: 500 }
+    );
+  }
 }
