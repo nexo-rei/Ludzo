@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     const { data: user, error } = await supabase
       .from("users")
       .select("id, telegram_id, first_name, last_name, username, language_code, photo_url, status, created_at")
-      .eq("telegram_id", auth.userId!)
+      .eq("id", auth.userId!)
       .maybeSingle();
 
     if (error || !user) return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
