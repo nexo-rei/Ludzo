@@ -135,15 +135,15 @@ export async function POST(req: NextRequest) {
         welcome_bonus: isNewUser ? settings.welcome_bonus_coins : 0,
       },
     });
-  } catch (err) {
+  } catch (err: any) {
   console.error("[auth/telegram ERROR]", err);
 
-  return NextResponse.json(
-    {
-      success: false,
-      error: String(err),
-    },
-    { status: 500 }
-  );
+  return Response.json({
+    success: false,
+    error: err?.message || String(err),
+    stack: err?.stack || null,
+  }, {
+    status: 500,
+  });
 }
 }
