@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
     console.log("STEP 3 - TELEGRAM ID:", telegramId);
 
     // Upsert user
+    //redeploy
     const { data: user, error: userError } = await supabase
       .from("users")
       .upsert(
