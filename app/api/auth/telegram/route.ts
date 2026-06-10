@@ -71,8 +71,11 @@ export async function POST(req: NextRequest) {
       .select("*")
       .maybeSingle();
 
-    if (userError || !user) {
-      return NextResponse.json({ success: false, error: "Failed to create user" }, { status: 500 });
+      console.log("USER DATA:", user);
+      console.log("USER ERROR:", JSON.stringify(userError));
+
+    if (userError) {
+    throw new Error(JSON.stringify(userError));
     }
 
     // Check if this is a new user (wallet doesn't exist yet)
