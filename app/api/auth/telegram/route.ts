@@ -38,6 +38,17 @@ export async function POST(req: NextRequest) {
     console.log("SUPABASE URL:", !!process.env.NEXT_PUBLIC_SUPABASE_URL);
     console.log("SERVICE KEY:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
     console.log("BOT TOKEN:", !!process.env.TELEGRAM_BOT_TOKEN);
+
+    console.log("STEP 1");
+    const settings = await getSettings(supabase);
+    console.log("STEP 2");
+
+    const telegramId = String(tgUser.id);
+    console.log("STEP 3");
+
+    const { data: user, error: userError } = await supabase
+    .from("users")
+    .upsert(...)
     
     const supabase = createAdminClient();
     const settings = await getSettings(supabase);
@@ -139,13 +150,19 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err) {
-  console.error("AUTH ERROR:", err);
+  console.error("AUTH ERROR FULL:", err);
 
   return NextResponse.json(
     {
       success: false,
-      error: String(err),
-      stack: err instanceof Error ? err.stack : null,
+      error:
+        err instanceof Error
+          ? err.message
+          : JSON.stringify(err),
+      stack:
+        err instanceof Error
+          ? err.stack
+          : null,
     },
     { status: 500 }
   );
