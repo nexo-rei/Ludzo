@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
     const { data: wallet } = await supabase
       .from("wallets")
       .select("id, coin_balance, usdt_balance")
-      .eq("id", user.id)
+      .eq("telegram_id", user.id)
       .maybeSingle();
 
     const isNewUser = !wallet;
