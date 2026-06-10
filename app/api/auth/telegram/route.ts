@@ -115,25 +115,31 @@ export async function POST(req: NextRequest) {
     console.log("TELEGRAM ID:", telegramId);
       
       // Handle referral
-      if (referralCode && referralCode !== telegramId) {
-        const { data: referrer } = await supabase
-          .from("users")
-          .select("id")
-          .eq("telegram_id", referralCode)
-          .maybeSingle();
-      console.log("REFERRER FOUND:", referrer);
+if (referralCode && referralCode !== telegramId) {
 
-        if (referrer) {
-          const insertResult = await supabase.from("referrals").insert({
-          referrer_id: referrer.id,
-          referee_id: user.id,
-          commission_status: "pending",
-         });
+  console.log("REFERRAL CODE:", referralCode);
 
-    console.log("REFERRAL INSERT:", insertResult);
-        }
-      }
-    }
+  const { data: referrer } = await supabase
+    .from("users")
+    .select("id")
+    .eq("telegram_id", referralCode)
+    .maybeSingle();
+
+  console.log("REFERRER FOUND:", referrer);
+
+  if (referrer) {
+    const { error } = await supabase
+      .from("referrals")
+      .insert({
+        referrer_id: referrer.id,
+        referee_id: user.id,
+        commission_status: "pending",
+      });
+
+    console.log("REFERRAL INSERT ERROR:", error);
+  }
+}
+}
 
     // Fetch fresh wallet
     const { data: freshWallet } = await supabase
