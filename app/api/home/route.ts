@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
     const supabase = createAdminClient();
     const settings = await getSettings(supabase);
 
+    // rebuild
     // Check maintenance mode first
     if (settings.maintenance_mode) {
       return NextResponse.json({
