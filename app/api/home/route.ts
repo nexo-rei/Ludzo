@@ -26,13 +26,14 @@ export async function GET(req: NextRequest) {
 
     console.log("AUTH USER ID:", auth.userId);
 
-  const { data: user } = await supabase
+  const { data: user, error: userError } = await supabase
   .from("users")
-  .select("id, telegram_id, first_name, photo_url, status")
+  .select("id, telegram_id, first_name, status")
   .eq("id", auth.userId!)
   .maybeSingle();
 
-    console.log("HOME USER:", user);
+console.log("HOME USER DATA:", JSON.stringify(user));
+console.log("HOME USER ERROR:", JSON.stringify(userError));
     if (!user) return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
     if (user.status === "suspended") {
       return NextResponse.json({ success: false, error: "Account suspended" }, { status: 403 });
