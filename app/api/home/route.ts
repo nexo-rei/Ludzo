@@ -5,6 +5,7 @@ import { getSettings, getStreakReward } from "@/lib/settings";
 import { startOfDay, differenceInCalendarDays } from "date-fns";
 
 // Aggregated home page data in one request
+//redeploy
 export async function GET(req: NextRequest) {
   const auth = await requireAuth(req);
   if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: 401 });
