@@ -35,7 +35,10 @@ export async function POST(req: NextRequest) {
     { status: 401 }
   );
 }
-
+    console.log("SUPABASE URL:", !!process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.log("SERVICE KEY:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+    console.log("BOT TOKEN:", !!process.env.TELEGRAM_BOT_TOKEN);
+    
     const supabase = createAdminClient();
     const settings = await getSettings(supabase);
     const telegramId = String(tgUser.id);
@@ -135,15 +138,16 @@ export async function POST(req: NextRequest) {
         welcome_bonus: isNewUser ? settings.welcome_bonus_coins : 0,
       },
     });
-  } catch (err: any) {
-  console.error("[auth/telegram ERROR]", err);
+  } catch (err) {
+  console.error("AUTH ERROR:", err);
 
-  return Response.json({
-    success: false,
-    error: err?.message || String(err),
-    stack: err?.stack || null,
-  }, {
-    status: 500,
-  });
+  return NextResponse.json(
+    {
+      success: false,
+      error: String(err),
+      stack: err instanceof Error ? err.stack : null,
+    },
+    { status: 500 }
+  );
 }
 }
