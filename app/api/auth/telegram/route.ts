@@ -7,6 +7,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { initData, referralCode } = body as { initData?: string; referralCode?: string };
+    console.log("BODY REFERRAL CODE:", referralCode);
 
     if (!initData) {
       return NextResponse.json({ success: false, error: "initData required" }, { status: 400 });
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
     const { data: wallet } = await supabase
       .from("wallets")
       .select("id, coin_balance, usdt_balance")
-      .eq("telegram_id", user.id)
+      .eq("user_id", user.id)
       .maybeSingle();
 
     const isNewUser = !wallet;
