@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const { data: user } = await supabase
   .from("users")
   .select("id, telegram_id, first_name, photo_url, status")
-  .eq("telegram_id", auth.userId!)
+  .eq("id", auth.userId!)
   .maybeSingle();
 
     console.log("HOME USER:", user);
