@@ -39,20 +39,19 @@ export async function POST(req: NextRequest) {
     console.log("SERVICE KEY:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
     console.log("BOT TOKEN:", !!process.env.TELEGRAM_BOT_TOKEN);
 
-    console.log("STEP 1");
-    const settings = await getSettings(supabase);
-    console.log("STEP 2");
-
-    const telegramId = String(tgUser.id);
-    console.log("STEP 3");
-
-    const { data: user, error: userError } = await supabase
-    .from("users")
-    .upsert(...)
-    
     const supabase = createAdminClient();
+
+    console.log("SUPABASE URL:", !!process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.log("SERVICE KEY:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+    console.log("BOT TOKEN:", !!process.env.TELEGRAM_BOT_TOKEN);
+
+    console.log("STEP 1 - CLIENT CREATED");
+
     const settings = await getSettings(supabase);
+    console.log("STEP 2 - SETTINGS LOADED");
+  
     const telegramId = String(tgUser.id);
+    console.log("STEP 3 - TELEGRAM ID:", telegramId);
 
     // Upsert user
     const { data: user, error: userError } = await supabase
