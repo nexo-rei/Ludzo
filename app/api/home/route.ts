@@ -22,11 +22,15 @@ export async function GET(req: NextRequest) {
       }, { status: 503 });
     }
 
-    const { data: user } = await supabase
-      .from("users")
-      .select("id, first_name, photo_url, status")
-      .eq("telegram_id", auth.userId!)
-      .maybeSingle();
+    console.log("AUTH USER ID:", auth.userId);
+
+  const { data: user } = await supabase
+  .from("users")
+  .select("id, telegram_id, first_name, photo_url, status")
+  .eq("telegram_id", auth.userId!)
+  .maybeSingle();
+
+    console.log("HOME USER:", user);
     if (!user) return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
     if (user.status === "suspended") {
       return NextResponse.json({ success: false, error: "Account suspended" }, { status: 403 });
