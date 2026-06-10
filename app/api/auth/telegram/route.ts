@@ -117,7 +117,6 @@ export async function POST(req: NextRequest) {
       
       // Handle referral
 if (referralCode && referralCode !== telegramId) {
-
   console.log("REFERRAL CODE:", referralCode);
 
   const { data: referrer } = await supabase
@@ -126,10 +125,10 @@ if (referralCode && referralCode !== telegramId) {
     .eq("telegram_id", referralCode)
     .maybeSingle();
 
-  console.log("REFERRER FOUND:", referrer);
+  console.log("REFERRER:", referrer);
 
   if (referrer) {
-    const { error } = await supabase
+    const { error: referralError } = await supabase
       .from("referrals")
       .insert({
         referrer_id: referrer.id,
@@ -137,7 +136,7 @@ if (referralCode && referralCode !== telegramId) {
         commission_status: "pending",
       });
 
-    console.log("REFERRAL INSERT ERROR:", error);
+    console.log("REFERRAL ERROR:", referralError);
   }
 }
 }
