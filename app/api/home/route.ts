@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
 
   const { data: user, error: userError } = await supabase
   .from("users")
-  .select("id, telegram_id, first_name, status")
+  .select("id, telegram_id, first_name, photo_url, status")
   .eq("id", auth.userId!)
   .maybeSingle();
 
