@@ -109,6 +109,10 @@ export async function POST(req: NextRequest) {
         language: tgUser.language_code ?? "en",
       });
 
+    console.log("REFERRAL CODE:", referralCode);
+    console.log("IS NEW USER:", isNewUser);
+    console.log("TELEGRAM ID:", telegramId);
+      
       // Handle referral
       if (referralCode && referralCode !== telegramId) {
         const { data: referrer } = await supabase
@@ -116,13 +120,16 @@ export async function POST(req: NextRequest) {
           .select("id")
           .eq("telegram_id", referralCode)
           .maybeSingle();
+      console.log("REFERRER FOUND:", referrer);
 
         if (referrer) {
-          await supabase.from("referrals").insert({
-            referrer_id: referrer.id,
-            referee_id: user.id,
-            commission_status: "pending",
-          });
+          const insertResult = await supabase.from("referrals").insert({
+          referrer_id: referrer.id,
+          referee_id: user.id,
+          commission_status: "pending",
+         });
+
+    console.log("REFERRAL INSERT:", insertResult);
         }
       }
     }
