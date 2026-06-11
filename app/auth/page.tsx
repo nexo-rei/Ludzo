@@ -27,12 +27,15 @@ function AuthContent() {
 
     authenticate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isReady, tgUser]);
+  }, [isReady, tgUser, startParam]);
 
   const authenticate = async () => {
     try {
       const referralCode = startParam ?? searchParams.get("start") ?? undefined;
-
+      
+      console.log("START PARAM:", startParam);
+      console.log("REFERRAL SENT:", referralCode);
+      
       const res = await fetch("/api/auth/telegram", {
         method: "POST",
         headers: {
