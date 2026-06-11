@@ -73,20 +73,7 @@ export default function AdSection({
     setLoading(false);
   }
 };
-      const data = await res.json();
-      if (data.success) {
-        showToast(`+${adReward} Coins earned! 🪙`, "success");
-        await refreshWallet();
-        onAdWatched?.();
-      } else {
-        showToast(data.error ?? "Failed to reward ad", "error");
-      }
-    } catch {
-      showToast("Connection error. Try again.", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
+      
 
   return (
     <motion.div
