@@ -17,7 +17,7 @@ interface AdSectionProps {
 
 declare global {
   interface Window {
-    show_9240681?: (id?: string) => void;
+    show_11113056?: () => Promise<void>;
   }
 }
 
@@ -33,22 +33,46 @@ export default function AdSection({
   const remaining = Math.max(0, dailyLimit - adsWatchedToday);
 
   const handleWatchAd = async () => {
-    if (limitReached || loading || !userId) return;
-    setLoading(true);
+  if (limitReached || loading || !userId) return;
 
-    try {
-      // Trigger Monetag rewarded ad
-      const monetagId = process.env.NEXT_PUBLIC_MONETAG_ZONE_ID;
-      if (monetagId && typeof window.show_9240681 === "function") {
-        window.show_9240681(monetagId);
-      }
+  setLoading(true);
 
-      // Server-side reward
-      const res = await fetch("/api/ads/reward", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-user-id": userId },
-        body: JSON.stringify({ ad_type: "normal" }),
-      });
+  try {
+    if (typeof window.show_11113056 !== "function") {
+      showToast("Ads unavailable. Please try again later.", "error");
+      return;
+    }
+
+    // Wait for rewarded interstitial completion
+    await window.show_11113056();
+
+    const res = await fetch("/api/ads/reward", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": userId,
+      },
+      body: JSON.stringify({
+        ad_type: "normal",
+      }),
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      showToast(`+${adReward} Coins earned! 🪙`, "success");
+      await refreshWallet();
+      onAdWatched?.();
+    } else {
+      showToast(data.error ?? "Failed to reward ad", "error");
+    }
+  } catch (err) {
+    console.error("Monetag error:", err);
+    showToast("Ad closed or failed.", "error");
+  } finally {
+    setLoading(false);
+  }
+};
       const data = await res.json();
       if (data.success) {
         showToast(`+${adReward} Coins earned! 🪙`, "success");
