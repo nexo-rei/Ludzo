@@ -44,6 +44,7 @@ export default function AdSection({
     }
 
     // Wait for rewarded interstitial completion
+    //rebuild
     await window.show_11113056();
 
     const res = await fetch("/api/ads/reward", {
