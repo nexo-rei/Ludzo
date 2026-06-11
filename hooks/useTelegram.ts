@@ -39,6 +39,8 @@ declare global {
   }
 }
 
+const REFERRAL_STORAGE_KEY = "ludzo_pending_referral";
+
 export function useTelegram() {
   const [tgUser, setTgUser] = useState<TelegramUser | null>(null);
   const [initData, setInitData] = useState<string>("");
@@ -48,16 +50,27 @@ export function useTelegram() {
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
+
     if (tg) {
       tg.ready();
       tg.expand();
+
       setInitData(tg.initData ?? "");
       setTgUser(tg.initDataUnsafe?.user ?? null);
-      setStartParam(tg.initDataUnsafe?.start_param);
       setColorScheme(tg.colorScheme ?? "dark");
+
+      const param = tg.initDataUnsafe?.start_param;
+
+      if (param) {
+        sessionStorage.setItem(REFERRAL_STORAGE_KEY, param);
+        setStartParam(param);
+      } else {
+        const saved = sessionStorage.getItem(REFERRAL_STORAGE_KEY);
+        setStartParam(saved ?? undefined);
+      }
+
       setIsReady(true);
     } else if (process.env.NODE_ENV === "development") {
-      // Dev mode mock user
       setTgUser({
         id: 123456789,
         first_name: "Dev",
@@ -65,19 +78,47 @@ export function useTelegram() {
         username: "devuser",
         language_code: "en",
       });
+
       setInitData("dev_mode");
+
+      const saved = sessionStorage.getItem(REFERRAL_STORAGE_KEY);
+      setStartParam(saved ?? undefined);
+
       setIsReady(true);
     } else {
+      const saved = sessionStorage.getItem(REFERRAL_STORAGE_KEY);
+      setStartParam(saved ?? undefined);
       setIsReady(true);
     }
   }, []);
 
-  const haptic = (type: "impact" | "success" | "error" | "warning" = "impact") => {
+  const haptic = (
+    type: "impact" | "success" | "error" | "warning" = "impact"
+  ) => {
     const tg = window.Telegram?.WebApp;
     if (!tg) return;
-    if (type === "impact") tg.HapticFeedback.impactOccurred("light");
-    else tg.HapticFeedback.notificationOccurred(type as "success" | "error" | "warning");
+
+    if (type === "impact") {
+      tg.HapticFeedback.impactOccurred("light");
+    } else {
+      tg.HapticFeedback.notificationOccurred(
+        type as "success" | "error" | "warning"
+      );
+    }
   };
 
-  return { tgUser, initData, startParam, isReady, colorScheme, haptic };
+  const clearReferral = () => {
+    sessionStorage.removeItem(REFERRAL_STORAGE_KEY);
+    setStartParam(undefined);
+  };
+
+  return {
+    tgUser,
+    initData,
+    startParam,
+    isReady,
+    colorScheme,
+    haptic,
+    clearReferral,
+  };
 }
