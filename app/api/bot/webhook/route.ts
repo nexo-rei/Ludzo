@@ -5,7 +5,12 @@ import { NextRequest, NextResponse } from "next/server";
 // ---------------------------------------------------------------------------
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? "";
-const TG = (method: string) => `https://api.telegram.org/bot${BOT_TOKEN}/${method}`;
+const TG = (method: string) =>
+  `https://api.telegram.org/bot${BOT_TOKEN}/${method}`;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 async function sendMessage(payload: object): Promise<number | null> {
   const res = await fetch(TG("sendMessage"), {
@@ -17,57 +22,63 @@ async function sendMessage(payload: object): Promise<number | null> {
   return data?.result?.message_id ?? null;
 }
 
-async function editMessage(chatId: number, messageId: number, text: string): Promise<void> {
+async function editMessageText(
+  chatId: number,
+  messageId: number,
+  text: string
+): Promise<void> {
   await fetch(TG("editMessageText"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      message_id: messageId,
-      text,
-    }),
+    body: JSON.stringify({ chat_id: chatId, message_id: messageId, text }),
   });
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+async function deleteMessage(
+  chatId: number,
+  messageId: number
+): Promise<void> {
+  await fetch(TG("deleteMessage"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, message_id: messageId }),
+  });
 }
 
 // ---------------------------------------------------------------------------
-// /start handler — animated loader then full welcome
+// /start — animated loader → delete → send fresh welcome with keyboard
 // ---------------------------------------------------------------------------
 
 async function handleStart(chatId: number): Promise<void> {
-  const steps = [
-    "⚡ Initializing Ludzo Core... ▰▱▱▱▱▱▱▱▱▱ 10%",
-    "⚡ Loading Rewards Engine... ▰▰▰▰▱▱▱▱▱▱ 40%",
-    "⚡ Syncing Wallet... ▰▰▰▰▰▰▰▱▱▱ 70%",
-    "⚡ Launch Complete ▰▰▰▰▰▰▰▰▰▰ 100%",
+  const loaderSteps = [
+    "⚡ Initializing Ludzo Core...\n█░░░░░░░░░ 10%",
+    "⚡ Loading Rewards Engine...\n███░░░░░░░ 40%",
+    "⚡ Syncing Wallet...\n███████░░░ 70%",
+    "⚡ Launch Complete\n██████████ 100%",
   ];
 
-  // Step 1 — send first loader message
-  const messageId = await sendMessage({
+  // Send the first loader frame
+  const loadingMsgId = await sendMessage({
     chat_id: chatId,
-    text: steps[0],
+    text: loaderSteps[0],
   });
 
-  if (!messageId) return;
+  if (!loadingMsgId) return;
 
-  // Edit through remaining loader steps with 700ms gaps
-  for (let i = 1; i < steps.length; i++) {
+  // Edit through the remaining loader frames
+  for (let i = 1; i < loaderSteps.length; i++) {
     await sleep(700);
-    await editMessage(chatId, messageId, steps[i]);
+    await editMessageText(chatId, loadingMsgId, loaderSteps[i]);
   }
 
-  // Step 2 — replace with full welcome message after final loader
-  await sleep(700);
-  await fetch(TG("editMessageText"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      message_id: messageId,
-      text: `🎮 <b>WELCOME TO LUDZO</b>
+  // Wait, then delete the loader message entirely
+  await sleep(500);
+  await deleteMessage(chatId, loadingMsgId);
+
+  // Send a brand-new message with inline keyboard
+  await sendMessage({
+    chat_id: chatId,
+    text: `🎮 <b>WELCOME TO LUDZO</b>
 ━━━━━━━━━━━━━━
 💰 Daily Rewards
 👥 Referral Earnings
@@ -75,41 +86,41 @@ async function handleStart(chatId: number): Promise<void> {
 🏆 Leaderboards
 💵 USDT Withdrawals
 ━━━━━━━━━━━━━━
-📌 <b>Commands</b>
+📌 <b>Quick Commands</b>
 /help - Help Center
 /profile - Your Profile
 /paidpromotion - Promotion Services
 ━━━━━━━━━━━━━━
-🛟 Support @LudzosupportBot
+🛟 Support
+@LudzosupportBot
 
 🚀 Start earning today!`,
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            {
-              text: "🎮 Open Ludzo",
-              web_app: { url: "https://t.me/LudzoBot/app" },
-            },
-          ],
-          [
-            {
-              text: "🛟 Support",
-              url: "https://t.me/LudzosupportBot",
-            },
-            {
-              text: "📢 Promotion",
-              callback_data: "paidpromotion",
-            },
-          ],
+    parse_mode: "HTML",
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: "🎮 Open Ludzo",
+            url: "https://t.me/LudzoBot/app",
+          },
         ],
-      },
-    }),
+        [
+          {
+            text: "🛟 Support",
+            url: "https://t.me/LudzosupportBot",
+          },
+          {
+            text: "📢 Promotion",
+            url: "https://t.me/LudzosupportBot",
+          },
+        ],
+      ],
+    },
   });
 }
 
 // ---------------------------------------------------------------------------
-// /profile handler — real Telegram user data
+// /profile — real Telegram user data
 // ---------------------------------------------------------------------------
 
 async function handleProfile(
@@ -133,7 +144,7 @@ async function handleProfile(
 }
 
 // ---------------------------------------------------------------------------
-// /help handler
+// /help
 // ---------------------------------------------------------------------------
 
 async function handleHelp(chatId: number): Promise<void> {
@@ -157,7 +168,7 @@ Contact:
 }
 
 // ---------------------------------------------------------------------------
-// /paidpromotion handler
+// /paidpromotion
 // ---------------------------------------------------------------------------
 
 async function handlePaidPromotion(chatId: number): Promise<void> {
@@ -188,23 +199,17 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null);
 
-    // Handle inline button callback for "paidpromotion"
+    // Acknowledge callback queries silently (buttons are all URLs, no callback_data)
     if (body?.callback_query) {
-      const cb = body.callback_query;
-      const chatId: number = cb.message?.chat?.id;
-      if (cb.data === "paidpromotion" && chatId) {
-        await handlePaidPromotion(chatId);
-        // Acknowledge the callback
-        await fetch(TG("answerCallbackQuery"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ callback_query_id: cb.id }),
-        });
-      }
+      await fetch(TG("answerCallbackQuery"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ callback_query_id: body.callback_query.id }),
+      });
       return NextResponse.json({ ok: true });
     }
 
-    // Ignore non-message updates
+    // Ignore non-text updates
     if (!body?.message?.text) {
       return NextResponse.json({ ok: true });
     }
@@ -213,15 +218,18 @@ export async function POST(req: NextRequest) {
     const chatId: number = message.chat?.id;
     const tgUser = message.from ?? {};
 
-    // Extract base command, strip @BotUsername suffix and arguments
-    const command = message.text.split("@")[0].split(" ")[0].toLowerCase();
-
     if (!chatId) return NextResponse.json({ ok: true });
 
     if (!BOT_TOKEN) {
       console.error("TELEGRAM_BOT_TOKEN is not set");
-      return NextResponse.json({ ok: false, error: "Bot token missing" }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, error: "Bot token missing" },
+        { status: 500 }
+      );
     }
+
+    // Extract base command, strip @BotUsername suffix and any arguments
+    const command = message.text.split("@")[0].split(" ")[0].toLowerCase();
 
     switch (command) {
       case "/start":
