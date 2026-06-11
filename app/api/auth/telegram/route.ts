@@ -3,6 +3,115 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { validateTelegramInitData } from "@/lib/telegram";
 import { getSettings } from "@/lib/settings";
 
+// ---------------------------------------------------------------------------
+// Bot command webhook handler (GET)
+// ---------------------------------------------------------------------------
+
+const BOT_COMMANDS: Record<string, string> = {
+  "/start": `🎮 Welcome to Ludzo!
+
+Earn rewards, complete tasks, invite friends and grow your wallet.
+
+✨ Features:
+• Daily Rewards
+• Referral Earnings
+• Coin Rewards
+• USDT Withdrawals
+• Special Events & Promotions
+
+📌 Commands:
+/help - Help & Support
+/profile - Your Account Info
+/paidpromotion - Promotion Services
+
+🛟 Support:
+@LudzosupportBot
+
+🚀 Open Ludzo Mini App and start earning today!`,
+
+  "/help": `🛟 Ludzo Help Center
+
+Available Commands:
+
+/start - Welcome message
+/help - Help & Support
+/profile - View your profile
+/paidpromotion - Promotion services
+
+Need help?
+
+Contact:
+@LudzosupportBot`,
+
+  "/profile": `👤 Profile
+
+Profile system will be available soon.
+
+Support:
+@LudzosupportBot`,
+
+  "/paidpromotion": `📢 Ludzo Paid Promotion
+
+We offer promotion opportunities for:
+
+• Telegram Channels
+• Telegram Groups
+• Bots
+• Mini Apps
+• Sponsored Campaigns
+
+For pricing and partnership inquiries:
+
+🛟 @LudzosupportBot`,
+};
+
+export async function GET(req: NextRequest) {
+  try {
+    const body = await req.json().catch(() => null);
+
+    if (!body || body.message?.text === undefined) {
+      return NextResponse.json({ ok: true });
+    }
+
+    const message = body.message;
+    const chatId: number = message.chat?.id;
+    const rawText: string = message.text ?? "";
+
+    // Extract the base command (strip any @BotUsername suffix)
+    const command = rawText.split("@")[0].split(" ")[0].toLowerCase();
+
+    const replyText = BOT_COMMANDS[command];
+    if (!replyText || !chatId) {
+      return NextResponse.json({ ok: true });
+    }
+
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    if (!botToken) {
+      console.error("TELEGRAM_BOT_TOKEN not set");
+      return NextResponse.json({ ok: false, error: "Bot token missing" }, { status: 500 });
+    }
+
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: replyText,
+        parse_mode: "HTML",
+      }),
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("BOT COMMAND ERROR:", err);
+    return NextResponse.json({ ok: false }, { status: 500 });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Existing auth handler (POST) — NOT modified
+// ---------------------------------------------------------------------------
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
