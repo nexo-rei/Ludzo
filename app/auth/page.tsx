@@ -27,6 +27,7 @@ function AuthContent() {
 
     authenticate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+    //redeploy
   }, [isReady, tgUser, startParam]);
 
   const authenticate = async () => {
