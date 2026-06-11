@@ -47,6 +47,7 @@ export default function AdSection({
     //rebuild
     await window.show_11113056();
 
+    console.log("USER ID =", userId);
     const res = await fetch("/api/ads/reward", {
       method: "POST",
       headers: {
