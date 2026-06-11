@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = createAdminClient();
     const { data: user } = await supabase
-      .from("users").select("id").eq("telegram_id", auth.userId!).maybeSingle();
+      .from("users").select("id").eq("id", auth.userId!).maybeSingle();
     if (!user) return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
 
     const { data: prefs } = await supabase
@@ -35,7 +35,7 @@ export async function PATCH(req: NextRequest) {
 
     const supabase = createAdminClient();
     const { data: user } = await supabase
-      .from("users").select("id").eq("telegram_id", auth.userId!).maybeSingle();
+      .from("users").select("id").eq("id", auth.userId!).maybeSingle();
     if (!user) return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
 
     await supabase
