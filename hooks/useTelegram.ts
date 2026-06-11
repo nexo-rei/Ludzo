@@ -60,6 +60,9 @@ export function useTelegram() {
       setColorScheme(tg.colorScheme ?? "dark");
 
       const param = tg.initDataUnsafe?.start_param;
+      console.log("INIT DATA UNSAFE:", JSON.stringify(tg.initDataUnsafe));
+      console.log("START PARAM:", tg.initDataUnsafe?.start_param);
+      console.log("RAW INIT DATA:", tg.initData);
 
       if (param) {
         sessionStorage.setItem(REFERRAL_STORAGE_KEY, param);
