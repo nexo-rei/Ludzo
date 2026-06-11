@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
         total_referrals: count ?? 0,
         total_commission: totalCommission,
         pending_commission: pendingCommission,
-        referral_link: `https://t.me/${telegramUsername}?start=${userData?.telegram_id}`,
+        referral_link: `https://t.me/${telegramUsername}?startapp=${userData?.telegram_id}`,
       },
     });
   } catch (err) {
