@@ -101,7 +101,7 @@ async function handleStart(chatId: number): Promise<void> {
         [
           {
             text: "🎮 Open Ludzo",
-            url: "https://t.me/LudzoBot/app",
+            url: "https://t.me/LudzoBot/Play",
           },
         ],
         [
