@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     const settings = await getSettings(supabase);
 
     const { data: user } = await supabase
-      .from("users").select("id, status").eq("telegram_id", auth.userId!).maybeSingle();
+      .from("users").select("id, status").eq("id", auth.userId!).maybeSingle();
     if (!user) return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
     if (user.status === "suspended") return NextResponse.json({ success: false, error: "Account suspended" }, { status: 403 });
 
