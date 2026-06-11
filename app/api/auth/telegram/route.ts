@@ -6,6 +6,7 @@ import { getSettings } from "@/lib/settings";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    console.log("FULL BODY:", JSON.stringify(body));
     const { initData, referralCode } = body as { initData?: string; referralCode?: string };
     console.log("BODY REFERRAL CODE:", referralCode);
 
