@@ -41,22 +41,20 @@ export async function POST(req: NextRequest) {
     }
 
     // Log ad
-    //rebuild 
     const { error: logError } = await supabase.from("ad_logs").insert({
-  user_id: user.id,
-  ad_type: adType,
-  reward_coins: adType === "normal" ? settings.ad_reward_coins : 0,
-});
+      user_id: user.id,
+      ad_type: adType,
+      reward_coins: adType === "normal" ? settings.ad_reward_coins : 0,
+    });
 
-if (logError) {
-  console.error("[ads/reward] ad_logs insert failed:", logError);
-  return NextResponse.json(
-    { success: false, error: logError.message },
-    { status: 500 }
-  );
-}
+    if (logError) {
+      console.error("[ads/reward] ad_logs insert failed:", logError);
+      return NextResponse.json(
+        { success: false, error: logError.message },
+        { status: 500 }
+      );
+    }
 
-    
     // Credit coins for normal ads only
     if (adType === "normal") {
       await supabase.rpc("credit_coins", {
