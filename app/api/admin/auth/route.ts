@@ -17,6 +17,8 @@ export async function POST(req: NextRequest) {
       .select("id, username, password_hash, role, is_active")
       .eq("username", username)
       .maybeSingle();
+    console.log("LOGIN_USERNAME:", username);
+    console.log("ADMIN_ROW:", JSON.stringify(admin));
 
     if (!admin || !admin.is_active) {
       return NextResponse.json({ success: false, error: "Invalid credentials" }, { status: 401 });
@@ -25,6 +27,9 @@ export async function POST(req: NextRequest) {
     // Verify password (bcrypt comparison)
     const { createHash } = await import("crypto");
     const hash = createHash("sha256").update(password).digest("hex");
+  console.log("INPUT_HASH:", hash);
+  console.log("DB_HASH:", admin?.password_hash);
+  console.log("HASH_MATCH:", admin?.password_hash === hash);
     if (admin.password_hash !== hash) {
       return NextResponse.json({ success: false, error: "Invalid credentials" }, { status: 401 });
     }
