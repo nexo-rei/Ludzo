@@ -42,14 +42,19 @@ export async function POST(req: NextRequest) {
 
     // Log ad
     //rebuild 
-    console.log("BEFORE AD LOG INSERT");
-    const { data, error } = await supabase
-  .from("ad_logs")
-  .insert({
-    user_id: user.id,
-    ad_type: adType,
-    reward_coins: adType === "normal" ? settings.ad_reward_coins : 0,
-  })
+    const { error: logError } = await supabase.from("ad_logs").insert({
+  user_id: user.id,
+  ad_type: adType,
+  reward_coins: adType === "normal" ? settings.ad_reward_coins : 0,
+});
+
+if (logError) {
+  console.error("[ads/reward] ad_logs insert failed:", logError);
+  return NextResponse.json(
+    { success: false, error: logError.message },
+    { status: 500 }
+  );
+}
   .select();
 
     console.log("AD_LOG_DATA:", data);
