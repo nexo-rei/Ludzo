@@ -55,7 +55,6 @@ if (logError) {
     { status: 500 }
   );
 }
-  .select();
 
     console.log("AD_LOG_DATA:", data);
     console.log("AD_LOG_ERROR:", error);
