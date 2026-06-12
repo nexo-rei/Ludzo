@@ -42,11 +42,17 @@ export async function POST(req: NextRequest) {
 
     // Log ad
     console.log("BEFORE AD LOG INSERT");
-    await supabase.from("ad_logs").insert({
-      user_id: user.id,
-      ad_type: adType,
-      reward_coins: adType === "normal" ? settings.ad_reward_coins : 0,
-    });
+    const { data, error } = await supabase
+  .from("ad_logs")
+  .insert({
+    user_id: user.id,
+    ad_type: adType,
+    reward_coins: adType === "normal" ? settings.ad_reward_coins : 0,
+  })
+  .select();
+
+    console.log("AD_LOG_DATA:", data);
+    console.log("AD_LOG_ERROR:", error);
     console.log("AFTER AD LOG INSERT");
     
     // Credit coins for normal ads only
