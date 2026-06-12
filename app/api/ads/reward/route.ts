@@ -56,9 +56,6 @@ if (logError) {
   );
 }
 
-    console.log("AD_LOG_DATA:", data);
-    console.log("AD_LOG_ERROR:", error);
-    console.log("AFTER AD LOG INSERT");
     
     // Credit coins for normal ads only
     if (adType === "normal") {
