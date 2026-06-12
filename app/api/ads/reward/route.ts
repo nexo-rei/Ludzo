@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Log ad
+    //rebuild 
     console.log("BEFORE AD LOG INSERT");
     const { data, error } = await supabase
   .from("ad_logs")
