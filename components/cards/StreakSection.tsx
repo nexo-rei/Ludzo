@@ -19,6 +19,12 @@ const BONUS_ADS_REQUIRED = 3;
 
 const DAY_LABELS = ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"];
 
+declare global {
+  interface Window {
+    show_11113056?: () => Promise<void>;
+  }
+}
+
 export default function StreakSection({ streak, todayReward, onClaimed }: StreakSectionProps) {
   const { userId, refreshWallet } = useApp();
   const [bonusWatched, setBonusWatched] = useState(0);
@@ -26,6 +32,7 @@ export default function StreakSection({ streak, todayReward, onClaimed }: Streak
   const [watchingBonus, setWatchingBonus] = useState(false);
 
   const currentDay = streak?.current_day ?? 1;
+
   const alreadyClaimed = (() => {
     if (!streak?.last_claimed_at) return false;
     const last = new Date(streak.last_claimed_at);
@@ -41,26 +48,44 @@ export default function StreakSection({ streak, todayReward, onClaimed }: Streak
 
   const handleWatchBonusAd = async () => {
     if (bonusWatched >= BONUS_ADS_REQUIRED || watchingBonus || !userId) return;
+
     setWatchingBonus(true);
     try {
+      // Step 1 — Show the actual Monetag rewarded ad first
+      if (typeof window.show_11113056 !== "function") {
+        showToast("Ads unavailable. Please try again later.", "error");
+        return;
+      }
+
+      // User must watch the full ad before we log it
+      await window.show_11113056();
+
+      // Step 2 — Only after ad completes, log it to the backend
       const res = await fetch("/api/ads/reward", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-user-id": userId },
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": userId,
+        },
         body: JSON.stringify({ ad_type: "bonus" }),
       });
+
       const data = await res.json();
+
       if (data.success) {
-        setBonusWatched((prev) => prev + 1);
-        if (bonusWatched + 1 >= BONUS_ADS_REQUIRED) {
-          showToast("3 bonus ads watched! Claim your streak reward.", "success");
+        const next = bonusWatched + 1;
+        setBonusWatched(next);
+        if (next >= BONUS_ADS_REQUIRED) {
+          showToast("3 bonus ads watched! Claim your streak reward. 🔥", "success");
         } else {
-          showToast(`Bonus ad ${bonusWatched + 1}/${BONUS_ADS_REQUIRED} watched`, "info");
+          showToast(`Bonus ad ${next}/${BONUS_ADS_REQUIRED} watched`, "info");
         }
       } else {
-        showToast(data.error ?? "Failed", "error");
+        showToast(data.error ?? "Failed to log bonus ad", "error");
       }
-    } catch {
-      showToast("Connection error", "error");
+    } catch (err) {
+      console.error("Bonus ad error:", err);
+      showToast("Ad closed or failed. Please try again.", "error");
     } finally {
       setWatchingBonus(false);
     }
@@ -72,10 +97,15 @@ export default function StreakSection({ streak, todayReward, onClaimed }: Streak
     try {
       const res = await fetch("/api/ads/streak", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-user-id": userId },
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": userId,
+        },
         body: JSON.stringify({ bonus_ads_watched: bonusWatched }),
       });
+
       const data = await res.json();
+
       if (data.success) {
         showToast(`Streak Day ${currentDay} claimed! +${todayReward} Coins 🔥`, "success");
         setBonusWatched(0);
@@ -117,7 +147,9 @@ export default function StreakSection({ streak, todayReward, onClaimed }: Streak
               i < currentDay - 1
                 ? "bg-[#F59E0B]"
                 : i === currentDay - 1
-                ? alreadyClaimed ? "bg-[#10B981]" : "bg-[#F59E0B] animate-pulse"
+                ? alreadyClaimed
+                  ? "bg-[#10B981]"
+                  : "bg-[#F59E0B] animate-pulse"
                 : "bg-[var(--border)]"
             }`}
           />
