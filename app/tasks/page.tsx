@@ -24,40 +24,72 @@ interface TaskItem {
 }
 
 const TYPE_ICON: Record<string, string> = {
-  channel_join: "📢", group_join: "👥", ad_task: "📺", custom: "⭐",
+  channel_join: "📢",
+  group_join: "👥",
+  ad_task: "📺",
+  custom: "⭐",
 };
 
 export default function TasksPage() {
   const { userId } = useApp();
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [starting, setStarting] = useState<string | null>(null);
   const [verifying, setVerifying] = useState<string | null>(null);
+
   const loadTasks = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/tasks", { headers: { "x-user-id": userId } });
+      const res = await fetch("/api/tasks", {
+        headers: { "x-user-id": userId },
+      });
       const data = await res.json();
-      console.log("TASKS PAGE DATA:", JSON.stringify(data));
       if (data.success) setTasks(data.data ?? []);
-      
-    } catch { /* silent */ }
-    finally { setLoading(false); }
+    } catch {
+      /* silent */
+    } finally {
+      setLoading(false);
+    }
   }, [userId]);
 
-  useEffect(() => { loadTasks(); }, [loadTasks]);
+  useEffect(() => {
+    loadTasks();
+  }, [loadTasks]);
 
   const handleStart = async (task: TaskItem) => {
     if (!userId) return;
+    setStarting(task.id);
     try {
-      await fetch("/api/tasks/claim", {
+      const res = await fetch("/api/tasks/claim", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-user-id": userId },
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": userId,
+        },
         body: JSON.stringify({ task_id: task.id }),
       });
-      if (task.target_link) window.open(task.target_link, "_blank");
+
+      // ✅ FIX: Always parse and check the response.
+      // Previously errors were swallowed silently, so the task never
+      // updated to in_progress and the Verify button never appeared.
+      const data = await res.json();
+      if (!data.success) {
+        showToast(data.error ?? "Failed to start task", "error");
+        return;
+      }
+
+      // Open the target link only after a successful claim
+      const targetLink = data.data?.target_link ?? task.target_link;
+      if (targetLink) window.open(targetLink, "_blank");
+
+      // Reload so the Verify button appears
       await loadTasks();
-    } catch { showToast("Failed to start task", "error"); }
+    } catch {
+      showToast("Connection error", "error");
+    } finally {
+      setStarting(null);
+    }
   };
 
   const handleVerify = async (task: TaskItem) => {
@@ -66,7 +98,10 @@ export default function TasksPage() {
     try {
       const res = await fetch("/api/tasks/verify", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-user-id": userId },
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": userId,
+        },
         body: JSON.stringify({ task_id: task.id }),
       });
       const data = await res.json();
@@ -76,20 +111,33 @@ export default function TasksPage() {
       } else {
         showToast(data.error ?? "Verification failed", "error");
       }
-    } catch { showToast("Connection error", "error"); }
-    finally { setVerifying(null); }
+    } catch {
+      showToast("Connection error", "error");
+    } finally {
+      setVerifying(null);
+    }
   };
 
-  const available = tasks.filter((t) => !t.user_task || t.user_task.status === "in_progress");
-  const completed = tasks.filter((t) => t.user_task?.status === "completed");
+  const available = tasks.filter(
+    (t) => !t.user_task || t.user_task.status === "in_progress"
+  );
+  const completed = tasks.filter(
+    (t) => t.user_task?.status === "completed"
+  );
 
   return (
     <AppShell>
-      <PageHeader title="Tasks" right={
-        <button onClick={loadTasks} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
-          <RefreshCw size={16} />
-        </button>
-      } />
+      <PageHeader
+        title="Tasks"
+        right={
+          <button
+            onClick={loadTasks}
+            className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+          >
+            <RefreshCw size={16} />
+          </button>
+        }
+      />
 
       <div className="px-4 py-4 space-y-6 pb-6">
         {loading ? (
@@ -102,7 +150,11 @@ export default function TasksPage() {
                 Available ({available.length})
               </h2>
               {available.length === 0 ? (
-                <EmptyState emoji="🎯" title="All tasks completed!" description="Check back later for new tasks." />
+                <EmptyState
+                  emoji="🎯"
+                  title="All tasks completed!"
+                  description="Check back later for new tasks."
+                />
               ) : (
                 <div className="space-y-3">
                   {available.map((task, i) => (
@@ -114,26 +166,52 @@ export default function TasksPage() {
                       className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-4"
                     >
                       <div className="flex items-start gap-3">
-                        <span className="text-2xl">{TYPE_ICON[task.type] ?? "⭐"}</span>
+                        <span className="text-2xl">
+                          {TYPE_ICON[task.type] ?? "⭐"}
+                        </span>
                         <div className="flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-bold text-[var(--text-primary)]">{task.title}</span>
-                            <Badge variant="purple" size="sm">+{task.reward_coins} 🪙</Badge>
+                            <span className="text-sm font-bold text-[var(--text-primary)]">
+                              {task.title}
+                            </span>
+                            <Badge variant="purple" size="sm">
+                              +{task.reward_coins} 🪙
+                            </Badge>
                           </div>
                           {task.description && (
-                            <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">{task.description}</p>
+                            <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
+                              {task.description}
+                            </p>
                           )}
                         </div>
                       </div>
+
                       <div className="flex gap-2 mt-3">
-                        {(!task.user_task || task.user_task.status !== "in_progress") ? (
-                          <Button variant="primary" size="sm" className="flex-1 gap-1.5" onClick={() => handleStart(task)}>
+                        {!task.user_task ||
+                        task.user_task.status !== "in_progress" ? (
+                          // ✅ FIX: Show loading state on Start button so users
+                          // know the request is in flight (previously no feedback
+                          // was given and errors were swallowed silently).
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            className="flex-1 gap-1.5"
+                            loading={starting === task.id}
+                            onClick={() => handleStart(task)}
+                          >
                             <ExternalLink size={12} /> Start
                           </Button>
                         ) : (
                           <>
                             {task.target_link && (
-                              <Button variant="secondary" size="sm" className="flex-1 gap-1.5" onClick={() => window.open(task.target_link!, "_blank")}>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="flex-1 gap-1.5"
+                                onClick={() =>
+                                  window.open(task.target_link!, "_blank")
+                                }
+                              >
                                 <ExternalLink size={12} /> Open
                               </Button>
                             )}
@@ -163,10 +241,19 @@ export default function TasksPage() {
                 </h2>
                 <div className="space-y-2">
                   {completed.map((task) => (
-                    <div key={task.id} className="flex items-center gap-3 p-3 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl opacity-60">
-                      <span className="text-xl">{TYPE_ICON[task.type] ?? "⭐"}</span>
-                      <span className="flex-1 text-sm font-medium text-[var(--text-secondary)]">{task.title}</span>
-                      <Badge variant="success" size="sm">Done</Badge>
+                    <div
+                      key={task.id}
+                      className="flex items-center gap-3 p-3 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl opacity-60"
+                    >
+                      <span className="text-xl">
+                        {TYPE_ICON[task.type] ?? "⭐"}
+                      </span>
+                      <span className="flex-1 text-sm font-medium text-[var(--text-secondary)]">
+                        {task.title}
+                      </span>
+                      <Badge variant="success" size="sm">
+                        Done
+                      </Badge>
                     </div>
                   ))}
                 </div>
