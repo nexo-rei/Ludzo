@@ -36,11 +36,19 @@ export async function POST(req: NextRequest) {
     }
 
     if (!existing) {
-      await supabase.from("user_tasks").insert({
-        user_id: user.id,
-        task_id: taskId,
-        status: "in_progress",
-      });
+  const { error: insertError } = await supabase
+    .from("user_tasks")
+    .insert({
+      user_id: user.id,
+      task_id: taskId,
+      status: "in_progress",
+    });
+
+  console.log("USER_TASK_INSERT_ERROR:", JSON.stringify(insertError));
+
+  if (insertError) {
+    throw insertError;
+  }
     }
 
     return NextResponse.json({ success: true, data: { task_id: taskId, target_link: task.target_link } });
