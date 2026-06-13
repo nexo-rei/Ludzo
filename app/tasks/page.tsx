@@ -38,6 +38,7 @@ export default function TasksPage() {
     try {
       const res = await fetch("/api/tasks", { headers: { "x-user-id": userId } });
       const data = await res.json();
+      console.log("TASKS PAGE DATA:", JSON.stringify(data));
       if (data.success) setTasks(data.data ?? []);
       
     } catch { /* silent */ }
@@ -45,7 +46,6 @@ export default function TasksPage() {
   }, [userId]);
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
-  console.log("TASKS PAGE DATA:", JSON.stringify(data));
 
   const handleStart = async (task: TaskItem) => {
     if (!userId) return;
