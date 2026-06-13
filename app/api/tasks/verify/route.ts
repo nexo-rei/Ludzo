@@ -91,9 +91,17 @@ export async function POST(req: NextRequest) {
                 { status: 400 }
               );
             }
-          } catch {
-            // If bot check fails, allow completion (graceful degradation)
-          }
+          } catch (err) {
+  console.error("TELEGRAM VERIFY ERROR:", err);
+
+  return NextResponse.json(
+    {
+      success: false,
+      error: "Unable to verify channel membership"
+    },
+    { status: 400 }
+  );
+  }
         }
       }
     }
