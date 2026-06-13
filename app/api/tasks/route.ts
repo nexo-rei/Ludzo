@@ -38,6 +38,9 @@ console.log("AUTH USER ID:", auth.userId);
       user_task: userTaskMap.get(task.id) ?? null,
     }));
 
+    console.log("TASKS COUNT:", tasks?.length);
+    console.log("TASKS RESULT:", JSON.stringify(result));
+
     return NextResponse.json({ success: true, data: result });
   } catch (err) {
     console.error("[tasks]", err);
