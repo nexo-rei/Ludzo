@@ -1,5 +1,7 @@
 "use client";
 
+import { type ReactElement } from "react";
+
 import { motion } from "framer-motion";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
@@ -20,7 +22,7 @@ const RANK_COLORS: Record<number, { ring: string; bg: string; text: string }> = 
   3: { ring: "rgba(180,83,9,0.6)", bg: "rgba(180,83,9,0.1)", text: "#D97706" },
 };
 
-const RANK_ICONS: Record<number, JSX.Element> = {
+const RANK_ICONS: Record<number, ReactElement> = {
   1: <svg width="16" height="16" viewBox="0 0 24 24" fill="#F59E0B" stroke="none"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z"/></svg>,
   2: <svg width="16" height="16" viewBox="0 0 24 24" fill="#94A3B8" stroke="none"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z"/></svg>,
   3: <svg width="16" height="16" viewBox="0 0 24 24" fill="#D97706" stroke="none"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z"/></svg>,
