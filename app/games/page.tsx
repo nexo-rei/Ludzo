@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactElement } from "react";
 import { motion } from "framer-motion";
 import { Bell } from "lucide-react";
 import AppShell from "@/components/layout/AppShell";
@@ -9,8 +9,6 @@ import Badge from "@/components/ui/Badge";
 import { showToast } from "@/components/ui/Toast";
 import Button from "@/components/ui/Button";
 
-import { ReactNode } from "react";
-
 interface GameCard {
   id: string;
   title: string;
@@ -18,7 +16,7 @@ interface GameCard {
   available: boolean;
   color: string;
   bg: string;
-  icon: ReactNode;
+  icon: ReactElement;
 }
 
 const GAMES: GameCard[] = [
