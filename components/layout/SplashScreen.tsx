@@ -10,13 +10,26 @@ interface SplashScreenProps {
 
 export default function SplashScreen({ onDone }: SplashScreenProps) {
   const [visible, setVisible] = useState(true);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
+    // Animate progress bar
+    const progressInterval = setInterval(() => {
+      setProgress((p) => {
+        if (p >= 100) { clearInterval(progressInterval); return 100; }
+        return p + 2;
+      });
+    }, 48);
+
     const timer = setTimeout(() => {
       setVisible(false);
-      setTimeout(onDone, 500); // allow exit animation to complete
-    }, 3000);
-    return () => clearTimeout(timer);
+      setTimeout(onDone, 500);
+    }, 3200);
+
+    return () => {
+      clearTimeout(timer);
+      clearInterval(progressInterval);
+    };
   }, [onDone]);
 
   return (
@@ -24,35 +37,77 @@ export default function SplashScreen({ onDone }: SplashScreenProps) {
       {visible && (
         <motion.div
           key="splash"
-          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black"
+          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden"
+          style={{ background: "#0F172A" }}
           initial={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.5 }}
+          exit={{ opacity: 0, scale: 0.98 }}
+          transition={{ duration: 0.5, ease: "easeInOut" }}
         >
-          {/* Glow blob */}
+          {/* Background radial glow */}
           <motion.div
-            className="absolute w-80 h-80 rounded-full"
+            className="absolute inset-0 pointer-events-none"
             style={{
-              background: "radial-gradient(circle, rgba(124,58,237,0.35) 0%, transparent 70%)",
+              background:
+                "radial-gradient(ellipse 60% 50% at 50% 50%, rgba(124,58,237,0.18) 0%, transparent 70%)",
             }}
-            animate={{ scale: [1, 1.15, 1], opacity: [0.6, 1, 0.6] }}
+            animate={{ opacity: [0.6, 1, 0.6] }}
             transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+          />
+
+          {/* Decorative grid lines */}
+          <div
+            className="absolute inset-0 pointer-events-none opacity-5"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(124,58,237,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(124,58,237,0.4) 1px, transparent 1px)",
+              backgroundSize: "48px 48px",
+            }}
+          />
+
+          {/* Diamond spinner ring */}
+          <motion.div
+            className="absolute"
+            style={{
+              width: 180,
+              height: 180,
+              border: "1px solid rgba(124,58,237,0.25)",
+              clipPath: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)",
+            }}
+            animate={{ rotate: 360 }}
+            transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+          />
+          <motion.div
+            className="absolute"
+            style={{
+              width: 140,
+              height: 140,
+              border: "1px solid rgba(168,85,247,0.15)",
+              clipPath: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)",
+            }}
+            animate={{ rotate: -360 }}
+            transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
           />
 
           {/* Logo + title */}
           <motion.div
-            className="relative flex flex-col items-center gap-5"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
+            className="relative flex flex-col items-center gap-6 z-10"
+            initial={{ opacity: 0, scale: 0.85, y: 16 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: [0.34, 1.2, 0.64, 1] }}
           >
-            {/* Logo ring glow */}
+            {/* Logo with glow */}
             <motion.div
               className="relative"
-              animate={{ filter: ["drop-shadow(0 0 12px #7C3AED)", "drop-shadow(0 0 28px #A855F7)", "drop-shadow(0 0 12px #7C3AED)"] }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              animate={{
+                filter: [
+                  "drop-shadow(0 0 12px rgba(124,58,237,0.5))",
+                  "drop-shadow(0 0 32px rgba(168,85,247,0.7))",
+                  "drop-shadow(0 0 12px rgba(124,58,237,0.5))",
+                ],
+              }}
+              transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
             >
-              <LudzoLogo size={80} />
+              <LudzoLogo size={88} />
             </motion.div>
 
             {/* App name */}
@@ -60,37 +115,46 @@ export default function SplashScreen({ onDone }: SplashScreenProps) {
               className="text-center"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35, duration: 0.5 }}
+              transition={{ delay: 0.4, duration: 0.5 }}
             >
-              <h1 className="text-5xl font-black tracking-widest text-white">
+              <h1
+                className="text-5xl font-black tracking-[0.2em] text-white"
+                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              >
                 LUDZO
               </h1>
               <motion.p
-                className="mt-2 text-sm font-semibold tracking-[0.3em] text-[#A855F7] uppercase"
+                className="mt-2 text-xs font-semibold tracking-[0.35em] uppercase"
+                style={{ color: "#A855F7" }}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.65, duration: 0.5 }}
+                transition={{ delay: 0.75, duration: 0.5 }}
               >
-                Earn • Play • Win
+                Earn · Play · Win
               </motion.p>
             </motion.div>
           </motion.div>
 
-          {/* Loading dots */}
+          {/* Progress bar */}
           <motion.div
-            className="absolute bottom-16 flex gap-2"
+            className="absolute bottom-16 w-40"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 1, duration: 0.4 }}
+            transition={{ delay: 0.9, duration: 0.4 }}
           >
-            {[0, 1, 2].map((i) => (
+            <div
+              className="w-full h-0.5 rounded-full overflow-hidden"
+              style={{ background: "rgba(124,58,237,0.2)" }}
+            >
               <motion.div
-                key={i}
-                className="w-2 h-2 rounded-full bg-[#7C3AED]"
-                animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.2, 0.8] }}
-                transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2, ease: "easeInOut" }}
+                className="h-full rounded-full"
+                style={{
+                  background: "linear-gradient(90deg, #7C3AED, #A855F7)",
+                  width: `${progress}%`,
+                  transition: "width 0.05s linear",
+                }}
               />
-            ))}
+            </div>
           </motion.div>
         </motion.div>
       )}
