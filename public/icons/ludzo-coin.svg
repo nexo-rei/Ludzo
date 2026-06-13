@@ -1,0 +1,29 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer gold ring -->
+  <circle cx="16" cy="16" r="15" fill="url(#coin-gold-outer)" stroke="url(#coin-gold-stroke)" stroke-width="1" />
+  <!-- Inner gold ring border -->
+  <circle cx="16" cy="16" r="12.5" fill="url(#coin-purple-inner)" />
+  <!-- Highlight ring -->
+  <circle cx="16" cy="16" r="11" fill="none" stroke="rgba(168,85,247,0.3)" stroke-width="0.5" />
+  <!-- Geometric L -->
+  <path d="M11 10V22H21V19H14V10H11Z" fill="white" />
+  <!-- Lightning accent -->
+  <path d="M15 15.5L18 13.5L16.5 16.5L19.5 15.5" stroke="#F59E0B" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- Shine -->
+  <ellipse cx="12" cy="11" rx="2.5" ry="1.5" fill="rgba(255,255,255,0.2)" transform="rotate(-30 12 11)" />
+  <defs>
+    <linearGradient id="coin-gold-outer" x1="1" y1="1" x2="31" y2="31" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FCD34D" />
+      <stop offset="50%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+    <linearGradient id="coin-gold-stroke" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FDE68A" />
+      <stop offset="100%" stop-color="#B45309" />
+    </linearGradient>
+    <linearGradient id="coin-purple-inner" x1="3.5" y1="3.5" x2="28.5" y2="28.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#A855F7" />
+      <stop offset="100%" stop-color="#7C3AED" />
+    </linearGradient>
+  </defs>
+</svg>
