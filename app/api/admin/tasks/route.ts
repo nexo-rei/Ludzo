@@ -40,18 +40,28 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const supabase = createAdminClient();
-    const { data, error } = await supabase.from("tasks").insert({
-      title: body.title,
-      description: body.description ?? null,
-      type: body.type,
-      reward_coins: Number(body.reward_coins),
-      target_link: body.target_link ?? null,
-      target_id: body.target_id ?? null,
-      is_active: body.is_active ?? true,
-      sort_order: body.sort_order ?? 0,
-    }).select("id").single();
+    const { data, error } = await supabase
+  .from("tasks")
+  .insert({
+    title: body.title,
+    description: body.description ?? null,
+    type: body.type,
+    reward_coins: Number(body.reward_coins),
+    target_link: body.target_link ?? null,
+    target_id: body.target_id ?? null,
+    is_active: body.is_active ?? true,
+    sort_order: body.sort_order ?? 0,
+  })
+  .select("id")
+  .single();
 
-    if (error) throw error;
+if (error) {
+  console.error(
+    "TASK_CREATE_ERROR:",
+    JSON.stringify(error)
+  );
+  throw error;
+}
 
     await supabase.from("admin_logs").insert({
       admin_id: auth.adminId,
