@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ArrowLeft, MoreVertical } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import LudzoLogo from "./LudzoLogo";
 
 interface PageHeaderProps {
   title: string;
@@ -12,6 +13,7 @@ interface PageHeaderProps {
   right?: ReactNode;
   className?: string;
   transparent?: boolean;
+  showLogo?: boolean;
 }
 
 export default function PageHeader({
@@ -21,6 +23,7 @@ export default function PageHeader({
   right,
   className,
   transparent = false,
+  showLogo = false,
 }: PageHeaderProps) {
   const router = useRouter();
 
@@ -33,23 +36,36 @@ export default function PageHeader({
     <header
       className={cn(
         "sticky top-0 z-40 flex items-center h-14 px-4",
-        !transparent && "bg-[var(--bg)]/95 backdrop-blur-md border-b border-[var(--border)]",
+        !transparent &&
+          "border-b",
         className
       )}
+      style={
+        !transparent
+          ? {
+              background: "rgba(15,23,42,0.96)",
+              backdropFilter: "blur(24px)",
+              WebkitBackdropFilter: "blur(24px)",
+              borderBottomColor: "rgba(124,58,237,0.12)",
+            }
+          : undefined
+      }
     >
       {back ? (
         <button
           onClick={handleBack}
           className="flex items-center justify-center w-8 h-8 -ml-1 rounded-lg
                      text-[var(--text-secondary)] hover:text-[var(--text-primary)]
-                     hover:bg-[var(--border)] transition-colors"
+                     hover:bg-[rgba(124,58,237,0.1)] transition-all duration-150"
         >
-          <ArrowLeft size={20} />
+          <ArrowLeft size={20} strokeWidth={1.5} />
         </button>
+      ) : showLogo ? (
+        <LudzoLogo size={30} />
       ) : (
         <div className="w-8" />
       )}
-      <h1 className="flex-1 text-center text-base font-bold text-[var(--text-primary)] tracking-tight">
+      <h1 className="flex-1 text-center text-[15px] font-bold text-[var(--text-primary)] tracking-tight">
         {title}
       </h1>
       <div className="w-8 flex justify-end">
