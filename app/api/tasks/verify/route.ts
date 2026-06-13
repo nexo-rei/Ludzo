@@ -5,22 +5,54 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // Verify task completion and award reward
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
-  if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: 401 });
+  if (!auth.ok)
+    return NextResponse.json(
+      { success: false, error: auth.error },
+      { status: 401 }
+    );
 
   try {
     const body = await req.json();
     const taskId = body.task_id as string;
-    if (!taskId) return NextResponse.json({ success: false, error: "task_id required" }, { status: 400 });
+    if (!taskId)
+      return NextResponse.json(
+        { success: false, error: "task_id required" },
+        { status: 400 }
+      );
 
     const supabase = createAdminClient();
+
+    // ✅ FIX: Look up user by `id` (UUID), not `telegram_id`.
+    // Also fetch `telegram_id` so we can use it for the Telegram Bot API check below.
     const { data: user } = await supabase
-      .from("users").select("id, status").eq("telegram_id", auth.userId!).maybeSingle();
-    if (!user) return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
-    if (user.status === "suspended") return NextResponse.json({ success: false, error: "Account suspended" }, { status: 403 });
+      .from("users")
+      .select("id, status, telegram_id")
+      .eq("id", auth.userId!)
+      .maybeSingle();
+
+    if (!user)
+      return NextResponse.json(
+        { success: false, error: "User not found" },
+        { status: 404 }
+      );
+    if (user.status === "suspended")
+      return NextResponse.json(
+        { success: false, error: "Account suspended" },
+        { status: 403 }
+      );
 
     const { data: task } = await supabase
-      .from("tasks").select("*").eq("id", taskId).eq("is_active", true).maybeSingle();
-    if (!task) return NextResponse.json({ success: false, error: "Task not found" }, { status: 404 });
+      .from("tasks")
+      .select("*")
+      .eq("id", taskId)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (!task)
+      return NextResponse.json(
+        { success: false, error: "Task not found" },
+        { status: 404 }
+      );
 
     const { data: userTask } = await supabase
       .from("user_tasks")
@@ -30,23 +62,34 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (userTask?.status === "completed") {
-      return NextResponse.json({ success: false, error: "Task already completed" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "Task already completed" },
+        { status: 400 }
+      );
     }
 
-    // For channel/group tasks, verify via Telegram Bot API
+    // For channel/group tasks, verify membership via Telegram Bot API.
+    // ✅ FIX: Use user.telegram_id (the actual Telegram numeric ID),
+    // not auth.userId (which is a UUID).
     if (task.type === "channel_join" || task.type === "group_join") {
-      if (task.target_id) {
+      if (task.target_id && user.telegram_id) {
         const botToken = process.env.TELEGRAM_BOT_TOKEN;
         if (botToken) {
           try {
             const checkRes = await fetch(
-              `https://api.telegram.org/bot${botToken}/getChatMember?chat_id=${task.target_id}&user_id=${auth.userId}`
+              `https://api.telegram.org/bot${botToken}/getChatMember?chat_id=${task.target_id}&user_id=${user.telegram_id}`
             );
             const checkData = await checkRes.json();
             const memberStatus = checkData?.result?.status;
             const validStatuses = ["member", "administrator", "creator"];
             if (!validStatuses.includes(memberStatus)) {
-              return NextResponse.json({ success: false, error: "Please join the channel/group first" }, { status: 400 });
+              return NextResponse.json(
+                {
+                  success: false,
+                  error: "Please join the channel/group first",
+                },
+                { status: 400 }
+              );
             }
           } catch {
             // If bot check fails, allow completion (graceful degradation)
@@ -83,6 +126,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error("[tasks/verify]", err);
-    return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: "Server error" },
+      { status: 500 }
+    );
   }
 }
