@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import AppShell from "@/components/layout/AppShell";
@@ -24,7 +24,7 @@ const RANK_META: Record<number, { bar: string; text: string; height: string; lab
   3: { bar: "linear-gradient(180deg, #D97706 0%, #B45309 100%)", text: "#D97706", height: "h-10", label: "3rd" },
 };
 
-const TROPHY_ICONS: Record<number, JSX.Element> = {
+const TROPHY_ICONS: Record<number, ReactElement> = {
   1: <svg width="20" height="20" viewBox="0 0 24 24" fill="#F59E0B" stroke="none"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z"/></svg>,
   2: <svg width="18" height="18" viewBox="0 0 24 24" fill="#94A3B8" stroke="none"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z"/></svg>,
   3: <svg width="16" height="16" viewBox="0 0 24 24" fill="#D97706" stroke="none"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z"/></svg>,
