@@ -17,6 +17,8 @@ export async function GET(req: NextRequest) {
       .select("coin_balance, usdt_balance, updated_at")
       .eq("user_id", user.id)
       .maybeSingle();
+    
+    console.log("WALLET RESPONSE:", JSON.stringify(wallet));
 
     return NextResponse.json({
       success: true,
