@@ -32,7 +32,6 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState<string | null>(null);
-
   const loadTasks = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
@@ -40,11 +39,13 @@ export default function TasksPage() {
       const res = await fetch("/api/tasks", { headers: { "x-user-id": userId } });
       const data = await res.json();
       if (data.success) setTasks(data.data ?? []);
+      
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, [userId]);
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
+  console.log("TASKS PAGE DATA:", JSON.stringify(data));
 
   const handleStart = async (task: TaskItem) => {
     if (!userId) return;
