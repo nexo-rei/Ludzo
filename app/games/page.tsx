@@ -9,14 +9,14 @@ import Badge from "@/components/ui/Badge";
 import { showToast } from "@/components/ui/Toast";
 import Button from "@/components/ui/Button";
 
+import { ReactNode } from "react";
+
 interface GameCard {
-  id: string;
   title: string;
   description: string;
-  available: boolean;
   color: string;
   bg: string;
-  icon: JSX.Element;
+  icon: ReactNode;
 }
 
 const GAMES: GameCard[] = [
