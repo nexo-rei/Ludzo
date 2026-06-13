@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // is a UUID (the user's row id), not a telegram_id numeric string.
 // Every route that previously used telegram_id for user lookup has been
 // corrected to use .eq("id", auth.userId!).
+//rebuild
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth(req);
