@@ -42,10 +42,13 @@ export async function POST(req: NextRequest) {
     const supabase = createAdminClient();
     const { data, error } = await supabase
       .from("announcements")
-      .insert({ title: body.title, description: body.description ?? body.content, priority: body.priority ?? "low", is_active: body.is_active ?? true, created_by: auth.adminId })
+      .insert({ title: body.title, description: body.description ?? body.content, priority: body.priority ?? "low", is_active: body.is_active ?? true })
       .select("id").single();
 
-    if (error) throw error;
+    if (error) {
+  console.error("ANNOUNCEMENT ERROR:", error);
+  throw error;
+    }
 
     await supabase.from("admin_logs").insert({
       admin_id: auth.adminId,
