@@ -12,6 +12,12 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = createAdminClient();
+    const { data: allAdmins, error } = await supabase
+      .from("admin_users")
+      .select("username");
+
+console.log("ALL_ADMINS:", JSON.stringify(allAdmins));
+console.log("ADMIN_ERROR:", JSON.stringify(error));
     const { data: admin } = await supabase
       .from("admin_users")
       .select("id, username, password_hash, role, is_active")
