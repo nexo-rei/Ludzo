@@ -188,7 +188,7 @@ export interface LeaderboardEntry {
   first_name: string;
   photo_url?: string;
   country?: string;
-  total_usdt_earned: number;
+  usdt_earned: number; // renamed from total_usdt_earned to match get_leaderboard() SQL output
 }
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
