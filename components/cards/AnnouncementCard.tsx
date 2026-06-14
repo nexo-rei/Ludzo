@@ -23,7 +23,7 @@ export default function AnnouncementCard({ announcement, index = 0 }: Announceme
   const borderColor =
     announcement.priority === "high" ? "rgba(239,68,68,0.2)"
     : announcement.priority === "medium" ? "rgba(245,158,11,0.2)"
-    : "rgba(255,255,255,0.06)";
+    : "var(--bg-elevated)";
 
   return (
     <motion.div
