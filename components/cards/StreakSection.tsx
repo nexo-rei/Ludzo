@@ -113,7 +113,7 @@ export default function StreakSection({ streak, todayReward, onClaimed }: Streak
       style={{
         background: "var(--card-bg)",
         border: "1px solid rgba(245,158,11,0.15)",
-        boxShadow: "0 2px 16px rgba(0,0,0,0.2)",
+        boxShadow: "0 2px 16px rgba(0,0,0,0.06)",
       }}
     >
       {/* Header */}
@@ -158,7 +158,7 @@ export default function StreakSection({ streak, todayReward, onClaimed }: Streak
                     ? "#F59E0B"
                     : isCurrent
                     ? alreadyClaimed ? "#10B981" : "#F59E0B"
-                    : "rgba(255,255,255,0.06)",
+                    : "var(--bg-elevated)",
                   boxShadow: (isPast || (isCurrent && alreadyClaimed))
                     ? "0 0 6px rgba(245,158,11,0.4)" : "none",
                   animation: isCurrent && !alreadyClaimed ? "pulse 1.5s ease-in-out infinite" : "none",
