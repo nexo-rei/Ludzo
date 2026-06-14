@@ -133,7 +133,7 @@ export default function ReferPage() {
                 <h3 className="text-sm font-bold text-[var(--text-primary)]">Your Referral Link</h3>
               </div>
               <div className="flex items-center gap-2 rounded-xl px-3 py-2.5 mb-3"
-                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)" }}>
                 <span className="flex-1 text-xs text-[var(--text-muted)] truncate font-mono">
                   {stats?.referral_link ?? "Loading..."}
                 </span>
@@ -154,7 +154,7 @@ export default function ReferPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.15 }}
               className="rounded-2xl p-4"
-              style={{ background: "var(--card-bg)", border: "1px solid rgba(255,255,255,0.05)" }}
+              style={{ background: "var(--card-bg)", border: "1px solid var(--border)" }}
             >
               <h3 className="text-sm font-bold text-[var(--text-primary)] mb-3">How It Works</h3>
               <div className="space-y-2.5">
@@ -194,7 +194,7 @@ export default function ReferPage() {
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.04 }}
                       className="flex items-center gap-3 p-3 rounded-xl"
-                      style={{ background: "var(--card-bg)", border: "1px solid rgba(255,255,255,0.05)" }}
+                      style={{ background: "var(--card-bg)", border: "1px solid var(--border)" }}
                     >
                       <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-black text-white"
                         style={{ background: "linear-gradient(135deg, #7C3AED, #A855F7)" }}>
