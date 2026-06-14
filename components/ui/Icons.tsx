@@ -226,3 +226,96 @@ export function AnnouncementIcon({ size = 20, ...props }: IconProps) {
     </svg>
   );
 }
+
+// ── Legal Center icon set ────────────────────────────────────────────────
+
+export function LegalIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M12 2v20" />
+      <path d="M5 22h14" />
+      <path d="M5 6h14" />
+      <path d="M5 6L2 12a3 3 0 006 0L5 6z" />
+      <path d="M19 6l-3 6a3 3 0 006 0l-3-6z" />
+    </svg>
+  );
+}
+
+export function TermsIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+      <path d="M14 2v6h6" />
+      <path d="M9 13h6M9 17h6M9 9h1" />
+    </svg>
+  );
+}
+
+export function PrivacyShieldIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" />
+      <rect x="9" y="11" width="6" height="5" rx="1" />
+      <path d="M10.5 11V9.5a1.5 1.5 0 013 0V11" />
+    </svg>
+  );
+}
+
+export function ResponsibleGamingIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 10-7.78 7.78l1.06 1.06L12 21l7.78-7.55 1.06-1.06a5.5 5.5 0 000-7.78z" />
+      <path d="M7.5 12h2l1.5-2.5 2 4 1.5-2.5h2" />
+    </svg>
+  );
+}
+
+export function RefundIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M3 10a9 9 0 0115.5-5.5L21 7" />
+      <path d="M21 3v5h-5" />
+      <path d="M21 14a9 9 0 01-15.5 5.5L3 17" />
+      <path d="M3 21v-5h5" />
+    </svg>
+  );
+}
+
+export function AMLShieldIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" />
+      <path d="M9 12l2 2 4-4" />
+    </svg>
+  );
+}
+
+export function FairPlayIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M4 22V4" />
+      <path d="M4 4h13l-2 4 2 4H4" />
+      <path d="M9 6.5l1 1 2-2" />
+    </svg>
+  );
+}
+
+export function SupportDisputesIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <circle cx="12" cy="12" r="10" />
+      <circle cx="12" cy="12" r="4" />
+      <path d="M4.93 4.93l4.24 4.24M14.83 14.83l4.24 4.24M14.83 9.17l4.24-4.24M4.93 19.07l4.24-4.24" />
+    </svg>
+  );
+}
+
+export function FaqIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3" />
+      <path d="M12 17h.01" />
+    </svg>
+  );
+}
