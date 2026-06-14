@@ -172,7 +172,7 @@ export default function HomePage() {
             <EmptyState title="No activity yet" description="Start watching ads to earn Coins!" variant="compact" />
           ) : (
             <div className="rounded-2xl overflow-hidden"
-              style={{ background: "var(--card-bg)", border: "1px solid rgba(255,255,255,0.05)" }}>
+              style={{ background: "var(--card-bg)", border: "1px solid var(--border)" }}>
               {data.recent_activity.map((tx, i) => (
                 <motion.div
                   key={tx.id}
@@ -180,7 +180,7 @@ export default function HomePage() {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.04 }}
                   className="flex items-center gap-3 px-4 py-3"
-                  style={{ borderBottom: i < data.recent_activity.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}
+                  style={{ borderBottom: i < data.recent_activity.length - 1 ? "1px solid var(--border)" : "none" }}
                 >
                   <ActivityIcon type={tx.type} />
                   <div className="flex-1 min-w-0">
