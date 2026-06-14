@@ -5,6 +5,8 @@ import { getSettings } from "@/lib/settings";
 
 // BUG FIXED: User lookup was .eq("telegram_id", auth.userId!) but auth.userId
 // is a UUID. Corrected to .eq("id", auth.userId!).
+//rebuild
+
 
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
