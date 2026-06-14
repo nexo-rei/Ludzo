@@ -124,14 +124,14 @@ export default function ProfilePage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.12 }}
               className="rounded-2xl overflow-hidden"
-              style={{ background: "var(--card-bg)", border: "1px solid rgba(255,255,255,0.05)" }}
+              style={{ background: "var(--card-bg)", border: "1px solid var(--border)" }}
             >
               {MENU_ITEMS.map(({ label, href, color, bg, icon }, i) => (
                 <button
                   key={href}
                   onClick={() => router.push(href)}
                   className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-[rgba(124,58,237,0.06)] transition-colors"
-                  style={{ borderBottom: i < MENU_ITEMS.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}
+                  style={{ borderBottom: i < MENU_ITEMS.length - 1 ? "1px solid var(--border)" : "none" }}
                 >
                   <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
                     style={{ background: bg, border: `1px solid ${color}30` }}>
