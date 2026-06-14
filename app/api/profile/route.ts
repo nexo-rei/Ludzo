@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
 
     // Stats
     //rebuild
+    //rebuild
     const { count: totalTasks } = await supabase
       .from("user_tasks").select("id", { count: "exact", head: true })
       .eq("user_id", user.id).eq("status", "completed");
