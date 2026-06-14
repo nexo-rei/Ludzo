@@ -13,8 +13,9 @@ export async function GET(req: NextRequest) {
     const offset = (page - 1) * limit;
 
     const supabase = createAdminClient();
+    // ✅ FIXED: look up by id (UUID), not telegram_id
     const { data: user } = await supabase
-      .from("users").select("id").eq("telegram_id", auth.userId!).maybeSingle();
+      .from("users").select("id").eq("id", auth.userId!).maybeSingle();
     if (!user) return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
 
     const { data, count, error } = await supabase
