@@ -53,7 +53,7 @@ export default function LeaderboardPreview({ entries }: LeaderboardPreviewProps)
 
       <div className="space-y-2">
         {top3.map((entry, i) => {
-          const colors = RANK_COLORS[entry.rank] ?? { ring: "var(--border)", bg: "var(--bg-elevated)", text: "var(--text-muted)" };
+          const rankColors = RANK_COLORS[entry.rank] ?? { ring: "var(--border)", bg: "var(--bg-elevated)", text: "var(--text-muted)" };
           return (
             <motion.div
               key={entry.user_id}
@@ -67,11 +67,11 @@ export default function LeaderboardPreview({ entries }: LeaderboardPreviewProps)
                 {RANK_ICONS[entry.rank] ?? <span className="text-xs font-bold text-[var(--text-muted)]">#{entry.rank}</span>}
               </div>
               <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center text-xs font-bold"
-                style={{ border: `1.5px solid ${colors.ring}`, background: colors.bg, color: colors.text }}>
+                style={{ border: `1.5px solid ${rankColors.ring}`, background: rankColors.bg, color: rankColors.text }}>
                 {entry.photo_url ? (
                   <Image src={entry.photo_url} alt={entry.first_name} width={32} height={32} className="object-cover" />
                 ) : (
-                  entry.first_name[0]?.toUpperCase()
+                  entry.first_name[0]
                 )}
               </div>
               <div className="flex-1 min-w-0">
@@ -80,8 +80,9 @@ export default function LeaderboardPreview({ entries }: LeaderboardPreviewProps)
                   {entry.username && <span className="text-[var(--text-muted)] font-normal ml-1">@{entry.username}</span>}
                 </div>
               </div>
+              {/* ✅ FIXED: was entry.total_usdt_earned — new SQL returns usdt_earned */}
               <Badge variant={RANK_BADGE[entry.rank] ?? "default"} size="sm">
-                ${formatUSDT(entry.total_usdt_earned)}
+                ${formatUSDT(entry.usdt_earned)}
               </Badge>
             </motion.div>
           );
