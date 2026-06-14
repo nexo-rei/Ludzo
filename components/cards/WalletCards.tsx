@@ -112,7 +112,7 @@ export default function WalletCards({ coinBalance, usdtBalance, coinRate = 100 }
           </Link>
           <Link href="/withdraw"
             className="flex-1 flex items-center justify-center gap-0.5 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
-            style={{ background: "rgba(255,255,255,0.06)", color: "#94A3B8", border: "1px solid rgba(255,255,255,0.08)" }}>
+            style={{ background: "var(--bg-elevated)", color: "var(--text-muted)", border: "1px solid var(--border)" }}>
             <ArrowUpRight size={10} /> Out
           </Link>
         </div>
