@@ -122,7 +122,12 @@ export default function LeaderboardPage() {
     setEntries([]);
     setMyRank(null);
     try {
-      const res  = await fetch(`/api/leaderboard?period=${p}&limit=50`);
+      // Read userId from localStorage — same pattern as useApp.tsx wallet fetch
+      const stored = localStorage.getItem("ludzo_user");
+      const userId = stored ? (JSON.parse(stored) as { id: string }).id : null;
+      const headers: HeadersInit = userId ? { "x-user-id": userId } : {};
+
+      const res  = await fetch(`/api/leaderboard?period=${p}&limit=50`, { headers });
       const json = await res.json();
       if (json.success) {
         setEntries(json.data ?? []);
