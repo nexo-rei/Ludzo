@@ -66,7 +66,7 @@ export default function AdSection({ adsWatchedToday, dailyLimit, adReward, onAdW
       style={{
         background: "var(--card-bg)",
         border: "1px solid rgba(59,130,246,0.15)",
-        boxShadow: "0 2px 16px rgba(0,0,0,0.2)",
+        boxShadow: "0 2px 16px rgba(0,0,0,0.06)",
       }}
     >
       <div className="flex items-center justify-between mb-3">
