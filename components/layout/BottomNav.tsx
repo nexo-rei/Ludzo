@@ -18,16 +18,17 @@ export default function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav
-      className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app z-50 pb-safe"
-      style={{
-        background: "rgba(15,23,42,0.95)",
-        backdropFilter: "blur(24px)",
-        WebkitBackdropFilter: "blur(24px)",
-        borderTop: "1px solid rgba(124,58,237,0.15)",
-      }}
-    >
-      <div className="flex items-stretch justify-around h-16">
+    <nav className="fixed bottom-3 left-1/2 -translate-x-1/2 w-full max-w-app z-50 px-3">
+      <div
+        className="flex items-stretch justify-around h-16 rounded-2xl"
+        style={{
+          background: "rgba(255,255,255,0.95)",
+          backdropFilter: "blur(28px)",
+          WebkitBackdropFilter: "blur(28px)",
+          border: "1px solid rgba(124,58,237,0.12)",
+          boxShadow: "0 4px 32px rgba(124,58,237,0.12), 0 1px 8px rgba(0,0,0,0.06)",
+        }}
+      >
         {NAV_ITEMS.map(({ href, label, Icon }) => {
           const active = pathname === href;
           return (
@@ -35,40 +36,41 @@ export default function BottomNav() {
               key={href}
               href={href}
               className={cn(
-                "relative flex flex-col items-center justify-center gap-1 flex-1 transition-colors duration-150 select-none",
-                active ? "text-[#A855F7]" : "text-[#475569] hover:text-[#64748B]"
+                "relative flex flex-col items-center justify-center gap-0.5 flex-1 transition-all duration-200 select-none rounded-xl mx-1",
+                active ? "text-[#7C3AED]" : "text-[#94A3B8]"
               )}
             >
-              {/* Active top bar */}
+              {/* Active background pill */}
               {active && (
                 <motion.span
-                  layoutId="nav-active-bar"
-                  className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-0.5 rounded-full"
-                  style={{ background: "linear-gradient(90deg, #7C3AED, #A855F7)" }}
+                  layoutId="nav-active-pill"
+                  className="absolute inset-y-2 inset-x-0 rounded-xl"
+                  style={{ background: "rgba(124,58,237,0.08)" }}
                   transition={{ type: "spring", stiffness: 500, damping: 35 }}
                 />
               )}
-              <Icon
-                size={20}
-                strokeWidth={active ? 2 : 1.5}
-                className={active ? "text-[#A855F7]" : "text-[#475569]"}
-              />
-              <span
-                className={cn(
-                  "text-[10px] font-medium tracking-wide",
-                  active ? "font-bold text-[#A855F7]" : "text-[#475569]"
+              <div className="relative z-10">
+                <Icon
+                  size={20}
+                  strokeWidth={active ? 2.2 : 1.6}
+                  style={{ color: active ? "#7C3AED" : "#94A3B8" }}
+                />
+                {/* Active glow under icon */}
+                {active && (
+                  <motion.span
+                    className="absolute -inset-1 rounded-full blur-sm opacity-30 pointer-events-none"
+                    style={{ background: "#7C3AED" }}
+                    animate={{ opacity: [0.2, 0.4, 0.2] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  />
                 )}
+              </div>
+              <span
+                className="relative z-10 text-[9px] font-semibold tracking-wide"
+                style={{ color: active ? "#7C3AED" : "#94A3B8" }}
               >
                 {label}
               </span>
-              {/* Active glow dot */}
-              {active && (
-                <motion.span
-                  layoutId="nav-active-dot"
-                  className="absolute bottom-1.5 w-1 h-1 rounded-full bg-[#7C3AED]"
-                  transition={{ type: "spring", stiffness: 500, damping: 35 }}
-                />
-              )}
             </Link>
           );
         })}
