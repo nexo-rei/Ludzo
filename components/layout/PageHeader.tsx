@@ -43,10 +43,10 @@ export default function PageHeader({
       style={
         !transparent
           ? {
-              background: "rgba(15,23,42,0.96)",
+              background: "rgba(248,250,252,0.92)",
               backdropFilter: "blur(24px)",
               WebkitBackdropFilter: "blur(24px)",
-              borderBottomColor: "rgba(124,58,237,0.12)",
+              borderBottomColor: "rgba(124,58,237,0.1)",
             }
           : undefined
       }
