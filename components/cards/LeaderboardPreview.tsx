@@ -52,7 +52,7 @@ export default function LeaderboardPreview({ entries }: LeaderboardPreviewProps)
 
       <div className="space-y-2">
         {top3.map((entry, i) => {
-          const rankColors = RANK_COLORS[entry.rank] ?? { ring: "rgba(255,255,255,0.1)", bg: "rgba(255,255,255,0.04)", text: "#64748B" };
+          const rankColors = RANK_COLORS[entry.rank] ?? { ring: "var(--border)", bg: "var(--bg-elevated)", text: "var(--text-muted)" };
           return (
             <motion.div
               key={entry.user_id}
@@ -60,7 +60,7 @@ export default function LeaderboardPreview({ entries }: LeaderboardPreviewProps)
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.06 }}
               className="flex items-center gap-3 py-2 border-b last:border-0"
-              style={{ borderColor: "rgba(255,255,255,0.05)" }}
+              style={{ borderColor: "var(--border)" }}
             >
               <div className="w-6 h-6 flex items-center justify-center">
                 {RANK_ICONS[entry.rank] ?? <span className="text-xs font-bold text-[var(--text-muted)]">#{entry.rank}</span>}
