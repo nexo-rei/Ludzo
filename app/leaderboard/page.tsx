@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactElement } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
@@ -18,152 +18,325 @@ interface LeaderboardEntry {
   usdt_earned: number;
 }
 
-const RANK_META: Record<number, { bar: string; text: string; height: string; label: string }> = {
-  1: { bar: "linear-gradient(180deg, #FCD34D 0%, #F59E0B 100%)", text: "#F59E0B", height: "h-20", label: "1st" },
-  2: { bar: "linear-gradient(180deg, #E2E8F0 0%, #94A3B8 100%)", text: "#94A3B8", height: "h-14", label: "2nd" },
-  3: { bar: "linear-gradient(180deg, #D97706 0%, #B45309 100%)", text: "#D97706", height: "h-10", label: "3rd" },
+interface MyRank {
+  rank: number;
+  usdt_earned: number;
+}
+
+// ── Visual config ──────────────────────────────────────────────────────────────
+
+const RANK_META: Record<number, { bar: string; glow: string; text: string; height: string; label: string }> = {
+  1: {
+    bar:    "linear-gradient(180deg, #FCD34D 0%, #F59E0B 100%)",
+    glow:   "rgba(245,158,11,0.35)",
+    text:   "#F59E0B",
+    height: "h-20",
+    label:  "1st",
+  },
+  2: {
+    bar:    "linear-gradient(180deg, #E2E8F0 0%, #94A3B8 100%)",
+    glow:   "rgba(148,163,184,0.25)",
+    text:   "#94A3B8",
+    height: "h-14",
+    label:  "2nd",
+  },
+  3: {
+    bar:    "linear-gradient(180deg, #FDBA74 0%, #D97706 100%)",
+    glow:   "rgba(217,119,6,0.25)",
+    text:   "#D97706",
+    height: "h-10",
+    label:  "3rd",
+  },
 };
 
-const TROPHY_ICONS: Record<number, ReactElement> = {
-  1: <svg width="20" height="20" viewBox="0 0 24 24" fill="#F59E0B" stroke="none"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z"/></svg>,
-  2: <svg width="18" height="18" viewBox="0 0 24 24" fill="#94A3B8" stroke="none"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z"/></svg>,
-  3: <svg width="16" height="16" viewBox="0 0 24 24" fill="#D97706" stroke="none"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z"/></svg>,
+const TROPHY: Record<number, ReactElement> = {
+  1: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="#F59E0B" stroke="none">
+      <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" />
+    </svg>
+  ),
+  2: (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="#94A3B8" stroke="none">
+      <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" />
+    </svg>
+  ),
+  3: (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="#D97706" stroke="none">
+      <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" />
+    </svg>
+  ),
 };
+
+const PERIOD_LABEL: Record<string, string> = {
+  all:   "All Time",
+  month: "Monthly",
+  week:  "Weekly",
+};
+
+// ── Avatar ─────────────────────────────────────────────────────────────────────
+
+function Avatar({
+  entry,
+  size,
+  borderColor,
+}: {
+  entry: LeaderboardEntry;
+  size: number;
+  borderColor: string;
+}) {
+  return entry.photo_url ? (
+    <Image
+      src={entry.photo_url}
+      alt={entry.first_name}
+      width={size}
+      height={size}
+      className="rounded-full object-cover"
+      style={{ border: `2.5px solid ${borderColor}` }}
+    />
+  ) : (
+    <div
+      className="rounded-full flex items-center justify-center font-black text-white"
+      style={{
+        width: size,
+        height: size,
+        background: `linear-gradient(135deg, ${borderColor}90, ${borderColor}40)`,
+        border: `2.5px solid ${borderColor}`,
+        fontSize: size * 0.38,
+      }}
+    >
+      {entry.first_name[0]?.toUpperCase()}
+    </div>
+  );
+}
+
+// ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function LeaderboardPage() {
-  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState("all");
+  const [entries, setEntries]   = useState<LeaderboardEntry[]>([]);
+  const [myRank, setMyRank]     = useState<MyRank | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [period, setPeriod]     = useState("all");
 
   const load = async (p: string) => {
     setLoading(true);
+    setEntries([]);
+    setMyRank(null);
     try {
-      const res = await fetch(`/api/leaderboard?period=${p}&limit=50`);
-      const data = await res.json();
-      if (data.success) setEntries(data.data ?? []);
-    } catch { /* silent */ }
-    finally { setLoading(false); }
+      const res  = await fetch(`/api/leaderboard?period=${p}&limit=50`);
+      const json = await res.json();
+      if (json.success) {
+        setEntries(json.data ?? []);
+        setMyRank(json.my_rank ?? null);
+      }
+    } catch {
+      /* silent */
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(period); }, [period]);
 
-  const top3 = entries.slice(0, 3);
-  const rest = entries.slice(3);
-  const PERIODS = [{ value: "all", label: "All Time" }, { value: "month", label: "Monthly" }, { value: "week", label: "Weekly" }];
+  const top3   = entries.slice(0, 3);
+  const rest   = entries.slice(3);
 
-  // podium order: 2nd, 1st, 3rd
-  const podiumOrder = [top3[1], top3[0], top3[2]].filter(Boolean);
+  // Podium display order: 2nd | 1st | 3rd
+  const podiumOrder = [top3[1], top3[0], top3[2]];
   const podiumRanks = [2, 1, 3];
+
+  const PERIODS = [
+    { value: "all",   label: "All Time" },
+    { value: "month", label: "Monthly"  },
+    { value: "week",  label: "Weekly"   },
+  ];
 
   return (
     <AppShell hideNav>
       <PageHeader title="Leaderboard" back />
-      <div className="px-4 py-4 space-y-4 pb-6">
-        {/* Period tabs */}
-        <div className="flex gap-1 rounded-xl p-1"
-          style={{ background: "var(--card-bg)", border: "1px solid var(--border)" }}>
+
+      <div className="px-4 py-4 space-y-4 pb-24">
+
+        {/* ── Period tabs ── */}
+        <div
+          className="flex gap-1 rounded-xl p-1"
+          style={{ background: "var(--card-bg)", border: "1px solid var(--border)" }}
+        >
           {PERIODS.map((p) => (
             <button
               key={p.value}
               onClick={() => setPeriod(p.value)}
-              className="flex-1 py-2 text-xs font-semibold rounded-lg transition-all duration-150"
-              style={period === p.value
-                ? { background: "linear-gradient(135deg, #7C3AED, #5B21B6)", color: "white", boxShadow: "0 2px 8px rgba(124,58,237,0.3)" }
-                : { color: "#64748B" }}
+              className="flex-1 py-2 text-xs font-semibold rounded-lg transition-all duration-200"
+              style={
+                period === p.value
+                  ? {
+                      background: "linear-gradient(135deg, #7C3AED, #5B21B6)",
+                      color: "white",
+                      boxShadow: "0 2px 10px rgba(124,58,237,0.35)",
+                    }
+                  : { color: "var(--text-muted)" }
+              }
             >
               {p.label}
             </button>
           ))}
         </div>
 
-        {loading ? (
-          <SkeletonList count={10} />
-        ) : entries.length === 0 ? (
-          <EmptyState title="No rankings yet" description="Be the first to earn USDT!" variant="compact" />
-        ) : (
-          <>
-            {/* Podium */}
-            {top3.length === 3 && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-                className="relative rounded-2xl p-6 overflow-hidden"
-                style={{ background: "linear-gradient(180deg, rgba(124,58,237,0.1) 0%, transparent 100%)", border: "1px solid rgba(124,58,237,0.1)" }}
-              >
-                <div className="flex items-end justify-center gap-4">
-                  {podiumOrder.map((entry, i) => {
-                    if (!entry) return null;
-                    const rank = podiumRanks[i];
-                    const meta = RANK_META[rank];
-                    const isFirst = rank === 1;
-                    return (
-                      <motion.div
-                        key={entry.user_id}
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.1 }}
-                        className="flex flex-col items-center gap-1.5"
-                        style={{ width: isFirst ? 88 : 72 }}
-                      >
-                        <div className="flex items-center justify-center">{TROPHY_ICONS[rank]}</div>
-                        <div className="relative">
-                          {entry.photo_url ? (
-                            <Image src={entry.photo_url} alt={entry.first_name} width={isFirst ? 52 : 42} height={isFirst ? 52 : 42}
-                              className="rounded-full" style={{ border: `2.5px solid ${meta.text}`, boxShadow: `0 0 12px ${meta.text}40` }} />
-                          ) : (
-                            <div className={`rounded-full flex items-center justify-center font-black text-white ${isFirst ? "w-13 h-13" : "w-10 h-10"}`}
-                              style={{ width: isFirst ? 52 : 42, height: isFirst ? 52 : 42, background: `linear-gradient(135deg, ${meta.text}90, ${meta.text}50)`, border: `2px solid ${meta.text}` }}>
-                              {entry.first_name[0]}
-                            </div>
+        <AnimatePresence mode="wait">
+          {loading ? (
+            <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <SkeletonList count={10} />
+            </motion.div>
+          ) : entries.length === 0 ? (
+            <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <EmptyState
+                title={`No ${PERIOD_LABEL[period]} rankings yet`}
+                description={
+                  period === "all"
+                    ? "Users with USDT balance will appear here."
+                    : "Earn USDT this period to appear on the board!"
+                }
+                variant="compact"
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key={period}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-4"
+            >
+
+              {/* ── Podium ── */}
+              {top3.length >= 2 && (
+                <div
+                  className="relative rounded-2xl px-4 pt-5 pb-0 overflow-hidden"
+                  style={{
+                    background: "linear-gradient(180deg, rgba(124,58,237,0.1) 0%, transparent 100%)",
+                    border: "1px solid rgba(124,58,237,0.12)",
+                  }}
+                >
+                  <div className="flex items-end justify-center gap-3">
+                    {podiumOrder.map((entry, i) => {
+                      if (!entry) return <div key={i} style={{ width: 72 }} />;
+                      const rank = podiumRanks[i];
+                      const meta = RANK_META[rank];
+                      const isFirst = rank === 1;
+                      const avatarSize = isFirst ? 56 : 44;
+
+                      return (
+                        <motion.div
+                          key={entry.user_id}
+                          initial={{ opacity: 0, y: 16 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: i * 0.08, type: "spring", stiffness: 200 }}
+                          className="flex flex-col items-center gap-1"
+                          style={{ width: isFirst ? 90 : 72 }}
+                        >
+                          {/* Trophy */}
+                          <div className="flex items-center justify-center mb-0.5">
+                            {TROPHY[rank]}
+                          </div>
+
+                          {/* Avatar with glow */}
+                          <div
+                            className="rounded-full"
+                            style={{ boxShadow: `0 0 16px ${meta.glow}` }}
+                          >
+                            <Avatar entry={entry} size={avatarSize} borderColor={meta.text} />
+                          </div>
+
+                          {/* Name */}
+                          <div
+                            className="text-xs font-bold text-white text-center truncate mt-1"
+                            style={{ maxWidth: isFirst ? 84 : 68 }}
+                          >
+                            {entry.first_name}
+                          </div>
+
+                          {/* Amount */}
+                          <div
+                            className="text-[11px] font-black font-numeric text-center"
+                            style={{ color: meta.text }}
+                          >
+                            ${formatUSDT(entry.usdt_earned)}
+                          </div>
+
+                          {/* Podium bar */}
+                          <div
+                            className={`w-full ${meta.height} rounded-t-lg mt-1`}
+                            style={{ background: meta.bar }}
+                          />
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Ranks 4–N ── */}
+              {rest.length > 0 && (
+                <div className="space-y-2">
+                  {rest.map((entry, i) => (
+                    <motion.div
+                      key={entry.user_id}
+                      initial={{ opacity: 0, x: -6 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.025 }}
+                      className="flex items-center gap-3 p-3 rounded-xl"
+                      style={{ background: "var(--card-bg)", border: "1px solid var(--border)" }}
+                    >
+                      <span className="w-7 text-center text-xs font-bold text-[#475569]">
+                        #{entry.rank}
+                      </span>
+
+                      <Avatar entry={entry} size={36} borderColor="var(--border)" />
+
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-semibold text-[var(--text-primary)] truncate">
+                          {entry.first_name}
+                          {entry.username && (
+                            <span className="text-[var(--text-muted)] font-normal ml-1">
+                              @{entry.username}
+                            </span>
                           )}
                         </div>
-                        <div className="text-center">
-                          <div className="text-xs font-bold text-white truncate" style={{ maxWidth: isFirst ? 80 : 64 }}>{entry.first_name}</div>
-                          <div className="text-[10px] font-black font-numeric" style={{ color: meta.text }}>${formatUSDT(entry.usdt_earned)}</div>
-                        </div>
-                        <div className={`w-full ${meta.height} rounded-t-lg`} style={{ background: meta.bar }} />
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            )}
+                      </div>
 
-            {/* Rest of rankings */}
-            {rest.length > 0 && (
-              <div className="space-y-2">
-                {rest.map((entry, i) => (
-                  <motion.div
-                    key={entry.user_id}
-                    initial={{ opacity: 0, x: -4 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.03 }}
-                    className="flex items-center gap-3 p-3 rounded-xl"
-                    style={{ background: "var(--card-bg)", border: "1px solid var(--border)" }}
-                  >
-                    <span className="w-7 text-center text-xs font-bold text-[#475569]">#{entry.rank}</span>
-                    {entry.photo_url ? (
-                      <Image src={entry.photo_url} alt={entry.first_name} width={36} height={36} className="rounded-full" />
-                    ) : (
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-black text-white"
-                        style={{ background: "linear-gradient(135deg, rgba(124,58,237,0.4), rgba(168,85,247,0.3))" }}>
-                        {entry.first_name[0]}
+                      <div className="text-xs font-black font-numeric text-[#10B981]">
+                        ${formatUSDT(entry.usdt_earned)}
                       </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-semibold text-[var(--text-primary)] truncate">
-                        {entry.first_name}
-                        {entry.username && <span className="text-[#475569] font-normal ml-1">@{entry.username}</span>}
-                      </div>
-                    </div>
-                    <div className="text-xs font-black font-numeric text-[#10B981]">${formatUSDT(entry.usdt_earned)}</div>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+
+              {/* ── My rank (if outside top list) ── */}
+              {myRank && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-3 p-3 rounded-xl"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(124,58,237,0.12), rgba(91,33,182,0.08))",
+                    border: "1px solid rgba(124,58,237,0.3)",
+                  }}
+                >
+                  <span className="w-7 text-center text-xs font-bold" style={{ color: "#A855F7" }}>
+                    #{myRank.rank}
+                  </span>
+                  <div className="flex-1 text-xs font-semibold text-[var(--text-primary)]">
+                    You
+                  </div>
+                  <div className="text-xs font-black font-numeric text-[#A855F7]">
+                    ${formatUSDT(myRank.usdt_earned)}
+                  </div>
+                </motion.div>
+              )}
+
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </AppShell>
   );
