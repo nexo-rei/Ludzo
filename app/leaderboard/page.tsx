@@ -61,7 +61,7 @@ export default function LeaderboardPage() {
       <div className="px-4 py-4 space-y-4 pb-6">
         {/* Period tabs */}
         <div className="flex gap-1 rounded-xl p-1"
-          style={{ background: "var(--card-bg)", border: "1px solid rgba(255,255,255,0.05)" }}>
+          style={{ background: "var(--card-bg)", border: "1px solid var(--border)" }}>
           {PERIODS.map((p) => (
             <button
               key={p.value}
@@ -140,7 +140,7 @@ export default function LeaderboardPage() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.03 }}
                     className="flex items-center gap-3 p-3 rounded-xl"
-                    style={{ background: "var(--card-bg)", border: "1px solid rgba(255,255,255,0.04)" }}
+                    style={{ background: "var(--card-bg)", border: "1px solid var(--border)" }}
                   >
                     <span className="w-7 text-center text-xs font-bold text-[#475569]">#{entry.rank}</span>
                     {entry.photo_url ? (
