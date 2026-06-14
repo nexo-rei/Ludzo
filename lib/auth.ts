@@ -11,6 +11,7 @@ interface AuthResult {
 
 export async function requireAuth(req: NextRequest): Promise<AuthResult> {
   // Support both Authorization: Bearer <userId> and x-user-id header
+  //rebuild
   const authHeader = req.headers.get("authorization");
   const xUserId = req.headers.get("x-user-id");
 
