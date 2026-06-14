@@ -127,11 +127,15 @@ export async function POST(req: NextRequest) {
         net_amount: netAmount,
       },
     });
-  } catch (err) {
-    console.error("[withdrawals/create]", err);
-    return NextResponse.json(
-      { success: false, error: "Server error" },
-      { status: 500 }
-    );
-  }
+  } catch (err: any) {
+  console.error("[withdrawals/create]", err);
+
+  return NextResponse.json(
+    {
+      success: false,
+      error: String(err?.message || err),
+    },
+    { status: 500 }
+  );
+}
 }
