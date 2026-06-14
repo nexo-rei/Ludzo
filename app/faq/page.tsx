@@ -11,6 +11,7 @@ const FAQ_DATA = [
     category: "General",
     items: [
       { q: "What is LUDZO?", a: "LUDZO is a Telegram Mini App where you can earn Coins and USDT by watching ads, completing tasks, and referring friends." },
+      { q: "What are Coins?", a: "Coins are LUDZO's virtual in-app currency. They have no real-world cash value and cannot be withdrawn or transferred — they're used inside the app for games and rewards. USDT is separate and represents real value that can be withdrawn." },
       { q: "How do I start earning?", a: "Simply open the app, authenticate with Telegram, and start watching rewarded ads on the Home page to earn Coins instantly." },
       { q: "Is LUDZO free to use?", a: "Yes, LUDZO is completely free. You can earn Coins without spending anything. USDT requires a deposit." },
     ],
@@ -34,16 +35,36 @@ const FAQ_DATA = [
   {
     category: "Withdrawals",
     items: [
+      { q: "How do withdrawals work?", a: "Go to the Withdraw page, enter the amount you want to withdraw and your USDT wallet address, and submit the request. Your request is then queued for manual review before payment is sent." },
       { q: "What is the minimum withdrawal?", a: "The minimum withdrawal amount is $5 USDT." },
       { q: "Is there a withdrawal fee?", a: "Yes, a 5% fee is deducted from your withdrawal amount. The net amount you receive is shown before you confirm." },
-      { q: "How long does a withdrawal take?", a: "Withdrawals are manually reviewed by our admin team within 48 hours. Once approved, payment is processed to your wallet address." },
+      { q: "How long do withdrawals take?", a: "Withdrawals are manually reviewed by our admin team within 48 hours. Once approved, payment is processed to your wallet address." },
+      { q: "Why was my withdrawal reviewed?", a: "All withdrawals go through a manual review as part of our standard AML and anti-fraud checks — this isn't unique to your account. Some withdrawals may need extra verification, which can take a little longer. See our AML & Anti-Fraud Policy for details." },
     ],
   },
   {
     category: "Referrals",
     items: [
-      { q: "How does the referral system work?", a: "Share your unique referral link. When a new user joins through your link and makes their first deposit, you earn a 10% commission in USDT." },
+      { q: "How do referrals work?", a: "Share your unique referral link from the Refer & Earn page. When a new user joins through your link and makes their first deposit, you earn a 10% commission in USDT." },
       { q: "Do I earn commission on all deposits from my referral?", a: "No. Commission is only earned on your referred user's FIRST deposit. Subsequent deposits do not generate commission." },
+    ],
+  },
+  {
+    category: "Games",
+    items: [
+      { q: "What happens if a game disconnects?", a: "If a game session is interrupted by a confirmed technical issue on our side, any Coins spent entering that session may be reinstated after review. Disconnections caused by your own internet connection or device are not eligible for reinstatement. Contact Support if this happens to you." },
+    ],
+  },
+  {
+    category: "Account & Security",
+    items: [
+      { q: "Can I have multiple accounts?", a: "No. Each person may have only one LUDZO account, linked to one Telegram account. Operating multiple accounts is against our Terms & Conditions and Fair Play Policy and may result in suspension and forfeiture of rewards." },
+    ],
+  },
+  {
+    category: "Support & Legal",
+    items: [
+      { q: "How do I contact support?", a: "Open the Support page from your Profile menu to chat with us on Telegram or submit a support ticket. You can also visit the Legal Center for our full policies, including Support & Disputes." },
     ],
   },
 ];
