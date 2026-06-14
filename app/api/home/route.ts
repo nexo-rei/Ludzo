@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
     const settings = await getSettings(supabase);
 
     // rebuild
+    //rebuild
     // Check maintenance mode first
     if (settings.maintenance_mode) {
       return NextResponse.json({
