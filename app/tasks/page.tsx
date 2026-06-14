@@ -155,7 +155,7 @@ export default function TasksPage() {
                         border: task.user_task?.status === "in_progress"
                           ? "1px solid rgba(245,158,11,0.25)"
                           : "1px solid rgba(124,58,237,0.12)",
-                        boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
+                        boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
                       }}
                     >
                       <div className="flex items-start gap-3">
