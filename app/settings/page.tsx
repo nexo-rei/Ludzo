@@ -83,7 +83,7 @@ export default function SettingsPage() {
                   className="flex-1 flex flex-col items-center gap-2 py-4 rounded-2xl transition-all duration-150"
                   style={{
                     background: active ? "rgba(124,58,237,0.12)" : "var(--card-bg)",
-                    border: active ? "1.5px solid rgba(124,58,237,0.5)" : "1px solid rgba(255,255,255,0.05)",
+                    border: active ? "1.5px solid rgba(124,58,237,0.5)" : "1px solid var(--border)",
                     boxShadow: active ? "0 0 16px rgba(124,58,237,0.12)" : "none",
                   }}
                 >
@@ -116,11 +116,11 @@ export default function SettingsPage() {
                   className="flex items-center gap-3 p-3 rounded-xl transition-all duration-150"
                   style={{
                     background: active ? "rgba(124,58,237,0.1)" : "var(--card-bg)",
-                    border: active ? "1.5px solid rgba(124,58,237,0.4)" : "1px solid rgba(255,255,255,0.05)",
+                    border: active ? "1.5px solid rgba(124,58,237,0.4)" : "1px solid var(--border)",
                   }}
                 >
                   <span className="w-8 h-6 rounded text-[10px] font-black flex items-center justify-center shrink-0"
-                    style={{ background: active ? "rgba(124,58,237,0.2)" : "rgba(255,255,255,0.06)", color: active ? "#A855F7" : "#64748B" }}>
+                    style={{ background: active ? "rgba(124,58,237,0.2)" : "var(--bg-elevated)", color: active ? "#A855F7" : "#64748B" }}>
                     {lang.flag}
                   </span>
                   <span className="flex-1 text-xs font-semibold text-left truncate"
