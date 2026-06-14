@@ -50,11 +50,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Insert withdrawal record
+    const fee_amount = 0; // adjust if you have a fee formula
+    const net_amount = Number(amount) - fee_amount;
+
     const { data: withdrawal, error: insertError } = await supabase
       .from("withdrawals")
       .insert({
         user_id: user.id,
         amount,
+        fee_amount,
+        net_amount,
         wallet_address,
         status: "pending",
       })
