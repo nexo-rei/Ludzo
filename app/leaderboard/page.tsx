@@ -145,9 +145,17 @@ export default function LeaderboardPage() {
   const top3   = entries.slice(0, 3);
   const rest   = entries.slice(3);
 
-  // Podium display order: 2nd | 1st | 3rd
-  const podiumOrder = [top3[1], top3[0], top3[2]];
-  const podiumRanks = [2, 1, 3];
+  // Podium display order: 2nd | 1st | 3rd — only slots with real entries
+  const podiumSlots: Array<{ entry: LeaderboardEntry; rank: number }> = [];
+  if (top3[1]) podiumSlots.push({ entry: top3[1], rank: 2 }); // left
+  if (top3[0]) podiumSlots.push({ entry: top3[0], rank: 1 }); // center
+  if (top3[2]) podiumSlots.push({ entry: top3[2], rank: 3 }); // right
+  // Re-sort so center (rank 1) is always in the middle visually
+  const podiumOrder2 = [
+    podiumSlots.find(s => s.rank === 2) ?? null,
+    podiumSlots.find(s => s.rank === 1) ?? null,
+    podiumSlots.find(s => s.rank === 3) ?? null,
+  ].filter(Boolean) as Array<{ entry: LeaderboardEntry; rank: number }>;
 
   const PERIODS = [
     { value: "all",   label: "All Time" },
@@ -213,7 +221,7 @@ export default function LeaderboardPage() {
             >
 
               {/* ── Podium ── */}
-              {top3.length >= 2 && (
+              {top3.length >= 1 && (
                 <div
                   className="relative rounded-2xl px-4 pt-5 pb-0 overflow-hidden"
                   style={{
@@ -222,9 +230,7 @@ export default function LeaderboardPage() {
                   }}
                 >
                   <div className="flex items-end justify-center gap-3">
-                    {podiumOrder.map((entry, i) => {
-                      if (!entry) return <div key={i} style={{ width: 72 }} />;
-                      const rank = podiumRanks[i];
+                    {podiumOrder2.map(({ entry, rank }, i) => {
                       const meta = RANK_META[rank];
                       const isFirst = rank === 1;
                       const avatarSize = isFirst ? 56 : 44;
