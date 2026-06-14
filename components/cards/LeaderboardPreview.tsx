@@ -13,11 +13,7 @@ interface LeaderboardPreviewProps {
   entries: LeaderboardEntry[];
 }
 
-const RANK_BADGE: Record<number, "gold" | "silver" | "bronze"> = {
-  1: "gold",
-  2: "silver",
-  3: "bronze",
-};
+const RANK_BADGE: Record<number, "gold" | "silver" | "bronze"> = { 1: "gold", 2: "silver", 3: "bronze" };
 
 const RANK_COLORS: Record<number, { ring: string; bg: string; text: string }> = {
   1: { ring: "rgba(245,158,11,0.6)",  bg: "rgba(245,158,11,0.12)", text: "#F59E0B" },
@@ -26,21 +22,9 @@ const RANK_COLORS: Record<number, { ring: string; bg: string; text: string }> = 
 };
 
 const RANK_ICONS: Record<number, ReactElement> = {
-  1: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="#F59E0B" stroke="none">
-      <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" />
-    </svg>
-  ),
-  2: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="#94A3B8" stroke="none">
-      <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" />
-    </svg>
-  ),
-  3: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="#D97706" stroke="none">
-      <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" />
-    </svg>
-  ),
+  1: <svg width="16" height="16" viewBox="0 0 24 24" fill="#F59E0B" stroke="none"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z"/></svg>,
+  2: <svg width="16" height="16" viewBox="0 0 24 24" fill="#94A3B8" stroke="none"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z"/></svg>,
+  3: <svg width="16" height="16" viewBox="0 0 24 24" fill="#D97706" stroke="none"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z"/></svg>,
 };
 
 export default function LeaderboardPreview({ entries }: LeaderboardPreviewProps) {
@@ -49,51 +33,27 @@ export default function LeaderboardPreview({ entries }: LeaderboardPreviewProps)
   if (top3.length === 0) return null;
 
   return (
-    <div
-      className="rounded-2xl p-4"
-      style={{ background: "var(--card-bg)", border: "1px solid rgba(245,158,11,0.12)" }}
-    >
-      {/* Header */}
+    <div className="rounded-2xl p-4" style={{ background: "var(--card-bg)", border: "1px solid rgba(245,158,11,0.12)" }}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2.5">
-          <div
-            className="w-8 h-8 rounded-xl flex items-center justify-center"
-            style={{
-              background: "rgba(245,158,11,0.12)",
-              border: "1px solid rgba(245,158,11,0.2)",
-            }}
-          >
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+            style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.2)" }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="#F59E0B" stroke="none">
-              <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" />
+              <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z"/>
             </svg>
           </div>
           <span className="text-sm font-bold text-[var(--text-primary)]">Top Earners</span>
         </div>
-        <Link
-          href="/leaderboard"
+        <Link href="/leaderboard"
           className="flex items-center gap-0.5 text-xs font-semibold hover:opacity-80 transition-opacity"
-          style={{ color: "#A855F7" }}
-        >
+          style={{ color: "#A855F7" }}>
           View All <ChevronRight size={12} />
         </Link>
       </div>
 
-      {/* Rows */}
       <div className="space-y-2">
         {top3.map((entry, i) => {
-          const colors =
-            RANK_COLORS[entry.rank] ?? {
-              ring: "var(--border)",
-              bg: "var(--bg-elevated)",
-              text: "var(--text-muted)",
-            };
-
-          // LeaderboardEntry uses usdt_earned; also handle legacy total_usdt_earned
-          const amount =
-            (entry as LeaderboardEntry & { total_usdt_earned?: number }).total_usdt_earned ??
-            entry.usdt_earned ??
-            0;
-
+          const colors = RANK_COLORS[entry.rank] ?? { ring: "var(--border)", bg: "var(--bg-elevated)", text: "var(--text-muted)" };
           return (
             <motion.div
               key={entry.user_id}
@@ -103,52 +63,25 @@ export default function LeaderboardPreview({ entries }: LeaderboardPreviewProps)
               className="flex items-center gap-3 py-2 border-b last:border-0"
               style={{ borderColor: "var(--border)" }}
             >
-              {/* Rank icon */}
               <div className="w-6 h-6 flex items-center justify-center">
-                {RANK_ICONS[entry.rank] ?? (
-                  <span className="text-xs font-bold text-[var(--text-muted)]">
-                    #{entry.rank}
-                  </span>
-                )}
+                {RANK_ICONS[entry.rank] ?? <span className="text-xs font-bold text-[var(--text-muted)]">#{entry.rank}</span>}
               </div>
-
-              {/* Avatar */}
-              <div
-                className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center text-xs font-bold"
-                style={{
-                  border: `1.5px solid ${colors.ring}`,
-                  background: colors.bg,
-                  color: colors.text,
-                }}
-              >
+              <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center text-xs font-bold"
+                style={{ border: `1.5px solid ${colors.ring}`, background: colors.bg, color: colors.text }}>
                 {entry.photo_url ? (
-                  <Image
-                    src={entry.photo_url}
-                    alt={entry.first_name}
-                    width={32}
-                    height={32}
-                    className="object-cover"
-                  />
+                  <Image src={entry.photo_url} alt={entry.first_name} width={32} height={32} className="object-cover" />
                 ) : (
                   entry.first_name[0]?.toUpperCase()
                 )}
               </div>
-
-              {/* Name */}
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-semibold text-[var(--text-primary)] truncate">
                   {entry.first_name}
-                  {entry.username && (
-                    <span className="text-[var(--text-muted)] font-normal ml-1">
-                      @{entry.username}
-                    </span>
-                  )}
+                  {entry.username && <span className="text-[var(--text-muted)] font-normal ml-1">@{entry.username}</span>}
                 </div>
               </div>
-
-              {/* Badge */}
               <Badge variant={RANK_BADGE[entry.rank] ?? "default"} size="sm">
-                ${formatUSDT(amount)}
+                ${formatUSDT(entry.total_usdt_earned)}
               </Badge>
             </motion.div>
           );
