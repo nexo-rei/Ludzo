@@ -4,13 +4,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { paymentId: string } }
+  { params }: { params: Promise<{ paymentId: string }> }
 ) {
   const auth = await requireAuth(req);
   if (!auth.ok)
     return NextResponse.json({ success: false, error: auth.error }, { status: 401 });
 
-  const { paymentId } = params;
+  const { paymentId } = await params;
   if (!paymentId)
     return NextResponse.json({ success: false, error: "paymentId required." }, { status: 400 });
 
