@@ -10,6 +10,7 @@ interface PageHeaderProps {
   title: string;
   back?: boolean;
   backHref?: string;
+  onBack?: () => void;
   right?: ReactNode;
   className?: string;
   transparent?: boolean;
@@ -20,6 +21,7 @@ export default function PageHeader({
   title,
   back = false,
   backHref,
+  onBack,
   right,
   className,
   transparent = false,
@@ -28,6 +30,7 @@ export default function PageHeader({
   const router = useRouter();
 
   const handleBack = () => {
+    if (onBack) { onBack(); return; }
     if (backHref) router.push(backHref);
     else router.back();
   };
