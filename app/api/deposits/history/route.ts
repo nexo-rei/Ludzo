@@ -14,12 +14,12 @@ export async function GET(req: NextRequest) {
 
     const supabase = createAdminClient();
     const { data: user } = await supabase
-      .from("users").select("id").eq("telegram_id", auth.userId!).maybeSingle();
+      .from("users").select("id").eq("id", auth.userId!).maybeSingle();
     if (!user) return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
 
     const { data, count, error } = await supabase
       .from("deposits")
-      .select("id, amount, status, created_at, completed_at, binance_transaction_id", { count: "exact" })
+      .select("id, amount, coin_amount, usdt_amount, network, nowpayments_status, status, created_at, completed_at, payment_id", { count: "exact" })
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
