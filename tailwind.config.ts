@@ -11,6 +11,18 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        gaming: {
+  background: "hsl(var(--gaming-background))",
+  foreground: "hsl(var(--gaming-foreground))",
+  surface: "hsl(var(--gaming-surface))",
+  muted: "hsl(var(--gaming-muted))",
+  border: "hsl(var(--gaming-border))",
+  primary: "hsl(var(--gaming-primary))",
+  accent: "hsl(var(--gaming-accent))",
+  gold: "hsl(var(--gaming-gold))",
+  success: "hsl(var(--gaming-success))",
+  error: "hsl(var(--gaming-error))",
+},
         purple: {
           primary: "#7C3AED",
           dark: "#5B21B6",
