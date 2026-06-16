@@ -203,18 +203,6 @@ export default function HomePage() {
           )}
         </div>
 
-/*.===========================================================
-   GAMES ENTRY CARD FOR app/home/page.tsx
-   Add this section/component to your existing Home page
-   to provide an entry point into the Gaming Hub.
-
-   Import at top of file:
-   import Link from "next/link";
-   import { motion } from "framer-motion";
-   import { PlayIcon, LudoIcon } from "@/components/gaming/GamingIcons";
-   ============================================================ */
-
-/* Place this card anywhere on your home page, e.g. after balance cards */
 
 <motion.div
   initial={{ opacity: 0, y: 10 }}
