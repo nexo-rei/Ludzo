@@ -394,3 +394,64 @@ body {
 .podium-2 { background: linear-gradient(180deg, #E2E8F0 0%, #94A3B8 100%); }
 .podium-3 { background: linear-gradient(180deg, #D97706 0%, #B45309 100%); }
 
+
+/* ============================================================
+   GAMING HUB CSS VARIABLES
+   Add these to your existing app/globals.css
+   ============================================================ */
+
+@layer base {
+  /* Gaming Hub color tokens — light mode defaults */
+  :root {
+    --gaming-background: 0 0% 100%;
+    --gaming-foreground: 222 47% 11%;
+    --gaming-surface: 210 20% 98%;
+    --gaming-muted: 220 9% 46%;
+    --gaming-border: 220 13% 91%;
+    --gaming-primary: 262 83% 58%;
+    --gaming-accent: 270 50% 52%;
+    --gaming-gold: 43 96% 56%;
+    --gaming-success: 142 71% 45%;
+    --gaming-error: 0 84% 60%;
+  }
+
+  /* Dark mode gaming tokens */
+  .dark {
+    --gaming-background: 222 47% 6%;
+    --gaming-foreground: 220 13% 91%;
+    --gaming-surface: 222 47% 8%;
+    --gaming-muted: 220 9% 46%;
+    --gaming-border: 222 20% 16%;
+    --gaming-primary: 262 83% 58%;
+    --gaming-accent: 270 50% 60%;
+    --gaming-gold: 43 96% 56%;
+    --gaming-success: 142 71% 50%;
+    --gaming-error: 0 84% 65%;
+  }
+}
+
+@layer utilities {
+  /* Hide scrollbar for horizontal scroll containers */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Glass effect utility */
+  .glass {
+    background: hsl(var(--gaming-surface) / 0.5);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* Line clamp utilities */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
