@@ -7,7 +7,7 @@ import EconomyCard from "@/components/gaming/EconomyCard";
 import ActivePlayers from "@/components/gaming/ActivePlayers";
 import WinnersSection from "@/components/gaming/WinnerCard";
 import AnnouncementsSection from "@/components/gaming/AnnouncementCard";
-//import LudoModesPreview from "@/components/gaming/LudoModesPreview";
+import LudoModesPreview from "@/components/gaming/LudoModesPreview";
 
 // Mock Telegram user data — replace with useTelegram hook in production
 const TELEGRAM_USER = {
