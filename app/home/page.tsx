@@ -17,6 +17,8 @@ import { useApp } from "@/hooks/useApp";
 import { formatDateTime } from "@/lib/utils";
 import type { HomePageData } from "@/types";
 import LudzoLogo from "@/components/layout/LudzoLogo";
+import Link from "next/link";
+import { PlayIcon, LudoIcon } from "@/components/gaming/GamingIcons";
 
 // SVG icon mapping for activity types
 const ACTIVITY_SVG: Record<string, { icon: ReactElement; color: string; bg: string }> = {
@@ -200,6 +202,44 @@ export default function HomePage() {
             </div>
           )}
         </div>
+
+/*.===========================================================
+   GAMES ENTRY CARD FOR app/home/page.tsx
+   Add this section/component to your existing Home page
+   to provide an entry point into the Gaming Hub.
+
+   Import at top of file:
+   import Link from "next/link";
+   import { motion } from "framer-motion";
+   import { PlayIcon, LudoIcon } from "@/components/gaming/GamingIcons";
+   ============================================================ */
+
+/* Place this card anywhere on your home page, e.g. after balance cards */
+
+<motion.div
+  initial={{ opacity: 0, y: 10 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ delay: 0.2, duration: 0.4 }}
+>
+  <Link
+    href="/games"
+    className="group relative block overflow-hidden rounded-2xl border border-[#7C3AED]/25 bg-gradient-to-br from-[#7C3AED]/10 via-[#7C3AED]/5 to-transparent p-4"
+  >
+    <div className="flex items-center gap-3">
+      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#7C3AED]/10 text-[#7C3AED]">
+        <LudoIcon size={28} />
+      </div>
+      <div className="flex-1">
+        <h3 className="text-sm font-bold text-[var(--text-primary)]">Gaming Hub</h3>
+        <p className="text-[11px] text-[var(--text-muted)]">Play Ludo, track matches & win coins</p>
+      </div>
+      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#7C3AED]/20 text-[#7C3AED] group-hover:bg-[#7C3AED] group-hover:text-white transition-all">
+        <PlayIcon size={14} />
+      </div>
+    </div>
+  </Link>
+</motion.div>
+
 
         {/* Leaderboard Preview */}
         {data.leaderboard_top3.length > 0 && (
