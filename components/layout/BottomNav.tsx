@@ -16,11 +16,24 @@ import {
 } from "@/components/ui/Icons";
 import { motion } from "framer-motion";
 import { useApp } from "@/hooks/useApp";
+import { useEffect } from "react";
 
 export default function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { isInGamingHub, setIsInGamingHub } = useApp();
+
+  // Route-based check to prevent layout flashes or blank page navigation loops
+  // Pathnames /matches and /games are exclusively inside the Gaming Hub.
+  // /home and /profile are dual-use and rely on the isInGamingHub state.
+  const isGamingTab = ["/matches", "/games"].includes(pathname) || (["/home", "/profile"].includes(pathname) && isInGamingHub);
+
+  // Sync state if user navigated via deep links or address bar
+  useEffect(() => {
+    if (["/matches", "/games"].includes(pathname) && !isInGamingHub) {
+      setIsInGamingHub(true);
+    }
+  }, [pathname, isInGamingHub, setIsInGamingHub]);
 
   // Navigation items for the main application
   const MAIN_NAV_ITEMS = [
@@ -39,9 +52,9 @@ export default function BottomNav() {
     { href: "/profile", label: "Profile", Icon: GamingProfileIcon },
   ];
 
-  const navItems = isInGamingHub ? GAMING_NAV_ITEMS : MAIN_NAV_ITEMS;
+  const navItems = isGamingTab ? GAMING_NAV_ITEMS : MAIN_NAV_ITEMS;
 
-  const handleNavClick = (e: React.MouseEvent, item: typeof MAIN_NAV_ITEMS[0]) => {
+  const handleNavClick = (e: React.MouseEvent, item: any) => {
     if (!isInGamingHub && item.isGamesEntry) {
       e.preventDefault();
       setIsInGamingHub(true);
@@ -54,7 +67,7 @@ export default function BottomNav() {
       <div
         className={cn(
           "flex items-stretch justify-around h-16 rounded-2xl transition-all duration-300",
-          isInGamingHub 
+          isGamingTab 
             ? "bg-slate-950/90 border border-purple-500/30 shadow-[0_4px_32px_rgba(168,85,247,0.25)]" 
             : "bg-white/95 border border-purple-500/12 shadow-[0_4px_32px_rgba(124,58,237,0.12),_0_1px_8px_rgba(0,0,0,0.06)] dark:bg-slate-950/90 dark:border-slate-800"
         )}
@@ -65,8 +78,8 @@ export default function BottomNav() {
       >
         {navItems.map((item) => {
           const active = pathname === item.href;
-          const activeColor = isInGamingHub ? "#A855F7" : "#7C3AED";
-          const inactiveColor = isInGamingHub ? "#64748B" : "#94A3B8";
+          const activeColor = isGamingTab ? "#A855F7" : "#7C3AED";
+          const inactiveColor = isGamingTab ? "#64748B" : "#94A3B8";
 
           return (
             <Link
@@ -88,7 +101,7 @@ export default function BottomNav() {
                   layoutId="nav-active-pill"
                   className="absolute inset-y-2 inset-x-0 rounded-xl"
                   style={{ 
-                    background: isInGamingHub 
+                    background: isGamingTab 
                       ? "rgba(168,85,247,0.12)" 
                       : "rgba(124,58,237,0.08)" 
                   }}
