@@ -34,13 +34,13 @@ export async function GET(req: NextRequest) {
 
     const { data: wallet } = await supabase
       .from("wallets")
-      .select("coin_balance, usdt_balance, updated_at")
+      .select("coin_balance, usdt_balance, won_coins_balance, updated_at")
       .eq("user_id", user.id)
       .maybeSingle();
 
     return NextResponse.json({
       success: true,
-      data: wallet ?? { coin_balance: 0, usdt_balance: 0, updated_at: null },
+      data: wallet ?? { coin_balance: 0, usdt_balance: 0, won_coins_balance: 0, updated_at: null },
     });
   } catch (err) {
     console.error("[wallet]", err);
