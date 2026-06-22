@@ -89,9 +89,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (storedWon) {
       setWonCoinsBalanceState(Number(storedWon));
     } else {
-      // Seed with some won coins for interactive testing
-      setWonCoinsBalanceState(250);
-      localStorage.setItem("ludzo_won_coins_balance", "250");
+      // Default to 0, wait for Supabase DB values to load
+      setWonCoinsBalanceState(0);
     }
 
     if (storedStats) {
