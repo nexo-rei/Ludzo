@@ -31,14 +31,14 @@ export async function GET(req: NextRequest) {
       .eq("user_id", user.id).maybeSingle();
 
     const { data: wallet } = await supabase
-      .from("wallets").select("coin_balance, usdt_balance")
+      .from("wallets").select("coin_balance, usdt_balance, won_coins_balance")
       .eq("user_id", user.id).maybeSingle();
 
     return NextResponse.json({
       success: true,
       data: {
         user,
-        wallet: wallet ?? { coin_balance: 0, usdt_balance: 0 },
+        wallet: wallet ?? { coin_balance: 0, usdt_balance: 0, won_coins_balance: 0 },
         stats: {
           total_tasks_completed: totalTasks ?? 0,
           total_referrals: totalReferrals ?? 0,
