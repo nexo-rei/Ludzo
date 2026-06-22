@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import AppShell from "@/components/layout/AppShell";
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import { useApp } from "@/hooks/useApp";
@@ -40,10 +40,15 @@ const MENU_ITEMS = [
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { userId, setUser, isInGamingHub, setIsInGamingHub, prefs, setPrefs } = useApp();
+  const { userId, setUser, isInGamingHub, setIsInGamingHub, prefs, setPrefs, wonCoinsBalance, gamingStats, updateWalletBalances, clearGamingData, wallet } = useApp();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
+
+  // Conversion Modal states
+  const [convertModalOpen, setConvertModalOpen] = useState(false);
+  const [coinsToConvert, setCoinsToConvert] = useState<string>("");
+  const [isConverting, setIsConverting] = useState(false);
 
   // Initialize sound from localStorage
   useEffect(() => {
@@ -91,6 +96,39 @@ export default function ProfilePage() {
     showToast(`Theme updated to ${newTheme}`, "success");
   };
 
+  // Convert Won Coins to USDT (Economy Logic)
+  const handleConvertWonCoins = () => {
+    const coins = parseInt(coinsToConvert);
+    if (isNaN(coins) || coins <= 0) {
+      showToast("Please enter a valid amount of coins.", "error");
+      return;
+    }
+    if (coins < 500) {
+      showToast("Minimum conversion limit is 500 Won Coins ($5.00).", "error");
+      return;
+    }
+    if (coins > wonCoinsBalance) {
+      showToast(`Insufficient Won Coins. Your balance is ${wonCoinsBalance} Coins.`, "error");
+      return;
+    }
+
+    setIsConverting(true);
+
+    // Simulate API delay
+    setTimeout(() => {
+      const usdtReward = coins / 100;
+
+      // Deduct coins from both total wallet and won coins, and add USDT
+      // 100 Coins = $1.00. Main coin balance decrements by the amount of coins, USDT increases by usdtReward, wonCoins decrements by coins.
+      updateWalletBalances(-coins, usdtReward, -coins);
+
+      setIsConverting(false);
+      setConvertModalOpen(false);
+      setCoinsToConvert("");
+      showToast(`Successfully converted ${coins} Won Coins to $${usdtReward.toFixed(2)} USDT!`, "success");
+    }, 1500);
+  };
+
   if (loading) {
     return (
       <AppShell>
@@ -104,21 +142,7 @@ export default function ProfilePage() {
 
   // --- RENDER PREMIUM GAMING HUB PROFILE ---
   if (isInGamingHub) {
-    const mockGamingStats = {
-      totalMatches: 36,
-      wins: 24,
-      losses: 12,
-      winRate: "66.7%",
-      currentStreak: "3 Wins",
-      bestStreak: "7 Wins",
-    };
-
-    const mockEconomyStats = {
-      totalWon: 14500,
-      totalLost: 6200,
-      netProfit: "+8300 Coins",
-      lifetimeEarnings: "$145.00",
-    };
+    const showEmptyStats = gamingStats.totalMatches === 0;
 
     return (
       <AppShell>
@@ -191,7 +215,7 @@ export default function ProfilePage() {
               </div>
             </motion.div>
 
-            {/* Gaming Statistics Section */}
+            {/* Gaming Statistics Section (Database Driven Mock / Empty State Support) */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -201,36 +225,61 @@ export default function ProfilePage() {
               <h3 className="text-[10px] font-black uppercase tracking-widest text-purple-400 px-0.5">
                 Gaming Statistics
               </h3>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 text-center space-y-1">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Matches</span>
-                  <span className="text-base font-black font-numeric text-slate-100">{mockGamingStats.totalMatches}</span>
+
+              {showEmptyStats ? (
+                // Database Empty State: Shown when totalMatches === 0
+                <div className="p-8 rounded-2xl border border-dashed border-slate-800 bg-slate-950/20 text-center space-y-4 flex flex-col items-center">
+                  <div className="w-16 h-16 bg-purple-500/5 rounded-full flex items-center justify-center border border-purple-500/10 text-purple-400">
+                    <TrophyIcon size={24} />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-black text-slate-300 uppercase tracking-wide">No Matches Logged</h4>
+                    <p className="text-[10px] text-slate-500 max-w-[200px] leading-relaxed font-semibold">
+                      You have no matches on record. Head to the Play tab and complete your first match to activate statistics!
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => router.push("/games")}
+                    className="h-8 px-4 rounded-lg bg-purple-600/10 border border-purple-500/30 text-purple-300 text-[10px] font-black uppercase tracking-widest hover:bg-purple-600/20 transition-all"
+                  >
+                    Play First Match
+                  </button>
                 </div>
-                <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 text-center space-y-1">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Wins</span>
-                  <span className="text-base font-black font-numeric text-emerald-400">{mockGamingStats.wins}</span>
+              ) : (
+                // Stats Grid (Database driven values)
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 text-center space-y-1">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Matches</span>
+                      <span className="text-base font-black font-numeric text-slate-100">{gamingStats.totalMatches}</span>
+                    </div>
+                    <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 text-center space-y-1">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Wins</span>
+                      <span className="text-base font-black font-numeric text-emerald-400">{gamingStats.wins}</span>
+                    </div>
+                    <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 text-center space-y-1">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Losses</span>
+                      <span className="text-base font-black font-numeric text-red-400">{gamingStats.losses}</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 text-center space-y-1">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Win Rate</span>
+                      <span className="text-sm font-black font-numeric text-purple-300">{gamingStats.winRate}</span>
+                    </div>
+                    <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 text-center space-y-1 flex flex-col justify-center items-center">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Streak</span>
+                      <span className="text-sm font-black text-amber-400 flex items-center gap-1 justify-center mt-1 leading-none font-numeric">
+                        🔥 {gamingStats.currentStreak}
+                      </span>
+                    </div>
+                    <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 text-center space-y-1">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Best Streak</span>
+                      <span className="text-sm font-black font-numeric text-purple-300">{gamingStats.bestStreak} Wins</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 text-center space-y-1">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Losses</span>
-                  <span className="text-base font-black font-numeric text-red-400">{mockGamingStats.losses}</span>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-3 mt-3">
-                <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 text-center space-y-1">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Win Rate</span>
-                  <span className="text-sm font-black font-numeric text-purple-300">{mockGamingStats.winRate}</span>
-                </div>
-                <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 text-center space-y-1 flex flex-col justify-center items-center">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Streak</span>
-                  <span className="text-sm font-black text-amber-400 flex items-center gap-1 justify-center mt-1 leading-none font-numeric">
-                    🔥 {mockGamingStats.currentStreak.split(" ")[0]}
-                  </span>
-                </div>
-                <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 text-center space-y-1">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Best Streak</span>
-                  <span className="text-sm font-black font-numeric text-purple-300">{mockGamingStats.bestStreak}</span>
-                </div>
-              </div>
+              )}
             </motion.div>
 
             {/* Economy Section */}
@@ -241,7 +290,7 @@ export default function ProfilePage() {
               className="space-y-2.5"
             >
               <h3 className="text-[10px] font-black uppercase tracking-widest text-purple-400 px-0.5">
-                Economy Statistics
+                Economy Statistics &amp; Conversions
               </h3>
               <div className="rounded-2xl border border-slate-800 bg-slate-950/40 divide-y divide-slate-900 overflow-hidden text-xs">
 
@@ -249,57 +298,49 @@ export default function ProfilePage() {
                 <div className="flex items-center justify-between p-4 bg-slate-950/60">
                   <span className="text-slate-400 font-semibold flex items-center gap-1.5">
                     <CoinIcon size={14} className="text-amber-400" />
-                    Coin Balance
+                    Dashboard Balance (Main)
                   </span>
                   <span className="font-black font-numeric text-white text-sm">
-                    {profile?.wallet.coin_balance.toLocaleString()} Coins
+                    {wallet?.coin_balance.toLocaleString() ?? 0} Coins
+                  </span>
+                </div>
+
+                {/* Won Coins tracked separately */}
+                <div className="flex items-center justify-between p-4">
+                  <span className="text-slate-400 font-semibold flex items-center gap-1.5">
+                    <TrophyIcon size={14} className="text-purple-400" />
+                    Won Coins (Convertible Only)
+                  </span>
+                  <span className="font-black font-numeric text-purple-300 text-sm">
+                    {wonCoinsBalance.toLocaleString()} Coins
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between p-4">
                   <span className="text-slate-400 font-semibold flex items-center gap-1.5">
-                    <USDTIcon size={14} className="text-emerald-400" />
-                    Cash Balance
-                  </span>
-                  <span className="font-black font-numeric text-emerald-400 text-sm">
-                    ${profile?.wallet.usdt_balance.toFixed(2)}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-4">
-                  <span className="text-slate-400 font-semibold flex items-center gap-1.5">
-                    Total Coins Won
-                  </span>
-                  <span className="font-bold font-numeric text-slate-200">
-                    {mockEconomyStats.totalWon.toLocaleString()} Coins
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-4">
-                  <span className="text-slate-400 font-semibold flex items-center gap-1.5">
-                    Total Coins Lost
+                    Deposited Coins
                   </span>
                   <span className="font-bold font-numeric text-slate-400">
-                    {mockEconomyStats.totalLost.toLocaleString()} Coins
+                    {Math.max(0, (wallet?.coin_balance ?? 0) - wonCoinsBalance).toLocaleString()} Coins (Non-convertible)
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between p-4">
-                  <span className="text-slate-400 font-semibold flex items-center gap-1.5">
-                    Lifetime Earnings
-                  </span>
-                  <span className="font-bold font-numeric text-emerald-400">
-                    {mockEconomyStats.lifetimeEarnings}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-purple-950/10">
-                  <span className="text-purple-300 font-bold flex items-center gap-1.5">
-                    Net Profit
-                  </span>
-                  <span className="font-black font-numeric text-purple-300">
-                    {mockEconomyStats.netProfit}
-                  </span>
+                {/* Convert Won Coins option */}
+                <div className="p-4 bg-purple-950/10 flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-purple-300 font-bold flex items-center gap-1.5">
+                      Won Coins Exchange
+                    </span>
+                    <span className="font-black font-numeric text-emerald-400">
+                      ${wallet?.usdt_balance.toFixed(2)} USDT
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setConvertModalOpen(true)}
+                    className="w-full h-10 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black uppercase text-[10px] tracking-wider border border-purple-400/20 hover:from-purple-500 shadow-md"
+                  >
+                    CONVERT WON COINS TO USDT
+                  </button>
                 </div>
 
               </div>
@@ -354,6 +395,17 @@ export default function ProfilePage() {
                   </button>
                 </div>
 
+                {/* Reset Option (Highly detailed for developers) */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-900">
+                  <span className="text-slate-500 font-bold">Demo Dev Suite</span>
+                  <button
+                    onClick={clearGamingData}
+                    className="px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-[8px] font-bold uppercase tracking-wider"
+                  >
+                    Reset Overrides
+                  </button>
+                </div>
+
               </div>
             </motion.div>
 
@@ -370,7 +422,7 @@ export default function ProfilePage() {
                   showToast("Redirecting to Ludzo Support...", "info");
                   window.open("https://t.me/ludzo_support", "_blank");
                 }}
-                className="w-full h-11 rounded-xl bg-slate-900 border border-slate-800 hover:border-purple-500/30 text-purple-400 font-bold uppercase tracking-wider text-[11px] flex items-center justify-center gap-2 transition-all shadow-[0_4px_16px_rgba(0,0,0,0.1)]"
+                className="w-full h-11 rounded-xl bg-slate-900 border border-slate-800 hover:border-purple-500/30 text-purple-400 font-bold uppercase tracking-wider text-[11px] flex items-center justify-center gap-2 transition-all"
               >
                 🎮 CONTACT GAMING SUPPORT
               </motion.button>
@@ -378,6 +430,108 @@ export default function ProfilePage() {
 
           </div>
         </div>
+
+        {/* --- CONVERSION MODAL --- */}
+        <AnimatePresence>
+          {convertModalOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 text-white"
+            >
+              <motion.div
+                initial={{ scale: 0.9, y: 15 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 15 }}
+                className="w-full max-w-sm rounded-3xl border border-purple-500/30 bg-slate-950 p-6 space-y-5 shadow-[0_24px_64px_rgba(168,85,247,0.35)]"
+              >
+                <div className="flex items-center justify-between border-b border-purple-500/10 pb-3">
+                  <h3 className="text-sm font-black uppercase tracking-wider text-purple-400">
+                    Exchange Won Coins
+                  </h3>
+                  <button 
+                    onClick={() => setConvertModalOpen(false)}
+                    className="text-slate-400 hover:text-white font-bold text-xs"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between font-bold text-slate-400">
+                    <span>Available Won Coins:</span>
+                    <span className="text-purple-300 font-numeric">{wonCoinsBalance.toLocaleString()} Coins</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-slate-400">
+                    <span>Conversion Rate:</span>
+                    <span>100 Coins = $1.00 USDT</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-slate-400">
+                    <span>Minimum Exchange:</span>
+                    <span className="text-emerald-400 font-bold">500 Coins ($5.00)</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-purple-400 block">
+                    Amount of Won Coins to Convert
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={coinsToConvert}
+                      onChange={(e) => setCoinsToConvert(e.target.value)}
+                      placeholder="e.g. 500"
+                      className="w-full h-11 bg-slate-900 border border-slate-800 rounded-xl px-4 text-sm font-bold text-white placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                    />
+                    <button
+                      onClick={() => setCoinsToConvert(String(Math.floor(wonCoinsBalance / 100) * 100))}
+                      className="absolute right-3 top-2 px-2.5 py-1 bg-purple-600/20 border border-purple-500/30 rounded-lg text-[9px] font-black text-purple-300"
+                    >
+                      MAX
+                    </button>
+                  </div>
+                </div>
+
+                {/* Conversion Equivalent Display */}
+                {parseInt(coinsToConvert) >= 500 && (
+                  <div className="p-3.5 rounded-xl bg-purple-950/20 border border-purple-500/20 flex items-center justify-between text-xs">
+                    <span className="text-slate-400 font-semibold">You will receive:</span>
+                    <span className="text-sm font-black text-emerald-400 font-numeric">
+                      ${(parseInt(coinsToConvert) / 100).toFixed(2)} USDT
+                    </span>
+                  </div>
+                )}
+
+                <div className="pt-2 flex flex-col gap-3">
+                  <button
+                    disabled={isConverting}
+                    onClick={handleConvertWonCoins}
+                    className="w-full h-11 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-black uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 shadow-md border border-purple-400/40"
+                  >
+                    {isConverting ? (
+                      <span className="flex items-center gap-2">
+                        <span className="w-4 h-4 border-2 border-t-transparent border-white rounded-full animate-spin" />
+                        PROCESSING CONVERSION...
+                      </span>
+                    ) : (
+                      "CONFIRM CONVERSION"
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setConvertModalOpen(false)}
+                    className="w-full py-2 bg-slate-900 border border-slate-800 text-slate-400 text-[10px] font-black uppercase tracking-wider rounded-xl"
+                  >
+                    CANCEL
+                  </button>
+                </div>
+
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
       </AppShell>
     );
   }
