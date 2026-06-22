@@ -19,11 +19,14 @@ interface AppContextValue {
   refreshWallet: () => Promise<void>;
   setUser: (u: User | null) => void;
   setPrefs: (p: UserPreferences | null) => void;
+  isInGamingHub: boolean;
+  setIsInGamingHub: (b: boolean) => void;
 }
 
 const AppContext = createContext<AppContextValue>({
   user: null, wallet: null, prefs: null, userId: null,
   loading: true, refreshWallet: async () => {}, setUser: () => {}, setPrefs: () => {},
+  isInGamingHub: false, setIsInGamingHub: () => {},
 });
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -31,6 +34,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [prefs, setPrefs] = useState<UserPreferences | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isInGamingHub, setIsInGamingHubState] = useState<boolean>(false);
+
+  const setIsInGamingHub = useCallback((value: boolean) => {
+    setIsInGamingHubState(value);
+    localStorage.setItem("ludzo_in_gaming_hub", value ? "true" : "false");
+  }, []);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("ludzo_in_gaming_hub");
+    if (stored === "true") {
+      setIsInGamingHubState(true);
+    }
+  }, []);
 
   const userId = user?.id ?? null;
 
@@ -96,7 +112,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider
-      value={{ user, wallet, prefs, userId, loading, refreshWallet, setUser: handleSetUser, setPrefs: handleSetPrefs }}
+      value={{ user, wallet, prefs, userId, loading, refreshWallet, setUser: handleSetUser, setPrefs: handleSetPrefs, isInGamingHub, setIsInGamingHub }}
     >
       {children}
     </AppContext.Provider>
