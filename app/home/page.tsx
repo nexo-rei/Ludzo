@@ -55,11 +55,15 @@ function ActivityIcon({ type }: { type: string }) {
 
 export default function HomePage() {
   const router = useRouter();
-  const { userId, isInGamingHub, setIsInGamingHub } = useApp();
+  const { userId, isInGamingHub, setIsInGamingHub, wonCoinsBalance } = useApp();
   const [data, setData] = useState<HomePageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [key, setKey] = useState(0);
 
+  // Dynamic Online Players state (beside exit hub button)
+  const [onlineCount, setOnlineCount] = useState<number>(7531);
+
+  // Fetch API info
   const loadData = useCallback(async () => {
     if (!userId) return;
     try {
@@ -75,6 +79,23 @@ export default function HomePage() {
     if (!userId) { router.replace("/auth"); return; }
     loadData();
   }, [userId, loadData, router]);
+
+  // Online Players counter setup: range 5000-10000, updates every 10s with ±10, ±50, or ±100
+  useEffect(() => {
+    const initial = Math.floor(Math.random() * (10000 - 5000 + 1)) + 5000;
+    setOnlineCount(initial);
+
+    const interval = setInterval(() => {
+      const choices = [-100, -50, -10, 10, 50, 100];
+      const fluctuation = choices[Math.floor(Math.random() * choices.length)];
+      setOnlineCount((prev) => {
+        const next = prev + fluctuation;
+        return Math.min(10000, Math.max(5000, next));
+      });
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const refresh = () => { setKey((k) => k + 1); loadData(); };
 
@@ -95,31 +116,25 @@ export default function HomePage() {
     );
   }
 
-  // Render Premium Gaming Hub Dashboard
+  // --- RENDER PREMIUM GAMING HUB DASHBOARD ---
   if (isInGamingHub) {
-    const mockWinners = [
-      { id: "1", username: "@ludo_pro", winAmount: 1200, game: "Ludo Clash", avatarColor: "from-purple-500 to-indigo-500", letter: "L" },
-      { id: "2", username: "@tg_champ", winAmount: 850, game: "Ludo Clash", avatarColor: "from-blue-500 to-cyan-500", letter: "T" },
-      { id: "3", username: "@coin_king", winAmount: 2400, game: "Ludo Clash", avatarColor: "from-amber-500 to-orange-500", letter: "C" },
-    ];
-
     const mockAnnouncements = [
-      { id: "a1", title: "🏆 Sunday Mega Tournament", desc: "Join Ludo Clash this Sunday for a massive 20,000 Coin reward pool!" },
-      { id: "a2", title: "🔥 2x Coins Active on Wins", desc: "For the next 24 hours, all completed Ludo matches yield double Coin rewards!" },
+      { id: "a1", title: "🏆 Ludo Sunday Mega Cup", desc: "Join Ludo Clash this Sunday for a massive 20,000 Coin reward pool!" },
+      { id: "a2", title: "🔥 Double Wins Weekend", desc: "For the next 48 hours, all completed Ludo matches yield double Coin rewards!" },
     ];
 
     return (
       <AppShell>
         <div className="relative min-h-screen pb-24 gaming-gradient-bg px-4 py-4 space-y-5 select-none text-white">
 
-          {/* Animated Matrix/Pulsing Glow backgrounds */}
+          {/* Animated glow backgrounds */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
             <div className="absolute top-1/4 left-10 w-64 h-64 rounded-full bg-purple-500/10 blur-3xl" />
             <div className="absolute top-2/3 right-10 w-72 h-72 rounded-full bg-blue-500/10 blur-3xl" />
           </div>
 
           <div className="relative z-10 space-y-5">
-            {/* Top Navigation Row (Gamer Header) */}
+            {/* Top Navigation Row (Gamer Header with Online Player counter beside exit button) */}
             <motion.div 
               className="flex items-center justify-between"
               initial={{ opacity: 0, y: -10 }}
@@ -149,19 +164,30 @@ export default function HomePage() {
                     </span>
                   </div>
                   <span className="text-[10px] text-purple-400 font-medium uppercase tracking-widest mt-0.5 block">
-                    Gaming Dashboard
+                    Gamer Lobby
                   </span>
                 </div>
               </div>
 
-              {/* Exit Button */}
-              <motion.button
-                onClick={() => setIsInGamingHub(false)}
-                whileTap={{ scale: 0.95 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-slate-900 border border-purple-500/40 text-purple-300 hover:text-white transition-colors shadow-[0_0_12px_rgba(168,85,247,0.15)]"
-              >
-                Exit Hub
-              </motion.button>
+              {/* Online players beside Exit Button */}
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 px-2 py-1 rounded-xl shadow-lg">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-[9px] font-black text-emerald-400 font-numeric leading-none">{onlineCount.toLocaleString()}</span>
+                  <span className="text-[8px] text-slate-400 uppercase font-bold tracking-wider leading-none">on</span>
+                </div>
+
+                <motion.button
+                  onClick={() => setIsInGamingHub(false)}
+                  whileTap={{ scale: 0.95 }}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-[9px] font-bold uppercase tracking-wider bg-slate-900 border border-purple-500/40 text-purple-300 hover:text-white transition-all shadow-[0_0_12px_rgba(168,85,247,0.15)]"
+                >
+                  Exit Hub
+                </motion.button>
+              </div>
             </motion.div>
 
             {/* Economy Card */}
@@ -174,7 +200,7 @@ export default function HomePage() {
               <div className="absolute top-0 right-0 w-24 h-24 pointer-events-none opacity-20 bg-radial-gradient from-purple-500 to-transparent" />
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total Balance</span>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total Balance (Dashboard)</span>
                   <div className="flex items-center gap-2 mt-1">
                     <CoinIcon size={24} className="text-amber-400 drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
                     <span className="text-2xl font-black font-numeric tracking-tight text-white">
@@ -184,44 +210,23 @@ export default function HomePage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Cash Wallet</span>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Won Coins (Convertible)</span>
                   <div className="flex items-center gap-1.5 mt-1 justify-end">
-                    <USDTIcon size={18} className="text-emerald-400 drop-shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
-                    <span className="text-lg font-black font-numeric tracking-tight text-emerald-400">
-                      ${data.wallet.usdt_balance.toFixed(2)}
+                    <TrophyIcon size={18} className="text-purple-400 drop-shadow-[0_0_6px_rgba(168,85,247,0.5)]" />
+                    <span className="text-lg font-black font-numeric tracking-tight text-purple-300">
+                      {wonCoinsBalance.toLocaleString()}
                     </span>
                   </div>
                 </div>
               </div>
               <div className="mt-4 pt-3 border-t border-purple-500/10 flex items-center justify-between">
                 <span className="text-[10px] font-bold text-purple-400/90 tracking-wide">
-                  ⚡ Exchange Rate: 100 Coins = $1.00
+                  ⚡ conversion: 100 Won Coins = $1.00 USDT
                 </span>
-                <span className="text-[9px] bg-slate-900 border border-slate-800 text-slate-500 px-2 py-0.5 rounded-md font-mono">
-                  Verified Economy
-                </span>
-              </div>
-            </motion.div>
-
-            {/* Live Active Players Pulse */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-slate-950/40 border border-slate-800"
-            >
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                <span className="text-xs font-bold text-slate-200">
-                  Ludo Clash matchmaking active
+                <span className="text-[9px] bg-slate-900 border border-slate-800 text-emerald-400 font-mono font-bold">
+                  Cash Wallet: ${data.wallet.usdt_balance.toFixed(2)}
                 </span>
               </div>
-              <span className="text-[10px] font-extrabold text-slate-400 font-numeric">
-                2,481 Players Online
-              </span>
             </motion.div>
 
             {/* Play Ludo CTA (Featured Game) */}
@@ -231,7 +236,7 @@ export default function HomePage() {
               transition={{ delay: 0.15 }}
               className="relative rounded-2xl overflow-hidden border border-purple-500/40 bg-gradient-to-b from-purple-950 to-slate-950 shadow-[0_16px_48px_rgba(124,58,237,0.2)] group"
             >
-              {/* Premium gaming SVG pattern in background */}
+              {/* Ludo Board background grid */}
               <div className="absolute inset-0 opacity-10 pointer-events-none z-0">
                 <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" fill="none">
                   <defs>
@@ -243,32 +248,46 @@ export default function HomePage() {
                 </svg>
               </div>
 
-              {/* Ludo Custom SVG Illustration */}
-              <div className="absolute top-4 right-4 opacity-25 z-0 pointer-events-none group-hover:scale-110 transition-transform duration-300">
-                <svg width="120" height="120" viewBox="0 0 48 48" fill="none">
-                  <rect x="6" y="6" width="36" height="36" rx="8" fill="rgba(168,85,247,0.2)" stroke="#A855F7" strokeWidth="1.5"/>
-                  <circle cx="16" cy="16" r="5" fill="#A855F7"/>
-                  <circle cx="32" cy="16" r="5" fill="#3B82F6"/>
-                  <circle cx="16" cy="32" r="5" fill="#10B981"/>
-                  <circle cx="32" cy="32" r="5" fill="#F59E0B"/>
+              {/* Realistic Ludo Board SVG Artwork */}
+              <div className="absolute top-4 right-4 opacity-30 z-0 pointer-events-none group-hover:scale-110 transition-transform duration-300">
+                <svg width="125" height="125" viewBox="0 0 100 100" fill="none">
+                  <rect width="100" height="100" rx="10" fill="#1E293B" stroke="#475569" strokeWidth="2"/>
+                  {/* Top-Left Red quadrant */}
+                  <rect x="5" y="5" width="36" height="36" rx="4" fill="#EF4444" stroke="#fff" strokeWidth="1.5"/>
+                  <rect x="14" y="14" width="18" height="14" rx="2" fill="#fff"/>
+                  {/* Top-Right Green quadrant */}
+                  <rect x="59" y="5" width="36" height="36" rx="4" fill="#22C55E" stroke="#fff" strokeWidth="1.5"/>
+                  <rect x="68" y="14" width="18" height="14" rx="2" fill="#fff"/>
+                  {/* Bottom-Left Yellow quadrant */}
+                  <rect x="5" y="59" width="36" height="36" rx="4" fill="#EAB308" stroke="#fff" strokeWidth="1.5"/>
+                  <rect x="14" y="68" width="18" height="14" rx="2" fill="#fff"/>
+                  {/* Bottom-Right Blue quadrant */}
+                  <rect x="59" y="59" width="36" height="36" rx="4" fill="#3B82F6" stroke="#fff" strokeWidth="1.5"/>
+                  <rect x="68" y="68" width="18" height="14" rx="2" fill="#fff"/>
+                  {/* Paths & Center triangles */}
+                  <polygon points="50,50 41,41 59,41" fill="#22C55E"/>
+                  <polygon points="50,50 41,59 59,59" fill="#EAB308"/>
+                  <polygon points="50,50 41,41 41,59" fill="#EF4444"/>
+                  <polygon points="50,50 59,41 59,59" fill="#3B82F6"/>
+                  <rect x="41" y="41" width="18" height="18" stroke="#fff" strokeWidth="1.5"/>
                 </svg>
               </div>
 
               <div className="relative z-10 p-6 flex flex-col justify-between h-48">
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <span className="bg-red-500 text-white text-[8px] font-black px-2 py-0.5 rounded uppercase tracking-widest animate-pulse">
-                      HOT GAME
+                    <span className="bg-purple-600 text-white text-[8px] font-black px-2 py-0.5 rounded uppercase tracking-widest animate-pulse">
+                      FEATURED STAKE
                     </span>
                     <span className="text-[10px] text-purple-400 font-extrabold tracking-widest uppercase">
-                      MULTIPLAYER
+                      MULTIPLAYER PvP
                     </span>
                   </div>
                   <h3 className="text-xl font-black text-white mt-1.5 tracking-tight">
                     LUDO CLASH
                   </h3>
                   <p className="text-xs text-slate-300 max-w-[220px] mt-1 font-medium leading-relaxed">
-                    Battle 1v1 against real players and claim Coin stakes instantly!
+                    Battle against live players, roll the dice, and claim Coin stakes instantly!
                   </p>
                 </div>
 
@@ -280,46 +299,6 @@ export default function HomePage() {
                   <GamesIcon size={16} />
                   PLAY LUDO NOW
                 </motion.button>
-              </div>
-            </motion.div>
-
-            {/* Recent Winners (Mock Scroll list) */}
-            <motion.div
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="space-y-3"
-            >
-              <div className="flex items-center justify-between px-0.5">
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-purple-400">
-                  Recent Hub Winners
-                </h3>
-                <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1 font-numeric">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  +12.4k Coins Won Today
-                </span>
-              </div>
-
-              <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-none">
-                {mockWinners.map((w) => (
-                  <div 
-                    key={w.id}
-                    className="flex items-center gap-3 p-3 rounded-xl border border-slate-800 bg-slate-950/40 shrink-0 w-[180px]"
-                  >
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black text-white bg-gradient-to-tr ${w.avatarColor}`}>
-                      {w.letter}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[11px] font-bold text-slate-200 truncate">
-                        {w.username}
-                      </div>
-                      <div className="flex items-center gap-1 text-[10px] text-amber-400 font-extrabold font-numeric mt-0.5">
-                        <CoinIcon size={12} />
-                        +{w.winAmount}
-                      </div>
-                    </div>
-                  </div>
-                ))}
               </div>
             </motion.div>
 
