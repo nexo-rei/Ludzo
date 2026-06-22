@@ -319,3 +319,47 @@ export function FaqIcon({ size = 20, ...props }: IconProps) {
     </svg>
   );
 }
+
+
+// --- PREMIUM GAMING HUB ICONS ---
+
+export function GamingHomeIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+      <path d="M9 13h6M12 10v6" />
+    </svg>
+  );
+}
+
+export function GamingMatchesIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M6 9H4.5a2.5 2.5 0 010-5H6M18 9h1.5a2.5 2.5 0 000-5H18" />
+      <path d="M4 22h16M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34" />
+      <path d="M12 2a6 6 0 016 6v5a6 6 0 01-6 6 6 6 0 01-6-6V8a6 6 0 016-6z" />
+    </svg>
+  );
+}
+
+export function GamingPlayIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <rect x="2" y="6" width="20" height="12" rx="4" />
+      <path d="M6 12h4M8 10v4" />
+      <circle cx="15" cy="11" r="1" fill="currentColor" stroke="none" />
+      <circle cx="17" cy="13" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function GamingProfileIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+      <path d="M12 2a7 7 0 00-7 7v2a1 1 0 001 1h1" />
+      <path d="M12 2a7 7 0 017 7v2a1 1 0 001-1h1" />
+    </svg>
+  );
+}
