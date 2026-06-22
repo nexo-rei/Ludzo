@@ -395,63 +395,83 @@ body {
 .podium-3 { background: linear-gradient(180deg, #D97706 0%, #B45309 100%); }
 
 
-/* ============================================================
-   GAMING HUB CSS VARIABLES
-   Add these to your existing app/globals.css
-   ============================================================ */
 
-@layer base {
-  /* Gaming Hub color tokens — light mode defaults */
-  :root {
-    --gaming-background: 0 0% 100%;
-    --gaming-foreground: 222 47% 11%;
-    --gaming-surface: 210 20% 98%;
-    --gaming-muted: 220 9% 46%;
-    --gaming-border: 220 13% 91%;
-    --gaming-primary: 262 83% 58%;
-    --gaming-accent: 270 50% 52%;
-    --gaming-gold: 43 96% 56%;
-    --gaming-success: 142 71% 45%;
-    --gaming-error: 0 84% 60%;
-  }
+/* --- PREMIUM GAMING HUB UNIQUE VISUAL IDENTITY --- */
 
-  /* Dark mode gaming tokens */
-  .dark {
-    --gaming-background: 222 47% 6%;
-    --gaming-foreground: 220 13% 91%;
-    --gaming-surface: 222 47% 8%;
-    --gaming-muted: 220 9% 46%;
-    --gaming-border: 222 20% 16%;
-    --gaming-primary: 262 83% 58%;
-    --gaming-accent: 270 50% 60%;
-    --gaming-gold: 43 96% 56%;
-    --gaming-success: 142 71% 50%;
-    --gaming-error: 0 84% 65%;
-  }
+.gaming-gradient-bg {
+  background: radial-gradient(circle at top left, rgba(124, 58, 237, 0.2) 0%, rgba(59, 130, 246, 0.1) 40%, rgba(15, 23, 42, 1) 100%);
 }
 
-@layer utilities {
-  /* Hide scrollbar for horizontal scroll containers */
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
+/* For light mode inside gaming hub (glassmorphic light purple theme) */
+[data-theme="light"] .gaming-gradient-bg {
+  background: radial-gradient(circle at top left, rgba(168, 85, 247, 0.15) 0%, rgba(59, 130, 246, 0.08) 50%, rgba(248, 250, 252, 1) 100%);
+  color: #0F172A !important;
+}
 
-  /* Glass effect utility */
-  .glass {
-    background: hsl(var(--gaming-surface) / 0.5);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
+[data-theme="light"] .gaming-gradient-bg text, 
+[data-theme="light"] .gaming-gradient-bg h1, 
+[data-theme="light"] .gaming-gradient-bg h2, 
+[data-theme="light"] .gaming-gradient-bg h3, 
+[data-theme="light"] .gaming-gradient-bg h4, 
+[data-theme="light"] .gaming-gradient-bg p,
+[data-theme="light"] .gaming-gradient-bg span {
+  color: #0F172A !important;
+}
 
-  /* Line clamp utilities */
-  .line-clamp-2 {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
+[data-theme="light"] .gaming-gradient-bg .text-slate-400 {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .gaming-gradient-bg .text-slate-300 {
+  color: #1E293B !important;
+}
+
+[data-theme="light"] .gaming-gradient-bg .text-slate-500 {
+  color: #64748B !important;
+}
+
+[data-theme="light"] .gaming-gradient-bg .bg-slate-950\/40 {
+  background-color: rgba(255, 255, 255, 0.7) !important;
+  border-color: rgba(124, 58, 237, 0.2) !important;
+}
+
+[data-theme="light"] .gaming-gradient-bg .bg-slate-950\/70 {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  border-color: rgba(124, 58, 237, 0.25) !important;
+}
+
+[data-theme="light"] .gaming-gradient-bg .bg-slate-950\/60 {
+  background-color: rgba(255, 255, 255, 0.7) !important;
+  border-color: rgba(124, 58, 237, 0.2) !important;
+}
+
+[data-theme="light"] .gaming-gradient-bg .bg-slate-900 {
+  background-color: rgba(241, 245, 249, 1) !important;
+  border-color: rgba(226, 232, 240, 1) !important;
+}
+
+[data-theme="light"] .gaming-gradient-bg .bg-slate-900\/60 {
+  background-color: rgba(241, 245, 249, 0.8) !important;
+  border-color: rgba(226, 232, 240, 1) !important;
+}
+
+[data-theme="light"] .gaming-gradient-bg .text-white {
+  color: #0F172A !important;
+}
+
+[data-theme="light"] .gaming-gradient-bg .text-slate-100 {
+  color: #0F172A !important;
+}
+
+[data-theme="light"] .gaming-gradient-bg .text-slate-200 {
+  color: #1E293B !important;
+}
+
+/* Hide scrollbar utility */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
