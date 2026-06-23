@@ -97,7 +97,7 @@ export default function PlayPage() {
             </div>
 
             <Link
-              href="#"
+              href="/games"
               className="mt-4 flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-gaming-primary text-white text-sm font-semibold hover:bg-gaming-primary/90 active:scale-[0.98] transition-all"
             >
               <PlayIcon size={18} />
