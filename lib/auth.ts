@@ -15,6 +15,10 @@ export async function requireAuth(req: NextRequest): Promise<AuthResult> {
   const authHeader = req.headers.get("authorization");
   const xUserId = req.headers.get("x-user-id");
 
+  console.log("AUTH HEADER =", authHeader); // 👈 ADD
+  console.log("X USER ID =", xUserId);       // 👈 ADD
+  
+  
   let userId: string | null = null;
 
   if (authHeader?.startsWith("Bearer ")) {
@@ -22,6 +26,9 @@ export async function requireAuth(req: NextRequest): Promise<AuthResult> {
   } else if (xUserId) {
     userId = xUserId.trim();
   }
+  
+  console.log("PARSED USER ID =", userId); // 👈 ADD
+  
 
   if (!userId || userId.length < 10) {
     return { ok: false, error: "Unauthorized" };
