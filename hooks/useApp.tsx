@@ -180,14 +180,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!prev) return null;
       const nextCoins = Math.max(0, prev.coin_balance + coinsChange);
       const nextUsdt = Math.max(0, prev.usdt_balance + usdtChange);
+      const nextWon = Math.max(0, (prev.won_coins_balance || 0) + wonCoinsChange);
 
       localStorage.setItem("ludzo_wallet_coins_override", String(nextCoins));
       localStorage.setItem("ludzo_wallet_usdt_override", String(nextUsdt));
+      localStorage.setItem("ludzo_won_coins_balance", String(nextWon));
 
       return {
         ...prev,
         coin_balance: nextCoins,
         usdt_balance: nextUsdt,
+        won_coins_balance: nextWon,
       };
     });
 
