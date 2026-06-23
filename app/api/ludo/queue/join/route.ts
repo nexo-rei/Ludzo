@@ -4,7 +4,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
-  console.log("AUTH RESULT", auth);
   if (!auth.ok) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
