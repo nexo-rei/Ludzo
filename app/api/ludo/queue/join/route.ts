@@ -18,8 +18,11 @@ export async function POST(req: NextRequest) {
     const supabase = createAdminClient();
     const userId = auth.userId!;
 
+    // Server-Side Log: Queue Join Requested
+    console.log(`[LUDO MATCHMAKER] Queue Join: User ${userId} requested stake ${stake}`);
+
     // 1. Check if already in an active room
-    const { data: activeRooms, error: activeRoomErr } = await supabase
+    const { data: activeRooms } = await supabase
       .from("ludo_rooms")
       .select("id")
       .or(`status.eq.countdown,status.eq.active`)
@@ -27,6 +30,7 @@ export async function POST(req: NextRequest) {
       .limit(1);
 
     if (activeRooms && activeRooms.length > 0) {
+      console.log(`[LUDO MATCHMAKER] Queue Join Aborted: User ${userId} is already in active room ${activeRooms[0].id}`);
       return NextResponse.json({
         success: false,
         error: "You are already in an active match",
@@ -44,73 +48,49 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (activeQueue) {
+      console.log(`[LUDO MATCHMAKER] User ${userId} already has waiting queue entry ${activeQueue.id}`);
+
+      // Perform atomic matchmaking immediately on the existing queue
+      const { data: matchResult, error: matchErr } = await supabase.rpc("match_ludo_queue", {
+        p_queue_id: activeQueue.id,
+        p_user_id: userId
+      });
+
+      if (!matchErr && matchResult && matchResult.matched) {
+        console.log(`[LUDO MATCHMAKER] MATCH SUCCESS: Room ${matchResult.room_id} created instantly for User ${userId}. Opponent: ${matchResult.opponent_id} (${matchResult.match_type})`);
+        return NextResponse.json({ success: true, matched: true, room_id: matchResult.room_id });
+      }
+
       return NextResponse.json({ success: true, matched: false, queue_id: activeQueue.id });
     }
 
-    // 3. Deduct coins and join queue using RPC function
+    // 3. Deduct coins and create queue entry atomically
     const { data: queueId, error: rpcErr } = await supabase.rpc("join_ludo_queue", {
       p_user_id: userId,
       p_stake: stake
     });
 
     if (rpcErr) {
+      console.error("[LUDO MATCHMAKER] Wallet deduction / join_ludo_queue failed:", rpcErr);
       return NextResponse.json({ success: false, error: rpcErr.message }, { status: 400 });
     }
 
-    // 4. Try matching with another waiting user immediately
-    const { data: opponentQueue } = await supabase
-      .from("ludo_queues")
-      .select("id, user_id")
-      .eq("stake", stake)
-      .eq("status", "waiting")
-      .neq("user_id", userId)
-      .order("joined_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
+    console.log(`[LUDO MATCHMAKER] Queue Joined: Queue ID ${queueId} created for User ${userId} with stake ${stake}`);
 
-    if (opponentQueue) {
-      // Create a Room
-      const initialBoard = {
-        pieces: {
-          player_1: [0, 0, 0, 0],
-          player_2: [0, 0, 0, 0]
-        },
-        last_roll: 0,
-        dice_rolled: false,
-        movable_pieces: []
-      };
+    // 4. Perform atomic matchmaking check immediately on join
+    const { data: matchResult, error: matchErr } = await supabase.rpc("match_ludo_queue", {
+      p_queue_id: queueId,
+      p_user_id: userId
+    });
 
-      const { data: room, error: roomErr } = await supabase
-        .from("ludo_rooms")
-        .insert({
-          stake,
-          player_1_id: opponentQueue.user_id,
-          player_2_id: userId,
-          status: "countdown",
-          board_state: initialBoard,
-          turn_player_id: opponentQueue.user_id,
-          turn_start_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-
-      if (roomErr) {
-        console.error("Failed to create room:", roomErr);
-        return NextResponse.json({ success: true, matched: false, queue_id: queueId });
-      }
-
-      // Mark both queues as matched
-      await supabase
-        .from("ludo_queues")
-        .update({ status: "matched", room_id: room.id })
-        .in("id", [opponentQueue.id, queueId]);
-
-      return NextResponse.json({ success: true, matched: true, room_id: room.id });
+    if (!matchErr && matchResult && matchResult.matched) {
+      console.log(`[LUDO MATCHMAKER] MATCH SUCCESS (Instant Join): Room ${matchResult.room_id} created for User ${userId}. Opponent: ${matchResult.opponent_id} (${matchResult.match_type})`);
+      return NextResponse.json({ success: true, matched: true, room_id: matchResult.room_id });
     }
 
     return NextResponse.json({ success: true, matched: false, queue_id: queueId });
   } catch (err: any) {
-    console.error("[ludo_join_queue]", err);
+    console.error("[LUDO MATCHMAKER ERROR]", err);
     return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
   }
 }
