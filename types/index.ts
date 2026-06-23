@@ -43,6 +43,7 @@ export interface Wallet {
   user_id: string;
   coin_balance: number;
   usdt_balance: number;
+  won_coins_balance: number;
   updated_at: string;
 }
 
