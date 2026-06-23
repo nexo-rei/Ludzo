@@ -7,7 +7,7 @@ import { MatchesIcon, TrendUpIcon } from "@/components/gaming/GamingIcons";
 import EmptyState from "@/components/gaming/EmptyState";
 
 export default function MatchesPage() {
-  const { wallet } = useApp();
+  const { wallet, userId } = useApp();
   const [stats, setStats] = useState<any>({
     wins: 0,
     losses: 0,
@@ -22,10 +22,10 @@ export default function MatchesPage() {
 
   useEffect(() => {
     const loadStats = async () => {
-      if (!wallet?.user_id) return;
+      if (!userId) return;
       try {
         const res = await fetch("/api/ludo/stats", {
-          headers: { "Authorization": `Bearer ${wallet.user_id}` }
+          headers: { "Authorization": `Bearer ${userId}`, "x-user-id": userId || "" }
         });
         if (res.ok) {
           const data = await res.json();
@@ -42,7 +42,7 @@ export default function MatchesPage() {
     };
 
     loadStats();
-  }, [wallet?.user_id]);
+  }, [userId]);
 
   return (
     <div className="min-h-screen w-full bg-slate-950 text-white pb-24">
