@@ -8,7 +8,7 @@ const BOTS = [
   { name: "Priya Sharma", avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Priya" },
   { name: "Amit Verma", avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Amit" },
   { name: "Sneha Reddy", avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Sneha" },
-  { name: "Kabir", avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Kabir" },
+  { name: "Kabir Mehata", avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Kabir" },
   { name: "Neha Patel", avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Neha" },
   { name: "Vikram Malhotra", avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Vikram" }
 ];
