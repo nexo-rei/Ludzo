@@ -70,7 +70,7 @@ const REACTIONS = ["Laugh", "Angry", "Fire", "GG", "Crown", "Shock", "Cry"];
 
 export default function GamesPage() {
   const router = useRouter();
-  const { isInGamingHub, setIsInGamingHub, wallet, refreshWallet } = useApp();
+  const { isInGamingHub, setIsInGamingHub, wallet, refreshWallet, userId } = useApp();
 
   // Dialog / Modal overlays
   const [showStakes, setShowStakes] = useState(false);
@@ -160,7 +160,7 @@ export default function GamesPage() {
       if (!queueId) return;
       try {
         const res = await fetch(`/api/ludo/queue/status?queue_id=${queueId}`, {
-          headers: { "Authorization": `Bearer ${wallet?.user_id}` }
+          headers: { "Authorization": `Bearer ${userId}`, "x-user-id": userId || "" }
         });
         if (res.ok) {
           const data = await res.json();
@@ -190,7 +190,7 @@ export default function GamesPage() {
     }
 
     return () => clearInterval(pollInterval);
-  }, [isQueueing, queueId, wallet?.user_id]);
+  }, [isQueueing, queueId, userId]);
 
   // Countdown timer thread
   useEffect(() => {
@@ -227,7 +227,7 @@ export default function GamesPage() {
     if (!roomId) return;
     try {
       const res = await fetch(`/api/ludo/room/state?room_id=${roomId}`, {
-        headers: { "Authorization": `Bearer ${wallet?.user_id}` }
+        headers: { "Authorization": `Bearer ${userId}`, "x-user-id": userId || "" }
       });
       if (res.ok) {
         const data = await res.json();
@@ -235,14 +235,14 @@ export default function GamesPage() {
           const state = data.data;
           setRoomState(state);
 
-          const opponent = state.player_1_id === wallet?.user_id ? state.player_2_profile : state.player_1_profile;
+          const opponent = state.player_1_id === userId ? state.player_2_profile : state.player_1_profile;
           setRevealedOpponent(opponent);
 
           // Audio triggers on turn change
           if (state.status === "active") {
             if (prevTurnPlayerIdRef.current && prevTurnPlayerIdRef.current !== state.turn_player_id) {
               // Trigger vibration for turn alert
-              if (state.turn_player_id === wallet?.user_id) {
+              if (state.turn_player_id === userId) {
                 triggerVibe("dice");
               }
             }
@@ -253,7 +253,7 @@ export default function GamesPage() {
           const reactions = state.chat_reactions || [];
           if (reactions.length > prevReactionsCountRef.current) {
             const latest = reactions[reactions.length - 1];
-            if (latest.player_id !== wallet?.user_id) {
+            if (latest.player_id !== userId) {
               playSound("piece-move");
             }
             prevReactionsCountRef.current = reactions.length;
@@ -262,7 +262,7 @@ export default function GamesPage() {
           // Handle game completed/settled
           if (state.status === "completed" || state.status === "forfeited") {
             if (roomState?.status === "active") {
-              const won = state.winner_id === wallet?.user_id;
+              const won = state.winner_id === userId;
               playSound(won ? "victory" : "defeat");
               triggerVibe(won ? "victory" : "defeat");
               refreshWallet(); // Reload Won Coins & stats from Supabase
@@ -282,10 +282,19 @@ export default function GamesPage() {
       interval = setInterval(fetchRoomState, 1000);
     }
     return () => clearInterval(interval);
-  }, [roomId, gameActive, wallet?.user_id]);
+  }, [roomId, gameActive, userId]);
 
   // Register Join Queue Request
   const handleRegister = async (stake: number) => {
+    // Console log the userId for debugging as requested
+    console.log("JOIN USER ID", userId);
+
+    // Assert userId is authenticated
+    if (!userId) {
+      showToast("Authentication error. Please reload the app.", "error");
+      return;
+    }
+
     const coinBalance = wallet?.coin_balance ?? 0;
     if (coinBalance < stake) {
       showToast(`Insufficient balance. You need ${stake} Coins to play.`, "error");
@@ -297,7 +306,8 @@ export default function GamesPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${wallet?.user_id}`
+          "Authorization": `Bearer ${userId}`,
+          "x-user-id": userId || ""
         },
         body: JSON.stringify({ stake })
       });
@@ -337,7 +347,8 @@ export default function GamesPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${wallet?.user_id}`
+          "Authorization": `Bearer ${userId}`,
+          "x-user-id": userId || ""
         },
         body: JSON.stringify({ queue_id: queueId })
       });
@@ -367,7 +378,8 @@ export default function GamesPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${wallet?.user_id}`
+          "Authorization": `Bearer ${userId}`,
+          "x-user-id": userId || ""
         },
         body: JSON.stringify({ room_id: roomId })
       });
@@ -394,7 +406,8 @@ export default function GamesPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${wallet?.user_id}`
+          "Authorization": `Bearer ${userId}`,
+          "x-user-id": userId || ""
         },
         body: JSON.stringify({ room_id: roomId, piece_index: pieceIndex })
       });
@@ -424,7 +437,8 @@ export default function GamesPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${wallet?.user_id}`
+          "Authorization": `Bearer ${userId}`,
+          "x-user-id": userId || ""
         },
         body: JSON.stringify({ room_id: roomId })
       });
@@ -446,7 +460,8 @@ export default function GamesPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${wallet?.user_id}`
+          "Authorization": `Bearer ${userId}`,
+          "x-user-id": userId || ""
         },
         body: JSON.stringify({ room_id: roomId, reaction_type: reaction })
       });
@@ -1040,7 +1055,7 @@ export default function GamesPage() {
                       const cy = (coords.y * size) + (size / 2) + offsets.dy;
 
                       const opponentTurn = roomState.turn_player_id === roomState.player_2_id;
-                      const isRealPlayer2 = roomState.player_2_id === wallet?.user_id;
+                      const isRealPlayer2 = roomState.player_2_id === userId;
                       const canMove = opponentTurn && isRealPlayer2 && roomState.dice_rolled && roomState.movable_pieces.includes(idx);
 
                       return (
@@ -1094,9 +1109,9 @@ export default function GamesPage() {
                     <div>
                       <span className="text-xs font-bold text-slate-200 block truncate max-w-[120px]">You</span>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className={`w-1.5 h-1.5 rounded-full ${roomState.turn_player_id === wallet?.user_id ? "bg-purple-500 animate-pulse" : "bg-slate-500"}`} />
+                        <span className={`w-1.5 h-1.5 rounded-full ${roomState.turn_player_id === userId ? "bg-purple-500 animate-pulse" : "bg-slate-500"}`} />
                         <span className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wide">
-                          {roomState.turn_player_id === wallet?.user_id ? "YOUR TURN" : "Waiting"}
+                          {roomState.turn_player_id === userId ? "YOUR TURN" : "Waiting"}
                         </span>
                       </div>
                     </div>
@@ -1106,13 +1121,13 @@ export default function GamesPage() {
                   <div className="flex items-center gap-1">
                     {[...Array(3)].map((_, i) => (
                       <span key={i} className="text-sm">
-                        {i < (roomState.player_1_id === wallet?.user_id ? roomState.hearts_player_1 : roomState.hearts_player_2) ? "❤️" : "💔"}
+                        {i < (roomState.player_1_id === userId ? roomState.hearts_player_1 : roomState.hearts_player_2) ? "❤️" : "💔"}
                       </span>
                     ))}
                   </div>
 
                   {/* Play Dice Area */}
-                  {roomState.status === "active" && roomState.turn_player_id === wallet?.user_id ? (
+                  {roomState.status === "active" && roomState.turn_player_id === userId ? (
                     <div className="shrink-0 flex items-center gap-2">
                       {!roomState.dice_rolled ? (
                         <motion.button
@@ -1149,7 +1164,7 @@ export default function GamesPage() {
                     🏳️ Forfeit Match
                   </button>
                   <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wide text-right truncate">
-                    {roomState.dice_rolled && roomState.turn_player_id === wallet?.user_id
+                    {roomState.dice_rolled && roomState.turn_player_id === userId
                       ? "TAP HIGHLIGHTED PEG ON BOARD TO MOVE"
                       : "WAITING FOR ACTIVE PLAY COORDINATE"}
                   </div>
@@ -1202,7 +1217,7 @@ export default function GamesPage() {
                     animate={{ scale: 1, opacity: 1 }}
                     className="w-full max-w-sm rounded-3xl border border-purple-500/30 bg-slate-950 p-6 text-center space-y-5 shadow-2xl relative overflow-hidden"
                   >
-                    {roomState.winner_id === wallet?.user_id ? (
+                    {roomState.winner_id === userId ? (
                       <>
                         <div className="absolute inset-0 pointer-events-none opacity-20 bg-radial-gradient from-emerald-500 to-transparent" />
                         <h4 className="text-xl font-black text-emerald-400 tracking-tight animate-bounce">🏆 VICTORY CHAMPION!</h4>
