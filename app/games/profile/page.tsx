@@ -6,7 +6,7 @@ import { useApp } from "@/hooks/useApp";
 import { TrophyIcon, CoinIcon } from "@/components/ui/Icons";
 
 export default function ProfilePage() {
-  const { wallet } = useApp();
+  const { wallet, userId } = useApp();
   const [stats, setStats] = useState<any>({
     wins: 0,
     losses: 0,
@@ -20,10 +20,10 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const loadStats = async () => {
-      if (!wallet?.user_id) return;
+      if (!userId) return;
       try {
         const res = await fetch("/api/ludo/stats", {
-          headers: { "Authorization": `Bearer ${wallet.user_id}` }
+          headers: { "Authorization": `Bearer ${userId}`, "x-user-id": userId || "" }
         });
         if (res.ok) {
           const data = await res.json();
@@ -39,7 +39,7 @@ export default function ProfilePage() {
     };
 
     loadStats();
-  }, [wallet?.user_id]);
+  }, [userId]);
 
   return (
     <div className="min-h-screen w-full bg-slate-950 text-white pb-24">
