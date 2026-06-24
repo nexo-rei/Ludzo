@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { HomeIcon, MatchesIcon, PlayIcon, ProfileIcon } from "./GamingIcons";
+import { useApp } from "@/hooks/useApp";
 
 const TABS = [
   { label: "Home", href: "/games", icon: HomeIcon },
@@ -14,6 +15,12 @@ const TABS = [
 
 export default function GamingBottomNav() {
   const pathname = usePathname();
+  const { isGameActive } = useApp();
+
+  // Hide nav during active game (game route OR gameActive state)
+  if (isGameActive || pathname.startsWith("/games/game")) {
+    return null;
+  }
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50">
