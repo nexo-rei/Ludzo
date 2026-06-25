@@ -12,18 +12,22 @@ export async function GET(req: NextRequest) {
     const supabase = createAdminClient();
     const userId = auth.userId!;
 
-    // Check for any active/countdown room the player is in
+    // Use a single combined OR so PostgREST receives one filter expression.
+    // Two chained .or() calls overwrite each other — do NOT chain them.
     const { data: rooms, error } = await supabase
       .from("ludo_rooms")
       .select("id, status, stake")
-      .or(`status.eq.countdown,status.eq.active`)
+      .in("status", ["countdown", "active"])
       .or(`player_1_id.eq.${userId},player_2_id.eq.${userId}`)
       .order("created_at", { ascending: false })
       .limit(1);
 
     if (error) {
-      console.error("[active_room] query error:", error);
-      return NextResponse.json({ success: false, error: "Query failed" }, { status: 500 });
+      console.error("[active_room] query error:", error.message, error.code);
+      return NextResponse.json(
+        { success: false, error: "Query failed", detail: error.message },
+        { status: 500 }
+      );
     }
 
     if (rooms && rooms.length > 0) {
@@ -38,7 +42,10 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ success: true, has_active_room: false });
   } catch (err: any) {
-    console.error("[active_room] error:", err);
-    return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+    console.error("[active_room] exception:", err?.message ?? err);
+    return NextResponse.json(
+      { success: false, error: "Server error" },
+      { status: 500 }
+    );
   }
 }
