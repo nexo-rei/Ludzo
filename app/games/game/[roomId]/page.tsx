@@ -6,6 +6,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useApp } from "@/hooks/useApp";
 import { showToast } from "@/components/ui/Toast";
 
+//rebuild
 // ─── Ludo Board Track Coordinates (15×15 grid) ───────────────────────────────
 const TRACK_COORDS = [
   { x: 0, y: 6 }, { x: 1, y: 6 }, { x: 2, y: 6 }, { x: 3, y: 6 },
