@@ -99,14 +99,15 @@ function EmoteSVG({ type, size = 24 }: { type: string; size?: number }) {
 
 // ─── Dice Face SVG ────────────────────────────────────────────────────────────
 function DiceFace({ value, size = 40 }: { value: number; size?: number }) {
-  const dots: [number, number][] = {
+  const dotMap: Record<number, [number, number][]> = {
     1: [[50, 50]],
     2: [[25, 25], [75, 75]],
     3: [[25, 25], [50, 50], [75, 75]],
     4: [[25, 25], [75, 25], [25, 75], [75, 75]],
     5: [[25, 25], [75, 25], [50, 50], [25, 75], [75, 75]],
     6: [[25, 20], [75, 20], [25, 50], [75, 50], [25, 80], [75, 80]],
-  }[value] || [];
+  };
+  const dots: [number, number][] = dotMap[value] ?? [];
 
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
