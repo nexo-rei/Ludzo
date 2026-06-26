@@ -4,7 +4,6 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { HomeIcon, MatchesIcon, PlayIcon, ProfileIcon } from "./GamingIcons";
-import { useApp } from "@/hooks/useApp";
 
 const TABS = [
   { label: "Home", href: "/games", icon: HomeIcon },
@@ -15,12 +14,10 @@ const TABS = [
 
 export default function GamingBottomNav() {
   const pathname = usePathname();
-  const { isGameActive } = useApp();
 
-  // Hide nav during active game (game route OR gameActive state)
-  if (isGameActive || pathname.startsWith("/games/game")) {
-    return null;
-  }
+  // Hide entirely during active game — layout already short-circuits,
+  // but this is a belt-and-suspenders guard.
+  if (pathname.startsWith("/games/game/")) return null;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50">
@@ -29,7 +26,9 @@ export default function GamingBottomNav() {
           <ul className="flex items-center justify-around">
             {TABS.map((tab) => {
               const Icon = tab.icon;
-              const isActive = pathname === tab.href || pathname.startsWith(tab.href + "/");
+              const isActive =
+                pathname === tab.href ||
+                (tab.href !== "/games" && pathname.startsWith(tab.href + "/"));
               return (
                 <li key={tab.href} className="relative flex-1">
                   <Link
