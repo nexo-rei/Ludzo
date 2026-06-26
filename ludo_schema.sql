@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS ludo_rooms (
     board_state         jsonb       NOT NULL DEFAULT '{}'::jsonb,
     turn_player_id      text        NOT NULL,
     turn_start_at       timestamptz NOT NULL DEFAULT now(),
+    match_start_at      timestamptz NOT NULL DEFAULT now(),
     dice_rolled         boolean     NOT NULL DEFAULT false,
     last_roll           integer     NOT NULL DEFAULT 0
                                     CHECK (last_roll >= 0 AND last_roll <= 6),
@@ -78,6 +79,9 @@ CREATE INDEX IF NOT EXISTS idx_ludo_rooms_player_2
 
 CREATE INDEX IF NOT EXISTS idx_ludo_rooms_created
     ON ludo_rooms (created_at DESC);
+
+ALTER TABLE ludo_rooms
+    ADD COLUMN IF NOT EXISTS match_start_at timestamptz NOT NULL DEFAULT now();
 
 
 -- ====================================================================
@@ -471,6 +475,7 @@ BEGIN
 
     -- ── Winner history + stats ────────────────────────────────────
     IF v_winner_uuid IS NOT NULL THEN
+        INSERT INTO ludo_stats (user_id) VALUES (v_winner_uuid) ON CONFLICT (user_id) DO NOTHING;
         INSERT INTO ludo_match_history
             (user_id, room_id, opponent_name, opponent_avatar,
              stake, result, duration, reward, created_at)
@@ -498,6 +503,7 @@ BEGIN
 
     -- ── Loser history + stats ─────────────────────────────────────
     IF v_loser_uuid IS NOT NULL THEN
+        INSERT INTO ludo_stats (user_id) VALUES (v_loser_uuid) ON CONFLICT (user_id) DO NOTHING;
         INSERT INTO ludo_match_history
             (user_id, room_id, opponent_name, opponent_avatar,
              stake, result, duration, reward, created_at)
@@ -523,6 +529,81 @@ BEGIN
 END;
 $$;
 
+
+
+
+-- ====================================================================
+-- 12B. RPC: match_ludo_queue
+--     Atomically pairs waiting players or creates bot room after timeout.
+-- ====================================================================
+
+CREATE OR REPLACE FUNCTION public.match_ludo_queue(
+    p_queue_id uuid,
+    p_user_id  uuid
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_my ludo_queues%ROWTYPE;
+    v_opp ludo_queues%ROWTYPE;
+    v_room_id uuid;
+    v_bot ludo_bot_profiles%ROWTYPE;
+    v_bot_id text;
+    v_board jsonb;
+BEGIN
+    SELECT * INTO v_my
+    FROM ludo_queues
+    WHERE id = p_queue_id AND user_id = p_user_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('matched', false, 'cancelled', true);
+    END IF;
+
+    IF v_my.status = 'matched' THEN
+        RETURN jsonb_build_object('matched', true, 'room_id', v_my.room_id, 'match_type', 'existing');
+    ELSIF v_my.status <> 'waiting' THEN
+        RETURN jsonb_build_object('matched', false, 'cancelled', true);
+    END IF;
+
+    SELECT * INTO v_opp
+    FROM ludo_queues
+    WHERE stake = v_my.stake
+      AND status = 'waiting'
+      AND user_id <> p_user_id
+    ORDER BY joined_at ASC
+    LIMIT 1
+    FOR UPDATE SKIP LOCKED;
+
+    v_board := jsonb_build_object('pieces', jsonb_build_object('player_1', jsonb_build_array(0,0,0,0), 'player_2', jsonb_build_array(0,0,0,0)));
+
+    IF FOUND THEN
+        INSERT INTO ludo_rooms (stake, player_1_id, player_2_id, board_state, turn_player_id, turn_start_at, match_start_at, status)
+        VALUES (v_my.stake, v_opp.user_id, p_user_id::text, v_board, v_opp.user_id::text, now(), now(), 'countdown')
+        RETURNING id INTO v_room_id;
+
+        UPDATE ludo_queues SET status = 'matched', room_id = v_room_id WHERE id IN (v_my.id, v_opp.id);
+        RETURN jsonb_build_object('matched', true, 'room_id', v_room_id, 'match_type', 'real', 'opponent_id', v_opp.user_id);
+    END IF;
+
+    IF now() - v_my.joined_at < interval '20 seconds' THEN
+        RETURN jsonb_build_object('matched', false);
+    END IF;
+
+    SELECT * INTO v_bot FROM ludo_bot_profiles WHERE active = true ORDER BY random() LIMIT 1;
+    v_bot_id := 'bot_' || COALESCE(v_bot.id::text, replace(gen_random_uuid()::text, '-', ''));
+    v_board := jsonb_set(v_board, '{bot_profile}', jsonb_build_object('name', COALESCE(v_bot.bot_name, 'Ludo Bot'), 'avatar', COALESCE(v_bot.avatar, '')));
+
+    INSERT INTO ludo_rooms (stake, player_1_id, player_2_id, board_state, turn_player_id, turn_start_at, match_start_at, status)
+    VALUES (v_my.stake, p_user_id, v_bot_id, v_board, p_user_id::text, now(), now(), 'countdown')
+    RETURNING id INTO v_room_id;
+
+    UPDATE ludo_queues SET status = 'matched', room_id = v_room_id WHERE id = v_my.id;
+    RETURN jsonb_build_object('matched', true, 'room_id', v_room_id, 'match_type', 'bot', 'opponent_id', v_bot_id);
+END;
+$$;
 
 -- ====================================================================
 -- 13. RPC: update_ludo_stats  (manual override / admin correction)

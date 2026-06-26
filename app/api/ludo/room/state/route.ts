@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { MATCH_SECONDS, TURN_SECONDS, normalizeBoardState } from "@/lib/ludo/engine";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth(req);
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
 
-    let boardState = room.board_state;
+    let boardState = normalizeBoardState(room.board_state);
     let status = room.status;
     let turnPlayerId = room.turn_player_id;
     let turnStartAt = new Date(room.turn_start_at).getTime();
@@ -51,7 +52,8 @@ export async function GET(req: NextRequest) {
     let stateModified = false;
 
     const now = Date.now();
-    const matchDuration = Math.floor((now - new Date(room.created_at).getTime()) / 1000);
+    const matchStartAt = room.match_start_at || room.created_at;
+    const matchDuration = Math.floor((now - new Date(matchStartAt).getTime()) / 1000);
 
     // 1. Handle Countdown Transition (10 seconds)
     if (status === "countdown") {
@@ -66,7 +68,7 @@ export async function GET(req: NextRequest) {
     // 2. Handle Turn Timeouts (18 seconds total: 15s turn + 3s extra warning)
     if (status === "active") {
       const turnElapsed = (now - turnStartAt) / 1000;
-      if (turnElapsed >= 18) {
+      if (turnElapsed >= TURN_SECONDS) {
         // Apply heart loss penalty to current turn player
         if (turnPlayerId === room.player_1_id) {
           hearts1 = Math.max(0, hearts1 - 1);
@@ -102,7 +104,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 3. Handle Game Match Timer Expiry (8 Minutes = 480 seconds)
-    if (status === "active" && matchDuration >= 480) {
+    if (status === "active" && matchDuration >= MATCH_SECONDS) {
       status = "completed";
       winReason = "score_timer";
       if (score1 === score2) {
@@ -322,7 +324,10 @@ export async function GET(req: NextRequest) {
         player_2_profile: p2Profile,
         status,
         turn_player_id: turnPlayerId,
-        turn_remaining_seconds: Math.max(0, 18 - Math.floor((now - turnStartAt) / 1000)),
+        turn_remaining_seconds: Math.max(0, TURN_SECONDS - Math.floor((now - turnStartAt) / 1000)),
+        match_start_time: matchStartAt,
+        server_time: new Date(now).toISOString(),
+        match_remaining_seconds: Math.max(0, MATCH_SECONDS - matchDuration),
         dice_rolled: diceRolled,
         last_roll: lastRoll,
         movable_pieces: movablePieces,

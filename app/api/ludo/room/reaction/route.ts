@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const { room_id, reaction_type } = await req.json();
-    const allowedReactions = ["Laugh", "Angry", "Fire", "GG", "Crown", "Shock", "Cry"];
+    const allowedReactions = ["Laugh", "Angry", "Fire", "GG", "Crown", "Shock", "Cry", "Clap"];
     if (!room_id || !allowedReactions.includes(reaction_type)) {
       return NextResponse.json({ success: false, error: "Invalid reaction parameters" }, { status: 400 });
     }
@@ -45,8 +45,14 @@ export async function POST(req: NextRequest) {
 
     await supabase
       .from("ludo_rooms")
-      .update({ chat_reactions: updatedReactions })
+      .update({ chat_reactions: updatedReactions, updated_at: new Date().toISOString() })
       .eq("id", room_id);
+
+    await supabase.from("ludo_reactions").insert({
+      room_id,
+      sender_id: userId,
+      reaction: reaction_type,
+    });
 
     return NextResponse.json({ success: true });
 
