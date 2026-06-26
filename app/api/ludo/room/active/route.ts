@@ -12,8 +12,8 @@ export async function GET(req: NextRequest) {
     const supabase = createAdminClient();
     const userId = auth.userId!;
 
-    // Use a single combined OR so PostgREST receives one filter expression.
-    // Two chained .or() calls overwrite each other — do NOT chain them.
+    // Single combined filter — do NOT chain two .or() calls, the second one
+    // silently overwrites the first in PostgREST.
     const { data: rooms, error } = await supabase
       .from("ludo_rooms")
       .select("id, status, stake")
@@ -43,9 +43,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: true, has_active_room: false });
   } catch (err: any) {
     console.error("[active_room] exception:", err?.message ?? err);
-    return NextResponse.json(
-      { success: false, error: "Server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
   }
 }
