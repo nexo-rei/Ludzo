@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     const { data: activeRooms } = await supabase
       .from("ludo_rooms")
       .select("id")
-      .or(`status.eq.countdown,status.eq.active`)
+      .in("status", ["countdown", "active"])
       .or(`player_1_id.eq.${userId},player_2_id.eq.${userId}`)
       .limit(1);
 

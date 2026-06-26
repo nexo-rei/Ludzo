@@ -57,7 +57,10 @@ interface RoomState {
   loser_id: string | null;
   win_reason: string | null;
   board_state: BoardState;
-  chat_reactions: Array<{ player_id: string; type: string; sent_at: string }>;
+  chat_reactions: Array<{ player_id: string; type: string; sent_at?: string; timestamp?: number }>;
+  match_start_time: string;
+  server_time: string;
+  match_remaining_seconds: number;
 }
 
 // ─── Ludo Board Track (15×15 grid, 52 cells clockwise) ───────────────────────
@@ -666,20 +669,19 @@ export default function LudoGamePage() {
     if (phase !== "playing" || !room?.id) return;
     if (matchTimerRef.current) clearInterval(matchTimerRef.current);
 
-    // Calculate remaining from server created_at
+    const sync = roomRef.current;
+    const baseRemaining = sync?.match_remaining_seconds ?? 480;
+    const localAt = Date.now();
     const recalc = () => {
-      try {
-        const elapsed = (Date.now() - new Date(roomRef.current?.id ? 0 : 0).getTime()) / 1000;
-        // We don't have created_at directly in RoomState — use local 480s countdown
-        setMatchSecs(prev => Math.max(0, prev - 1));
-      } catch {}
+      const elapsedSinceSync = Math.floor((Date.now() - localAt) / 1000);
+      setMatchSecs(Math.max(0, baseRemaining - elapsedSinceSync));
     };
 
     matchTimerRef.current = setInterval(recalc, 1000);
     return () => {
       if (matchTimerRef.current) clearInterval(matchTimerRef.current);
     };
-  }, [phase, room?.id]);
+  }, [phase, room?.id, room?.server_time, room?.match_remaining_seconds]);
 
   // ── Turn timer (display only, server is authoritative) ────────────────────
   useEffect(() => {
