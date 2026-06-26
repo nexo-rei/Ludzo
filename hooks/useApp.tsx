@@ -36,9 +36,6 @@ interface AppContextValue {
   updateWalletBalances: (coinsChange: number, usdtChange: number, wonCoinsChange: number) => void;
   recordMatchResult: (isWin: boolean, stakes: number) => void;
   clearGamingData: () => void;
-  // Game-in-progress state for hiding nav
-  isGameActive: boolean;
-  setIsGameActive: (b: boolean) => void;
 }
 
 const AppContext = createContext<AppContextValue>({
@@ -50,8 +47,6 @@ const AppContext = createContext<AppContextValue>({
   updateWalletBalances: () => {},
   recordMatchResult: () => {},
   clearGamingData: () => {},
-  isGameActive: false,
-  setIsGameActive: () => {},
 });
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -60,7 +55,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [prefs, setPrefs] = useState<UserPreferences | null>(null);
   const [loading, setLoading] = useState(true);
   const [isInGamingHub, setIsInGamingHubState] = useState<boolean>(false);
-  const [isGameActive, setIsGameActiveState] = useState<boolean>(false);
 
   // Gaming integrations
   const [wonCoinsBalance, setWonCoinsBalanceState] = useState<number>(0);
@@ -76,10 +70,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setIsInGamingHub = useCallback((value: boolean) => {
     setIsInGamingHubState(value);
     localStorage.setItem("ludzo_in_gaming_hub", value ? "true" : "false");
-  }, []);
-
-  const setIsGameActive = useCallback((value: boolean) => {
-    setIsGameActiveState(value);
   }, []);
 
   useEffect(() => {
@@ -99,6 +89,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (storedWon) {
       setWonCoinsBalanceState(Number(storedWon));
     } else {
+      // Default to 0, wait for Supabase DB values to load
       setWonCoinsBalanceState(0);
     }
 
@@ -115,6 +106,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
+          // If we have stored wallet overrides, merge them to preserve demo consistency
           const storedCoinsOverride = localStorage.getItem("ludzo_wallet_coins_override");
           const storedUsdtOverride = localStorage.getItem("ludzo_wallet_usdt_override");
           const finalWallet = { ...data.data };
@@ -182,6 +174,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (p) localStorage.setItem("ludzo_prefs", JSON.stringify(p));
   }, []);
 
+  // Update wallet coin and usdt balances locally
   const updateWalletBalances = useCallback((coinsChange: number, usdtChange: number, wonCoinsChange: number) => {
     setWallet((prev) => {
       if (!prev) return null;
@@ -208,6 +201,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Record simulated match result
   const recordMatchResult = useCallback((isWin: boolean, stakes: number) => {
     setGamingStatsState((prev) => {
       const nextWins = isWin ? prev.wins + 1 : prev.wins;
@@ -228,6 +222,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       localStorage.setItem("ludzo_gaming_stats", JSON.stringify(nextStats));
 
+      // Append to the list of user match history in localStorage
       const historyKey = "ludzo_match_history";
       const storedHistory = localStorage.getItem(historyKey);
       let historyList = [];
@@ -249,10 +244,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
 
     if (isWin) {
+      // Entry fee of 50 was deducted at start of match. Winning awards 100 total (refund 50 stake + win 50).
+      // This results in net +50 Coins. We also add +50 to Won Coins balance!
       updateWalletBalances(100, 0, 50);
+    } else {
+      // Loss: entry fee of 50 was deducted at start, and nothing is returned. Net -50 Coins.
     }
   }, [updateWalletBalances]);
 
+  // Clear all game logs, override balances, and statistics
   const clearGamingData = useCallback(() => {
     localStorage.removeItem("ludzo_won_coins_balance");
     localStorage.removeItem("ludzo_gaming_stats");
@@ -294,8 +294,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updateWalletBalances,
         recordMatchResult,
         clearGamingData,
-        isGameActive,
-        setIsGameActive,
       }}
     >
       {children}
