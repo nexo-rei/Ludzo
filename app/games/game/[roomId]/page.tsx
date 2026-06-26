@@ -1,14 +1,67 @@
 "use client";
 
+/**
+ * LUDZO — Ludo 1v1 Game Screen
+ * ─────────────────────────────
+ * Route: /games/game/[roomId]
+ *
+ * Architecture decisions:
+ *  - Full-screen fixed overlay (z-[999]) — no layout chrome
+ *  - Single source of truth: server room state, polled every 1.2s
+ *  - Phase machine: loading → pre-match → countdown → playing → ended
+ *  - Reconnect-safe: on any reopen, if room is active → skip to playing
+ *  - Zero null crashes: every server field has a safe default
+ *  - No AnimatePresence on critical paths that can cause blank renders
+ */
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useParams } from "next/navigation";
 import { useApp } from "@/hooks/useApp";
 import { showToast } from "@/components/ui/Toast";
 
-//rebuild
-// ─── Ludo Board Track Coordinates (15×15 grid) ───────────────────────────────
-const TRACK_COORDS = [
+// ─── Types ────────────────────────────────────────────────────────────────────
+type GamePhase = "loading" | "pre-match" | "countdown" | "playing" | "ended" | "error";
+
+interface PlayerProfile {
+  name: string;
+  avatar: string;
+}
+
+interface BoardState {
+  pieces: {
+    player_1: number[];
+    player_2: number[];
+  };
+  bot_profile?: PlayerProfile;
+}
+
+interface RoomState {
+  id: string;
+  stake: number;
+  player_1_id: string;
+  player_2_id: string;
+  player_1_profile: PlayerProfile;
+  player_2_profile: PlayerProfile;
+  status: "countdown" | "active" | "completed" | "forfeited";
+  turn_player_id: string;
+  turn_remaining_seconds: number;
+  dice_rolled: boolean;
+  last_roll: number;
+  movable_pieces: number[];
+  hearts_player_1: number;
+  hearts_player_2: number;
+  score_player_1: number;
+  score_player_2: number;
+  winner_id: string | null;
+  loser_id: string | null;
+  win_reason: string | null;
+  board_state: BoardState;
+  chat_reactions: Array<{ player_id: string; type: string; sent_at: string }>;
+}
+
+// ─── Ludo Board Track (15×15 grid, 52 cells clockwise) ───────────────────────
+const TRACK: { x: number; y: number }[] = [
   { x: 0, y: 6 }, { x: 1, y: 6 }, { x: 2, y: 6 }, { x: 3, y: 6 },
   { x: 4, y: 6 }, { x: 5, y: 6 }, { x: 6, y: 5 }, { x: 6, y: 4 },
   { x: 6, y: 3 }, { x: 6, y: 2 }, { x: 6, y: 1 }, { x: 6, y: 0 },
@@ -23,27 +76,29 @@ const TRACK_COORDS = [
   { x: 6, y: 9 }, { x: 5, y: 8 }, { x: 4, y: 8 }, { x: 3, y: 8 },
   { x: 2, y: 8 }, { x: 1, y: 8 }, { x: 0, y: 8 }, { x: 0, y: 7 },
 ];
+const SAFE_SPOTS = new Set([1, 9, 14, 22, 27, 35, 40, 48]);
+const STAR_SPOTS = new Set([9, 22, 35, 48]);
+const CELL = 100 / 15; // SVG units per grid cell
 
-const STAR_SPOTS = [9, 22, 35, 48];
-const EMOTES = ["Laugh", "Angry", "Fire", "Crown", "Clap", "Shock"];
+// ─── Emote Definitions ────────────────────────────────────────────────────────
+const EMOTES = ["Laugh", "Angry", "Fire", "Crown", "Clap", "Shock"] as const;
+type EmoteType = typeof EMOTES[number];
 
-// ─── SVG Emote Icons ──────────────────────────────────────────────────────────
-function EmoteSVG({ type, size = 24 }: { type: string; size?: number }) {
-  const s = size;
+// ─── SVG Emote ────────────────────────────────────────────────────────────────
+function EmoteSVG({ type, size = 24 }: { type: EmoteType | string; size?: number }) {
   switch (type) {
     case "Laugh":
       return (
-        <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+        <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
           <circle cx="16" cy="16" r="15" fill="#FBBF24" stroke="#F59E0B" strokeWidth="1.5" />
           <ellipse cx="11" cy="13" rx="2" ry="2.5" fill="#92400E" />
           <ellipse cx="21" cy="13" rx="2" ry="2.5" fill="#92400E" />
           <path d="M9 19 Q16 26 23 19" stroke="#92400E" strokeWidth="2" strokeLinecap="round" fill="#FCD34D" />
-          <path d="M9 21 Q16 28 23 21" fill="#EF4444" opacity="0.7" />
         </svg>
       );
     case "Angry":
       return (
-        <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+        <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
           <circle cx="16" cy="16" r="15" fill="#EF4444" stroke="#DC2626" strokeWidth="1.5" />
           <path d="M8 11 L14 14" stroke="#7F1D1D" strokeWidth="2.5" strokeLinecap="round" />
           <path d="M24 11 L18 14" stroke="#7F1D1D" strokeWidth="2.5" strokeLinecap="round" />
@@ -54,14 +109,14 @@ function EmoteSVG({ type, size = 24 }: { type: string; size?: number }) {
       );
     case "Fire":
       return (
-        <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
-          <path d="M16 2 C16 2 20 8 18 13 C22 10 24 6 22 2 C26 6 28 12 26 18 C28 16 29 14 28 10 C31 15 30 22 26 26 C24 30 20 31 16 31 C12 31 8 30 6 26 C2 22 1 15 4 10 C3 14 4 16 6 18 C4 12 6 6 10 2 C8 6 10 10 14 13 C12 8 16 2 16 2Z" fill="#F97316" />
-          <path d="M16 12 C16 12 19 16 17 20 C20 18 21 14 20 12 C22 15 22 20 19 24 C18 27 16 28 16 28 C16 28 14 27 13 24 C10 20 10 15 12 12 C11 14 12 16 14 20 C12 16 16 12 16 12Z" fill="#FCD34D" />
+        <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+          <path d="M16 2C16 2 20 8 18 13C22 10 24 6 22 2C26 6 28 12 26 18C28 16 29 14 28 10C31 15 30 22 26 26C24 30 20 31 16 31C12 31 8 30 6 26C2 22 1 15 4 10C3 14 4 16 6 18C4 12 6 6 10 2C8 6 10 10 14 13C12 8 16 2 16 2Z" fill="#F97316" />
+          <path d="M16 12C16 12 19 16 17 20C20 18 21 14 20 12C22 15 22 20 19 24C18 27 16 28 16 28C16 28 14 27 13 24C10 20 10 15 12 12C11 14 12 16 14 20C12 16 16 12 16 12Z" fill="#FCD34D" />
         </svg>
       );
     case "Crown":
       return (
-        <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+        <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
           <path d="M4 24 L6 12 L12 18 L16 8 L20 18 L26 12 L28 24 Z" fill="#FBBF24" stroke="#F59E0B" strokeWidth="1.5" strokeLinejoin="round" />
           <rect x="4" y="24" width="24" height="4" rx="1" fill="#F59E0B" />
           <circle cx="16" cy="8" r="2.5" fill="#EF4444" />
@@ -71,20 +126,17 @@ function EmoteSVG({ type, size = 24 }: { type: string; size?: number }) {
       );
     case "Clap":
       return (
-        <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
-          <path d="M12 8 L10 16 L8 14 L7 10 Q7 7 10 7 Z" fill="#FBBF24" stroke="#F59E0B" strokeWidth="1" />
-          <path d="M14 6 L13 18 L11 16 L10 8 Q10 5 13 5 Z" fill="#FCD34D" stroke="#F59E0B" strokeWidth="1" />
-          <path d="M16 7 L17 19 L10 19 L9 10 Q10 7 13 7 L16 7 Z" fill="#FBBF24" stroke="#F59E0B" strokeWidth="1" />
-          <path d="M17 9 L20 20 L16 22 L13 19 L17 9 Z" fill="#FCD34D" stroke="#F59E0B" strokeWidth="1" />
-          <path d="M19 12 L22 22 L19 24 L18 21 L19 12 Z" fill="#FBBF24" stroke="#F59E0B" strokeWidth="1" />
-          <path d="M9 20 L20 22 L20 26 Q16 28 10 26 Z" fill="#F59E0B" />
-          <path d="M7 11 L6 13" stroke="#FBBF24" strokeWidth="1.5" strokeLinecap="round" />
-          <path d="M5 9 L4 12" stroke="#FBBF24" strokeWidth="1.5" strokeLinecap="round" />
+        <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+          <path d="M12 8 L10 16 L8 14 L7 10 Q7 7 10 7Z" fill="#FBBF24" stroke="#F59E0B" strokeWidth="1" />
+          <path d="M15 6 L14 19 L10 18 L10 8 Q10 5 13 5Z" fill="#FCD34D" stroke="#F59E0B" strokeWidth="1" />
+          <path d="M18 7 L19 20 L12 20 L11 9 Q12 6 15 6Z" fill="#FBBF24" stroke="#F59E0B" strokeWidth="1" />
+          <path d="M21 10 L22 21 L18 22 L17 20Z" fill="#FCD34D" stroke="#F59E0B" strokeWidth="1" />
+          <path d="M10 20 L20 22 L20 26 Q15 28 10 26Z" fill="#F59E0B" />
         </svg>
       );
     case "Shock":
       return (
-        <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+        <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
           <circle cx="16" cy="16" r="15" fill="#A855F7" stroke="#9333EA" strokeWidth="1.5" />
           <path d="M9 11 L15 13" stroke="#DDD6FE" strokeWidth="2.5" strokeLinecap="round" />
           <path d="M23 11 L17 13" stroke="#DDD6FE" strokeWidth="2.5" strokeLinecap="round" />
@@ -98,8 +150,8 @@ function EmoteSVG({ type, size = 24 }: { type: string; size?: number }) {
   }
 }
 
-// ─── Dice Face SVG ────────────────────────────────────────────────────────────
-function DiceFace({ value, size = 40 }: { value: number; size?: number }) {
+// ─── Dice Face ────────────────────────────────────────────────────────────────
+function DiceFace({ value, size = 40, rolling = false }: { value: number; size?: number; rolling?: boolean }) {
   const dotMap: Record<number, [number, number][]> = {
     1: [[50, 50]],
     2: [[25, 25], [75, 75]],
@@ -108,28 +160,32 @@ function DiceFace({ value, size = 40 }: { value: number; size?: number }) {
     5: [[25, 25], [75, 25], [50, 50], [25, 75], [75, 75]],
     6: [[25, 20], [75, 20], [25, 50], [75, 50], [25, 80], [75, 80]],
   };
-  const dots: [number, number][] = dotMap[value] ?? [];
+  const dots: [number, number][] = dotMap[value] ?? dotMap[1];
 
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
+    <motion.svg
+      width={size} height={size} viewBox="0 0 100 100" fill="none"
+      animate={rolling ? { rotate: [0, -20, 20, -15, 15, 0] } : {}}
+      transition={{ duration: 0.4, ease: "easeInOut" }}
+    >
       <rect width="100" height="100" rx="20" fill="#1E293B" stroke="#A855F7" strokeWidth="4" />
       {dots.map(([cx, cy], i) => (
         <circle key={i} cx={cx} cy={cy} r="9" fill="#A855F7" />
       ))}
-    </svg>
+    </motion.svg>
   );
 }
 
-// ─── Heart Indicator ──────────────────────────────────────────────────────────
-function HeartRow({ count, max = 3 }: { count: number; max?: number }) {
+// ─── Hearts Row ───────────────────────────────────────────────────────────────
+function Hearts({ count, max = 3 }: { count: number; max?: number }) {
   return (
     <div className="flex gap-0.5">
       {Array.from({ length: max }).map((_, i) => (
-        <svg key={i} width="14" height="14" viewBox="0 0 24 24" fill="none">
+        <svg key={i} width="13" height="13" viewBox="0 0 24 24" fill="none">
           <path
             d="M12 21C12 21 3 14 3 8.5C3 5.46 5.46 3 8.5 3C10.24 3 11.91 3.81 13 5.08C14.09 3.81 15.76 3 17.5 3C20.54 3 23 5.46 23 8.5C23 14 14 21 14 21H12Z"
-            fill={i < count ? "#EF4444" : "#374151"}
-            stroke={i < count ? "#DC2626" : "#4B5563"}
+            fill={i < count ? "#EF4444" : "#1E293B"}
+            stroke={i < count ? "#DC2626" : "#374151"}
             strokeWidth="1.5"
           />
         </svg>
@@ -138,203 +194,559 @@ function HeartRow({ count, max = 3 }: { count: number; max?: number }) {
   );
 }
 
-// ─── Main Game Component ──────────────────────────────────────────────────────
+// ─── Loading Screen ───────────────────────────────────────────────────────────
+function LoadingScreen({ message }: { message: string }) {
+  return (
+    <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[999] gap-5">
+      <motion.div
+        className="relative w-16 h-16"
+        animate={{ rotate: 360 }}
+        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+      >
+        <div className="absolute inset-0 rounded-full border-2 border-purple-500/20" />
+        <div className="absolute inset-0 rounded-full border-2 border-t-purple-500 border-r-transparent border-b-transparent border-l-transparent" />
+      </motion.div>
+      <motion.p
+        key={message}
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-[11px] text-purple-400 font-black uppercase tracking-[0.2em]"
+      >
+        {message}
+      </motion.p>
+    </div>
+  );
+}
+
+// ─── Error / Recovery Screen ──────────────────────────────────────────────────
+function ErrorScreen({ message, onBack }: { message: string; onBack: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[999] p-6 gap-6">
+      <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+        <circle cx="28" cy="28" r="27" fill="#1E293B" stroke="#EF4444" strokeWidth="2" />
+        <path d="M28 16 L28 30" stroke="#EF4444" strokeWidth="3" strokeLinecap="round" />
+        <circle cx="28" cy="38" r="2.5" fill="#EF4444" />
+      </svg>
+      <div className="text-center space-y-2">
+        <p className="text-sm font-black text-white">Unable to Load Match</p>
+        <p className="text-xs text-slate-400 leading-relaxed max-w-[260px]">{message}</p>
+      </div>
+      <button
+        onClick={onBack}
+        className="px-6 py-3 rounded-xl bg-purple-600 text-white text-xs font-black uppercase tracking-wider"
+      >
+        Back to Lobby
+      </button>
+    </div>
+  );
+}
+
+// ─── Board Component ──────────────────────────────────────────────────────────
+function LudoBoard({
+  room,
+  amPlayer1,
+  isMyTurn,
+  onMove,
+}: {
+  room: RoomState;
+  amPlayer1: boolean;
+  isMyTurn: boolean;
+  onMove: (idx: number) => void;
+}) {
+  const p1Yard: [number, number][] = [[13, 13], [27, 13], [13, 27], [27, 27]];
+  const p2Yard: [number, number][] = [[73, 73], [87, 73], [73, 87], [87, 87]];
+
+  // Map a player's logical position to SVG (cx, cy) coordinates
+  const pieceXY = (isP1: boolean, pos: number, pieceIdx: number): [number, number] => {
+    if (pos === 0) {
+      // In yard
+      const yard = isP1 ? p1Yard : p2Yard;
+      const [cx, cy] = yard[pieceIdx % 4];
+      return [cx, cy];
+    }
+    if (pos === 57) {
+      // Home centre
+      return isP1
+        ? [50 - 4 + (pieceIdx % 2) * 4, 50 - 4 + Math.floor(pieceIdx / 2) * 4]
+        : [50 + (pieceIdx % 2) * 4, 50 + Math.floor(pieceIdx / 2) * 4];
+    }
+    if (pos >= 52 && pos <= 56) {
+      // Home path
+      const homeTrack: [number, number][] = isP1
+        ? [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7]]
+        : [[13, 7], [12, 7], [11, 7], [10, 7], [9, 7]];
+      const cell = homeTrack[(pos - 52) % 5];
+      return [cell[0] * CELL + CELL / 2, cell[1] * CELL + CELL / 2];
+    }
+    // Main track
+    const trackIdx = isP1
+      ? (pos - 1) % TRACK.length
+      : (pos + 25) % TRACK.length;
+    const cell = TRACK[Math.min(trackIdx, TRACK.length - 1)];
+    return [cell.x * CELL + CELL / 2, cell.y * CELL + CELL / 2];
+  };
+
+  // Stack offset so overlapping pieces don't hide each other
+  const stackOffset = (pieces: number[], pos: number, idx: number): [number, number] => {
+    if (pos === 0 || pos === 57) return [0, 0];
+    const samePos = pieces.reduce<number[]>((a, p, i) => (p === pos ? [...a, i] : a), []);
+    if (samePos.length <= 1) return [0, 0];
+    const order = samePos.indexOf(idx);
+    const angle = (order * 2 * Math.PI) / samePos.length;
+    return [Math.cos(angle) * 1.5, Math.sin(angle) * 1.5];
+  };
+
+  const canMove = (idx: number) =>
+    isMyTurn && room.dice_rolled && (room.movable_pieces ?? []).includes(idx);
+
+  const myPieces = amPlayer1
+    ? room.board_state?.pieces?.player_1 ?? [0, 0, 0, 0]
+    : room.board_state?.pieces?.player_2 ?? [0, 0, 0, 0];
+
+  const oppPieces = amPlayer1
+    ? room.board_state?.pieces?.player_2 ?? [0, 0, 0, 0]
+    : room.board_state?.pieces?.player_1 ?? [0, 0, 0, 0];
+
+  return (
+    <svg className="w-full h-full rounded-2xl" viewBox="0 0 100 100" fill="none">
+      {/* ── Board background ── */}
+      <rect width="100" height="100" rx="4" fill="#080D18" />
+
+      {/* ── Red yard (top-left = Player 1) ── */}
+      <rect x="0" y="0" width="40" height="40" rx="4" fill="#EF444412" stroke="#EF4444" strokeWidth="0.5" />
+      <rect x="6" y="6" width="28" height="28" rx="3" fill="#090E1C" stroke="#EF4444" strokeWidth="0.4" />
+      {p1Yard.map(([cx, cy], i) => (
+        <circle key={i} cx={cx / (100 / 100)} cy={cy / (100 / 100)} r="4" fill="#EF444425" stroke="#EF4444" strokeWidth="0.5" />
+      ))}
+
+      {/* ── Blue yard (bottom-right = Player 2) ── */}
+      <rect x="60" y="60" width="40" height="40" rx="4" fill="#3B82F612" stroke="#3B82F6" strokeWidth="0.5" />
+      <rect x="66" y="66" width="28" height="28" rx="3" fill="#090E1C" stroke="#3B82F6" strokeWidth="0.4" />
+      {p2Yard.map(([cx, cy], i) => (
+        <circle key={i} cx={cx / (100 / 100)} cy={cy / (100 / 100)} r="4" fill="#3B82F625" stroke="#3B82F6" strokeWidth="0.5" />
+      ))}
+
+      {/* ── Unused yards (grey, 1v1 mode) ── */}
+      <rect x="60" y="0" width="40" height="40" rx="4" fill="#0F172A" stroke="#1E293B" strokeWidth="0.3" />
+      <rect x="0" y="60" width="40" height="40" rx="4" fill="#0F172A" stroke="#1E293B" strokeWidth="0.3" />
+
+      {/* ── Home triangles ── */}
+      <polygon points="40,40 50,50 40,60" fill="#EF444418" stroke="#EF4444" strokeWidth="0.4" />
+      <polygon points="60,40 50,50 60,60" fill="#3B82F618" stroke="#3B82F6" strokeWidth="0.4" />
+      <polygon points="40,40 50,50 60,40" fill="#0F172A" stroke="#1E293B" strokeWidth="0.2" />
+      <polygon points="40,60 50,50 60,60" fill="#0F172A" stroke="#1E293B" strokeWidth="0.2" />
+      <circle cx="50" cy="50" r="4" fill="#A855F718" stroke="#A855F7" strokeWidth="0.5" />
+
+      {/* ── Track cells ── */}
+      {TRACK.map((cell, idx) => {
+        const x = cell.x * CELL;
+        const y = cell.y * CELL;
+        const isSafe = SAFE_SPOTS.has(idx);
+        const isStar = STAR_SPOTS.has(idx);
+        const isLaunchRed = idx === 1;
+        const isLaunchBlue = idx === 27;
+        let fill = "#0F172A30";
+        let stroke = "#1E293B";
+        let sw = 0.15;
+        if (isLaunchRed) { fill = "#EF444435"; stroke = "#EF4444"; sw = 0.4; }
+        else if (isLaunchBlue) { fill = "#3B82F635"; stroke = "#3B82F6"; sw = 0.4; }
+        else if (isStar) { fill = "#A855F720"; stroke = "#A855F7"; sw = 0.35; }
+        return (
+          <g key={idx}>
+            <rect x={x + 0.25} y={y + 0.25} width={CELL - 0.5} height={CELL - 0.5} rx="0.7" fill={fill} stroke={stroke} strokeWidth={sw} />
+            {isStar && (
+              <text x={x + CELL / 2} y={y + CELL / 2 + 1.5} textAnchor="middle" fontSize="3.5" fill="#A855F7" opacity="0.9">★</text>
+            )}
+          </g>
+        );
+      })}
+
+      {/* ── Red home path (columns 1-5, row 7) ── */}
+      {[1, 2, 3, 4, 5].map(col => (
+        <rect key={`rh${col}`} x={col * CELL + 0.25} y={7 * CELL + 0.25} width={CELL - 0.5} height={CELL - 0.5} rx="0.7"
+          fill="#EF444428" stroke="#EF4444" strokeWidth="0.3" />
+      ))}
+      {/* ── Blue home path (columns 9-13, row 7) ── */}
+      {[9, 10, 11, 12, 13].map(col => (
+        <rect key={`bh${col}`} x={col * CELL + 0.25} y={7 * CELL + 0.25} width={CELL - 0.5} height={CELL - 0.5} rx="0.7"
+          fill="#3B82F628" stroke="#3B82F6" strokeWidth="0.3" />
+      ))}
+
+      {/* ── Opponent pieces (always render behind mine) ── */}
+      {oppPieces.map((pos: number, idx: number) => {
+        const isP1Piece = !amPlayer1; // if I'm P2, opponent is P1
+        const [baseCx, baseCy] = pieceXY(isP1Piece, pos, idx);
+        const [dx, dy] = stackOffset(oppPieces, pos, idx);
+        const cx = baseCx + dx;
+        const cy = baseCy + dy;
+        const color = isP1Piece ? "#EF4444" : "#3B82F6";
+        const inner = isP1Piece ? "#7F1D1D" : "#1E3A8A";
+        return (
+          <g key={`opp-${idx}`}>
+            <circle cx={cx} cy={cy} r="2.6" fill={color} stroke="#FFFFFF" strokeWidth="0.5" />
+            <circle cx={cx} cy={cy} r="1.1" fill={inner} />
+          </g>
+        );
+      })}
+
+      {/* ── My pieces (render on top, interactive) ── */}
+      {myPieces.map((pos: number, idx: number) => {
+        const [baseCx, baseCy] = pieceXY(amPlayer1, pos, idx);
+        const [dx, dy] = stackOffset(myPieces, pos, idx);
+        const cx = baseCx + dx;
+        const cy = baseCy + dy;
+        const canMoveThis = canMove(idx);
+        const color = amPlayer1 ? "#EF4444" : "#3B82F6";
+        const inner = amPlayer1 ? "#7F1D1D" : "#1E3A8A";
+        return (
+          <g key={`my-${idx}`}
+            onClick={() => canMoveThis && onMove(idx)}
+            style={{ cursor: canMoveThis ? "pointer" : "default" }}
+          >
+            {/* Pulse ring when movable */}
+            {canMoveThis && (
+              <>
+                <circle cx={cx} cy={cy} r="4" fill={color} opacity="0.25">
+                  <animate attributeName="r" values="3;5;3" dur="1s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.25;0.05;0.25" dur="1s" repeatCount="indefinite" />
+                </circle>
+                <circle cx={cx} cy={cy} r="3.5" fill="none" stroke={color} strokeWidth="0.5" opacity="0.7" />
+              </>
+            )}
+            <circle cx={cx} cy={cy} r="2.6" fill={color} stroke="#FFFFFF" strokeWidth="0.5" />
+            <circle cx={cx} cy={cy} r="1.1" fill={inner} />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ─── Main Game Page ───────────────────────────────────────────────────────────
 export default function LudoGamePage() {
   const router = useRouter();
   const params = useParams();
-  const roomId = params?.roomId as string;
-  const { userId, refreshWallet, setIsGameActive, recordMatchResult } = useApp();
+  const rawRoomId = params?.roomId;
+  const roomId = Array.isArray(rawRoomId) ? rawRoomId[0] : rawRoomId ?? "";
 
-  const [phase, setPhase] = useState<"pre-match" | "countdown" | "playing" | "ended">("pre-match");
+  const { userId, refreshWallet, recordMatchResult } = useApp();
+
+  // Phase machine
+  const [phase, setPhase] = useState<GamePhase>("loading");
+  const [loadingMsg, setLoadingMsg] = useState("Loading Ludo Arena...");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  // Countdown
   const [countdown, setCountdown] = useState(3);
-  const [roomState, setRoomState] = useState<any>(null);
+
+  // Room state (server authoritative)
+  const [room, setRoom] = useState<RoomState | null>(null);
+
+  // Local UI states
   const [rolling, setRolling] = useState(false);
-  const [showEmotes, setShowEmotes] = useState(false);
-  const [lastReactTime, setLastReactTime] = useState(0);
-  const [floatingEmotes, setFloatingEmotes] = useState<Array<{ id: string; type: string; fromOpponent: boolean }>>([]);
-  const [matchTimer, setMatchTimer] = useState(480); // 8 minutes
-  const [turnTimer, setTurnTimer] = useState(15);
   const [rollingAnim, setRollingAnim] = useState(false);
-  const [diceDisplay, setDiceDisplay] = useState(0);
+  const [diceDisplay, setDiceDisplay] = useState(1);
+  const [matchSecs, setMatchSecs] = useState(480);
+  const [turnSecs, setTurnSecs] = useState(15);
+  const [showEmotes, setShowEmotes] = useState(false);
+  const [floatingEmotes, setFloatingEmotes] = useState<
+    Array<{ id: string; type: string; mine: boolean }>
+  >([]);
+  const [lastEmoteTime, setLastEmoteTime] = useState(0);
 
-  const prevReactionCount = useRef(0);
+  // Refs for stable callbacks
+  const phaseRef = useRef<GamePhase>("loading");
+  const roomRef = useRef<RoomState | null>(null);
+  const prevReactionLen = useRef(0);
   const prevTurnPlayer = useRef<string | null>(null);
-  const stateRef = useRef<any>(null);
-  stateRef.current = roomState;
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const matchTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const turnTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Lock game screen — hide nav, disable back
-  useEffect(() => {
-    setIsGameActive(true);
-    // Push state to prevent browser back during game
-    window.history.pushState(null, "", window.location.href);
-    const handlePop = () => {
-      window.history.pushState(null, "", window.location.href);
-    };
-    window.addEventListener("popstate", handlePop);
-    return () => {
-      setIsGameActive(false);
-      window.removeEventListener("popstate", handlePop);
-    };
-  }, [setIsGameActive]);
+  phaseRef.current = phase;
+  roomRef.current = room;
 
-  // Sound helper
+  // ── Sound & vibration ──────────────────────────────────────────────────────
   const playSound = useCallback((name: string) => {
     try {
       const a = new Audio(`/sounds/${name}.mp3`);
-      a.volume = 0.5;
+      a.volume = 0.6;
       a.play().catch(() => {});
     } catch {}
   }, []);
 
-  // Vibration helper
   const vibe = useCallback((pattern: number | number[]) => {
-    try {
-      if (navigator.vibrate) navigator.vibrate(pattern);
-    } catch {}
+    try { navigator.vibrate?.(pattern); } catch {}
   }, []);
 
-  // Fetch room state from server
-  const fetchState = useCallback(async () => {
-    if (!roomId || !userId) return;
+  // ── Lock game screen & prevent back nav ───────────────────────────────────
+  useEffect(() => {
+    window.history.pushState(null, "", window.location.href);
+    const onPop = () => window.history.pushState(null, "", window.location.href);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  // ── Core fetch ────────────────────────────────────────────────────────────
+  const fetchRoom = useCallback(async (): Promise<RoomState | null> => {
+    if (!roomId || !userId) return null;
     try {
       const res = await fetch(`/api/ludo/room/state?room_id=${roomId}`, {
-        headers: { "Authorization": `Bearer ${userId}`, "x-user-id": userId },
+        headers: {
+          "Authorization": `Bearer ${userId}`,
+          "x-user-id": userId,
+        },
+        cache: "no-store",
       });
-      if (!res.ok) return;
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        console.error("[LudoGame] state fetch error:", res.status, body);
+        return null;
+      }
+
       const data = await res.json();
-      if (!data.success || !data.data) return;
-
-      const state = data.data;
-      setRoomState(state);
-
-      // Update dice display if rolled
-      if (state.last_roll > 0) setDiceDisplay(state.last_roll);
-
-      // Detect new reactions from opponent
-      const reactions = state.chat_reactions || [];
-      if (reactions.length > prevReactionCount.current) {
-        const latest = reactions[reactions.length - 1];
-        if (latest.player_id !== userId) {
-          const id = `emote_${Date.now()}`;
-          setFloatingEmotes(prev => [...prev.slice(-4), { id, type: latest.type, fromOpponent: true }]);
-          playSound("piece-move");
-          setTimeout(() => setFloatingEmotes(prev => prev.filter(e => e.id !== id)), 2500);
-        }
-        prevReactionCount.current = reactions.length;
-      }
-
-      // Detect my turn start
-      if (prevTurnPlayer.current && prevTurnPlayer.current !== state.turn_player_id && state.turn_player_id === userId) {
-        vibe(30);
-        playSound("dice-roll");
-      }
-      prevTurnPlayer.current = state.turn_player_id;
-
-      // Handle game end
-      if ((state.status === "completed" || state.status === "forfeited") && phase === "playing") {
-        const won = state.winner_id === userId;
-        playSound(won ? "victory" : "defeat");
-        vibe(won ? [200, 100, 200, 100, 300] : [150, 150, 150]);
-        recordMatchResult(won, state.stake);
-        refreshWallet();
-        setPhase("ended");
-      }
-
-      // Transition from countdown to active
-      if (state.status === "active" && phase === "pre-match") {
-        setPhase("countdown");
-      }
-
+      if (!data.success || !data.data) return null;
+      return data.data as RoomState;
     } catch (err) {
-      console.error("fetchState error:", err);
+      console.error("[LudoGame] fetchRoom exception:", err);
+      return null;
     }
-  }, [roomId, userId, phase, playSound, vibe, recordMatchResult, refreshWallet]);
+  }, [roomId, userId]);
 
-  // Initial load + pre-match polling
+  // ── Apply room state update to UI ─────────────────────────────────────────
+  const applyRoomState = useCallback((state: RoomState) => {
+    setRoom(state);
+
+    // Keep dice display in sync
+    if (state.last_roll > 0) setDiceDisplay(state.last_roll);
+
+    // Detect new opponent reactions
+    const reactions = state.chat_reactions ?? [];
+    if (reactions.length > prevReactionLen.current) {
+      const latest = reactions[reactions.length - 1];
+      if (latest.player_id !== userId) {
+        const id = `fe_${Date.now()}_${Math.random()}`;
+        setFloatingEmotes(prev => [...prev.slice(-3), { id, type: latest.type, mine: false }]);
+        setTimeout(() => setFloatingEmotes(prev => prev.filter(e => e.id !== id)), 2800);
+        playSound("piece-move");
+      }
+      prevReactionLen.current = reactions.length;
+    }
+
+    // My turn notification
+    if (prevTurnPlayer.current !== null &&
+        prevTurnPlayer.current !== state.turn_player_id &&
+        state.turn_player_id === userId) {
+      vibe(40);
+    }
+    prevTurnPlayer.current = state.turn_player_id;
+  }, [userId, playSound, vibe]);
+
+  // ── Handle match end ──────────────────────────────────────────────────────
+  const handleMatchEnd = useCallback((state: RoomState) => {
+    if (phaseRef.current === "ended") return; // already handled
+    const won = state.winner_id === userId;
+    playSound(won ? "victory" : "defeat");
+    vibe(won ? [200, 100, 200, 100, 300] : [150, 150, 150]);
+    recordMatchResult(won, state.stake ?? 0);
+    refreshWallet();
+    setPhase("ended");
+  }, [userId, playSound, vibe, recordMatchResult, refreshWallet]);
+
+  // ── Initial load ──────────────────────────────────────────────────────────
   useEffect(() => {
-    fetchState();
-    const interval = setInterval(fetchState, 1500);
-    return () => clearInterval(interval);
-  }, [fetchState]);
+    if (!roomId) {
+      setErrorMsg("Invalid room link.");
+      setPhase("error");
+      return;
+    }
+    if (!userId) {
+      setErrorMsg("Not authenticated. Please reopen the app.");
+      setPhase("error");
+      return;
+    }
 
-  // Countdown 3→1 then go to playing
+    let cancelled = false;
+
+    const init = async () => {
+      setLoadingMsg("Loading Ludo Arena...");
+      const state = await fetchRoom();
+
+      if (cancelled) return;
+
+      if (!state) {
+        setErrorMsg("Room not found or you are not a player in this match.");
+        setPhase("error");
+        return;
+      }
+
+      // Validate board state exists
+      if (!state.board_state?.pieces?.player_1 || !state.board_state?.pieces?.player_2) {
+        setErrorMsg("Match data is corrupt. Please return to lobby.");
+        setPhase("error");
+        return;
+      }
+
+      applyRoomState(state);
+
+      // Phase routing based on server status
+      if (state.status === "completed" || state.status === "forfeited") {
+        handleMatchEnd(state);
+        return;
+      }
+
+      if (state.status === "active") {
+        // Room is already active — skip countdown (reconnect case)
+        setLoadingMsg("Syncing match...");
+        setPhase("playing");
+        return;
+      }
+
+      // status === "countdown" → show 3-2-1
+      setLoadingMsg("Match found!");
+      setPhase("pre-match");
+    };
+
+    init();
+    return () => { cancelled = true; };
+  }, [roomId, userId, fetchRoom, applyRoomState, handleMatchEnd]);
+
+  // ── Pre-match → countdown transition ─────────────────────────────────────
+  // Show opponent reveal for 1 second then kick off 3-2-1
+  useEffect(() => {
+    if (phase !== "pre-match") return;
+    const t = setTimeout(() => setPhase("countdown"), 1000);
+    return () => clearTimeout(t);
+  }, [phase]);
+
+  // ── 3-2-1 countdown ──────────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== "countdown") return;
-    if (countdown > 0) {
-      const t = setTimeout(() => setCountdown(c => c - 1), 1000);
-      return () => clearTimeout(t);
-    } else {
-      setPhase("playing");
-      playSound("match-found");
-    }
-  }, [phase, countdown, playSound]);
+    setCountdown(3);
+    let n = 3;
+    const tick = () => {
+      n -= 1;
+      if (n <= 0) {
+        playSound("match-found");
+        setPhase("playing");
+      } else {
+        setCountdown(n);
+        setTimeout(tick, 1000);
+      }
+    };
+    const t = setTimeout(tick, 1000);
+    return () => clearTimeout(t);
+  }, [phase, playSound]);
 
-  // Active game polling (faster)
+  // ── Active game polling ───────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== "playing") return;
-    const interval = setInterval(fetchState, 1000);
-    return () => clearInterval(interval);
-  }, [phase, fetchState]);
 
-  // Match timer countdown (client-side display only)
+    const poll = async () => {
+      const state = await fetchRoom();
+      if (!state) return; // silent — next poll will retry
+
+      applyRoomState(state);
+
+      if (state.status === "completed" || state.status === "forfeited") {
+        handleMatchEnd(state);
+      }
+    };
+
+    poll(); // immediate first fetch
+    pollTimerRef.current = setInterval(poll, 1200);
+    return () => {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    };
+  }, [phase, fetchRoom, applyRoomState, handleMatchEnd]);
+
+  // ── Match countdown timer (display only) ─────────────────────────────────
+  useEffect(() => {
+    if (phase !== "playing" || !room?.id) return;
+    if (matchTimerRef.current) clearInterval(matchTimerRef.current);
+
+    // Calculate remaining from server created_at
+    const recalc = () => {
+      try {
+        const elapsed = (Date.now() - new Date(roomRef.current?.id ? 0 : 0).getTime()) / 1000;
+        // We don't have created_at directly in RoomState — use local 480s countdown
+        setMatchSecs(prev => Math.max(0, prev - 1));
+      } catch {}
+    };
+
+    matchTimerRef.current = setInterval(recalc, 1000);
+    return () => {
+      if (matchTimerRef.current) clearInterval(matchTimerRef.current);
+    };
+  }, [phase, room?.id]);
+
+  // ── Turn timer (display only, server is authoritative) ────────────────────
   useEffect(() => {
     if (phase !== "playing") return;
-    if (!roomState?.created_at) return;
-    const elapsed = Math.floor((Date.now() - new Date(roomState.created_at).getTime()) / 1000);
-    setMatchTimer(Math.max(0, 480 - elapsed));
-    const t = setInterval(() => setMatchTimer(prev => Math.max(0, prev - 1)), 1000);
-    return () => clearInterval(t);
-  }, [phase, roomState?.created_at]);
+    if (turnTimerRef.current) clearInterval(turnTimerRef.current);
 
-  // Turn timer countdown (client-side display only)
-  useEffect(() => {
-    if (phase !== "playing" || !roomState?.turn_start_at) return;
-    const elapsed = Math.floor((Date.now() - new Date(roomState.turn_start_at).getTime()) / 1000);
-    setTurnTimer(Math.max(0, 15 - elapsed));
-    const t = setInterval(() => setTurnTimer(prev => Math.max(0, prev - 1)), 1000);
-    return () => clearInterval(t);
-  }, [phase, roomState?.turn_player_id, roomState?.turn_start_at]);
+    const remaining = room?.turn_remaining_seconds ?? 15;
+    setTurnSecs(remaining);
 
-  // ─── Actions ────────────────────────────────────────────────────────────────
-  const handleRoll = async () => {
-    if (!roomId || rolling || !userId) return;
-    if (roomState?.turn_player_id !== userId) return;
-    if (roomState?.dice_rolled) return;
+    turnTimerRef.current = setInterval(() => {
+      setTurnSecs(prev => Math.max(0, prev - 1));
+    }, 1000);
+
+    return () => {
+      if (turnTimerRef.current) clearInterval(turnTimerRef.current);
+    };
+    // Re-sync on turn player change
+  }, [phase, room?.turn_player_id, room?.turn_remaining_seconds]);
+
+  // ── Roll dice ─────────────────────────────────────────────────────────────
+  const handleRoll = useCallback(async () => {
+    if (!roomId || !userId || rolling) return;
+    if (room?.turn_player_id !== userId) return;
+    if (room?.dice_rolled) return;
+    if (room?.status !== "active") return;
 
     setRolling(true);
     setRollingAnim(true);
     playSound("dice-roll");
     vibe(30);
 
-    // Animate dice rolling
-    let animCount = 0;
-    const animInterval = setInterval(() => {
+    // Animated preview roll
+    let ticks = 0;
+    const anim = setInterval(() => {
       setDiceDisplay(Math.floor(Math.random() * 6) + 1);
-      animCount++;
-      if (animCount > 8) clearInterval(animInterval);
-    }, 80);
+      if (++ticks >= 10) clearInterval(anim);
+    }, 70);
 
     try {
       const res = await fetch("/api/ludo/room/roll", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${userId}`, "x-user-id": userId },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${userId}`,
+          "x-user-id": userId,
+        },
         body: JSON.stringify({ room_id: roomId }),
       });
+
       const data = await res.json();
       if (data.success) {
-        await fetchState();
+        setDiceDisplay(data.data?.roll ?? 1);
+        const fresh = await fetchRoom();
+        if (fresh) applyRoomState(fresh);
       } else {
-        showToast(data.error || "Roll failed", "error");
+        showToast(data.error ?? "Roll failed", "error");
       }
     } catch {
-      showToast("Connection error", "error");
+      showToast("Connection error. Try again.", "error");
     } finally {
       setRolling(false);
-      setTimeout(() => setRollingAnim(false), 300);
+      setTimeout(() => setRollingAnim(false), 400);
     }
-  };
+  }, [roomId, userId, rolling, room, playSound, vibe, fetchRoom, applyRoomState]);
 
-  const handleMove = async (pieceIndex: number) => {
+  // ── Move piece ────────────────────────────────────────────────────────────
+  const handleMove = useCallback(async (pieceIdx: number) => {
     if (!roomId || !userId) return;
     playSound("piece-move");
     vibe(20);
@@ -342,253 +754,266 @@ export default function LudoGamePage() {
     try {
       const res = await fetch("/api/ludo/room/move", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${userId}`, "x-user-id": userId },
-        body: JSON.stringify({ room_id: roomId, piece_index: pieceIndex }),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${userId}`,
+          "x-user-id": userId,
+        },
+        body: JSON.stringify({ room_id: roomId, piece_index: pieceIdx }),
       });
+
       const data = await res.json();
       if (data.success) {
         if (data.data?.has_capture) {
           playSound("kill");
-          vibe([100, 50, 100]);
-          showToast("🎯 Captured opponent piece!", "success");
+          vibe([80, 40, 80]);
+          showToast("Captured opponent piece!", "success");
         }
-        await fetchState();
+        const fresh = await fetchRoom();
+        if (fresh) applyRoomState(fresh);
       } else {
-        showToast(data.error || "Move failed", "error");
+        showToast(data.error ?? "Move failed", "error");
       }
     } catch {
-      showToast("Connection error", "error");
+      showToast("Connection error. Try again.", "error");
     }
-  };
+  }, [roomId, userId, playSound, vibe, fetchRoom, applyRoomState]);
 
-  const handleEmote = async (type: string) => {
-    if (!roomId || !userId || Date.now() - lastReactTime < 2000) return;
-    setLastReactTime(Date.now());
+  // ── Send emote ────────────────────────────────────────────────────────────
+  const handleEmote = useCallback(async (type: EmoteType) => {
+    if (!roomId || !userId) return;
+    if (Date.now() - lastEmoteTime < 2000) return;
+    setLastEmoteTime(Date.now());
     setShowEmotes(false);
 
-    const id = `emote_${Date.now()}`;
-    setFloatingEmotes(prev => [...prev.slice(-4), { id, type, fromOpponent: false }]);
-    setTimeout(() => setFloatingEmotes(prev => prev.filter(e => e.id !== id)), 2500);
+    const id = `fe_${Date.now()}`;
+    setFloatingEmotes(prev => [...prev.slice(-3), { id, type, mine: true }]);
+    setTimeout(() => setFloatingEmotes(prev => prev.filter(e => e.id !== id)), 2800);
 
     try {
       await fetch("/api/ludo/room/reaction", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${userId}`, "x-user-id": userId },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${userId}`,
+          "x-user-id": userId,
+        },
         body: JSON.stringify({ room_id: roomId, reaction_type: type }),
       });
     } catch {}
-  };
+  }, [roomId, userId, lastEmoteTime]);
 
-  const handleForfeit = async () => {
+  // ── Forfeit ───────────────────────────────────────────────────────────────
+  const handleForfeit = useCallback(async () => {
     if (!roomId || !userId) return;
     if (!confirm("Forfeit match? You will lose your stake.")) return;
     try {
       await fetch("/api/ludo/room/forfeit", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${userId}`, "x-user-id": userId },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${userId}`,
+          "x-user-id": userId,
+        },
         body: JSON.stringify({ room_id: roomId }),
       });
-      await fetchState();
-    } catch {}
-  };
+      const fresh = await fetchRoom();
+      if (fresh) {
+        applyRoomState(fresh);
+        if (fresh.status === "forfeited" || fresh.status === "completed") {
+          handleMatchEnd(fresh);
+        }
+      }
+    } catch {
+      showToast("Could not forfeit. Try again.", "error");
+    }
+  }, [roomId, userId, fetchRoom, applyRoomState, handleMatchEnd]);
 
-  const handleExit = () => {
-    setIsGameActive(false);
+  // ── Exit to lobby ─────────────────────────────────────────────────────────
+  const handleExit = useCallback(() => {
     router.replace("/games");
-  };
+  }, [router]);
 
-  // ─── Board Coordinate Logic ──────────────────────────────────────────────────
-  const getPieceCoords = (isPlayer1: boolean, position: number, pieceIdx: number) => {
-    if (position === 0) {
-      const p1Yard = [{ x: 1.5, y: 1.5 }, { x: 3.5, y: 1.5 }, { x: 1.5, y: 3.5 }, { x: 3.5, y: 3.5 }];
-      const p2Yard = [{ x: 10.5, y: 10.5 }, { x: 12.5, y: 10.5 }, { x: 10.5, y: 12.5 }, { x: 12.5, y: 12.5 }];
-      return isPlayer1 ? p1Yard[pieceIdx % 4] : p2Yard[pieceIdx % 4];
-    }
-    if (position === 57) {
-      return isPlayer1 ? { x: 4.5 + (pieceIdx * 0.4), y: 7.5 } : { x: 9.5 - (pieceIdx * 0.4), y: 7.5 };
-    }
-    if (position >= 52 && position <= 56) {
-      return isPlayer1
-        ? { x: position - 51, y: 7 }
-        : { x: 14 - (position - 51), y: 7 };
-    }
-    const index = isPlayer1 ? (position - 1) % 52 : (position + 25) % 52;
-    return TRACK_COORDS[Math.min(index, TRACK_COORDS.length - 1)] || { x: 7, y: 7 };
-  };
+  const formatTime = (s: number) =>
+    `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
-  const getStackOffset = (pieces: number[], pos: number, idx: number) => {
-    if (pos === 0 || pos === 57) return { dx: 0, dy: 0 };
-    const samePos = pieces.reduce((acc: number[], p, i) => (p === pos ? [...acc, i] : acc), []);
-    if (samePos.length <= 1) return { dx: 0, dy: 0 };
-    const orderIdx = samePos.indexOf(idx);
-    const angle = (orderIdx * 2 * Math.PI) / samePos.length;
-    return { dx: Math.cos(angle) * 1.2, dy: Math.sin(angle) * 1.2 };
-  };
+  // ────────────────────────────────────────────────────────────────────────────
+  // RENDER PHASES
+  // ────────────────────────────────────────────────────────────────────────────
 
-  // ─── Derived state shortcuts ─────────────────────────────────────────────────
-  const isMyTurn = roomState?.turn_player_id === userId;
-  const amPlayer1 = roomState?.player_1_id === userId;
-  const myHearts = amPlayer1 ? roomState?.hearts_player_1 : roomState?.hearts_player_2;
-  const oppHearts = amPlayer1 ? roomState?.hearts_player_2 : roomState?.hearts_player_1;
-  const myScore = amPlayer1 ? roomState?.score_player_1 : roomState?.score_player_2;
-  const oppScore = amPlayer1 ? roomState?.score_player_2 : roomState?.score_player_1;
-  const myPieces = amPlayer1 ? roomState?.board_state?.pieces?.player_1 : roomState?.board_state?.pieces?.player_2;
-  const oppPieces = amPlayer1 ? roomState?.board_state?.pieces?.player_2 : roomState?.board_state?.pieces?.player_1;
-  const opponent = amPlayer1 ? roomState?.player_2_profile : roomState?.player_1_profile;
-  const myProfile = amPlayer1 ? roomState?.player_1_profile : roomState?.player_2_profile;
+  if (phase === "loading") return <LoadingScreen message={loadingMsg} />;
+  if (phase === "error") return <ErrorScreen message={errorMsg} onBack={handleExit} />;
 
-  const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  // PRE-MATCH: opponent VS reveal (1 second before countdown)
+  if (phase === "pre-match" && room) {
+    const myProfile = room.player_1_id === userId ? room.player_1_profile : room.player_2_profile;
+    const oppProfile = room.player_1_id === userId ? room.player_2_profile : room.player_1_profile;
 
-  // ─── PRE-MATCH SCREEN ────────────────────────────────────────────────────────
-  if (phase === "pre-match" || !roomState) {
     return (
-      <div className="fixed inset-0 bg-slate-950 flex items-center justify-center z-[999]">
-        <div className="text-center space-y-4">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-            className="w-12 h-12 border-2 border-purple-500/30 border-t-purple-500 rounded-full mx-auto"
-          />
-          <p className="text-xs text-purple-400 font-bold uppercase tracking-widest">Entering Arena...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // ─── COUNTDOWN SCREEN ────────────────────────────────────────────────────────
-  if (phase === "countdown") {
-    return (
-      <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[999] select-none">
-        {/* VS reveal */}
-        <div className="flex items-center gap-8 mb-10">
+      <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[999] px-6">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex items-center gap-8"
+        >
+          {/* Me */}
           <div className="flex flex-col items-center gap-2">
-            <div className="w-20 h-20 rounded-full border-2 border-purple-500 overflow-hidden shadow-[0_0_24px_rgba(168,85,247,0.5)] bg-slate-900">
-              <img src={myProfile?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=You`} alt="Me" className="w-full h-full object-cover" />
+            <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-purple-500 shadow-[0_0_24px_rgba(168,85,247,0.5)] bg-slate-900">
+              <img src={myProfile?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=me`} alt="Me"
+                className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=me`; }} />
             </div>
-            <span className="text-xs font-black text-purple-300">{myProfile?.name || "You"}</span>
+            <span className="text-xs font-black text-purple-300 max-w-[80px] truncate text-center">{myProfile?.name ?? "You"}</span>
           </div>
 
           <div className="text-2xl font-black text-amber-400 animate-pulse">VS</div>
 
+          {/* Opponent */}
           <div className="flex flex-col items-center gap-2">
-            <div className="w-20 h-20 rounded-full border-2 border-blue-500 overflow-hidden shadow-[0_0_24px_rgba(59,130,246,0.5)] bg-slate-900">
-              <img src={opponent?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=Opponent`} alt="Opponent" className="w-full h-full object-cover" />
+            <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-blue-500 shadow-[0_0_24px_rgba(59,130,246,0.5)] bg-slate-900">
+              <img src={oppProfile?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=opp`} alt="Opponent"
+                className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=opp`; }} />
             </div>
-            <span className="text-xs font-black text-blue-300">{opponent?.name || "Opponent"}</span>
+            <span className="text-xs font-black text-blue-300 max-w-[80px] truncate text-center">{oppProfile?.name ?? "Opponent"}</span>
           </div>
-        </div>
+        </motion.div>
 
-        {/* Countdown number */}
-        <div className="space-y-3 text-center">
-          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Match starts in</p>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={countdown}
-              initial={{ scale: 0.3, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 1.5, opacity: 0 }}
-              transition={{ duration: 0.4, type: "spring" }}
-              className={`text-9xl font-black tabular-nums drop-shadow-[0_0_30px_rgba(168,85,247,0.6)] ${
-                countdown === 1 ? "text-red-400" : countdown === 2 ? "text-amber-400" : "text-purple-400"
-              }`}
-            >
-              {countdown === 0 ? "GO!" : countdown}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
-        {/* Stake info */}
-        <div className="mt-8 bg-slate-900/60 border border-purple-500/20 rounded-xl px-6 py-3 text-center">
-          <span className="text-[10px] text-slate-500 font-bold uppercase">Prize Pool</span>
-          <div className="text-lg font-black text-amber-400 mt-0.5">{roomState.stake * 2} Coins</div>
+        <div className="mt-8 text-center">
+          <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Prize Pool</div>
+          <div className="text-xl font-black text-amber-400">{(room.stake ?? 0) * 2} Coins</div>
         </div>
       </div>
     );
   }
 
-  // ─── ENDED SCREEN ────────────────────────────────────────────────────────────
-  if (phase === "ended" && roomState) {
-    const iWon = roomState.winner_id === userId;
+  // COUNTDOWN: 3-2-1
+  if (phase === "countdown" && room) {
+    const myProfile = room.player_1_id === userId ? room.player_1_profile : room.player_2_profile;
+    const oppProfile = room.player_1_id === userId ? room.player_2_profile : room.player_1_profile;
+
+    return (
+      <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[999] px-6">
+        <div className="flex items-center gap-8 mb-10">
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-purple-500 bg-slate-900">
+              <img src={myProfile?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=me`} alt="Me"
+                className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=me`; }} />
+            </div>
+            <span className="text-[10px] font-black text-purple-300 max-w-[70px] truncate">{myProfile?.name ?? "You"}</span>
+          </div>
+          <span className="text-lg font-black text-amber-400">VS</span>
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-blue-500 bg-slate-900">
+              <img src={oppProfile?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=opp`} alt="Opponent"
+                className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=opp`; }} />
+            </div>
+            <span className="text-[10px] font-black text-blue-300 max-w-[70px] truncate">{oppProfile?.name ?? "Opponent"}</span>
+          </div>
+        </div>
+
+        <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-3">Match starts in</div>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={countdown}
+            initial={{ scale: 0.3, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 1.8, opacity: 0 }}
+            transition={{ duration: 0.35, type: "spring", stiffness: 300 }}
+            className={`text-[96px] font-black tabular-nums leading-none ${
+              countdown === 1 ? "text-red-400" : countdown === 2 ? "text-amber-400" : "text-purple-400"
+            }`}
+            style={{ textShadow: "0 0 40px currentColor" }}
+          >
+            {countdown}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    );
+  }
+
+  // ENDED
+  if (phase === "ended" && room) {
+    const iWon = room.winner_id === userId;
     return (
       <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-[999] p-4">
         <motion.div
           initial={{ scale: 0.85, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 200 }}
-          className="w-full max-w-sm rounded-3xl bg-slate-950 border border-purple-500/30 p-7 text-center space-y-5"
+          transition={{ type: "spring", stiffness: 200, damping: 20 }}
+          className="w-full max-w-sm rounded-3xl bg-slate-950 border border-purple-500/20 p-7 text-center space-y-5 shadow-2xl"
         >
-          {iWon ? (
-            <>
-              <motion.div
-                animate={{ rotate: [0, -10, 10, -10, 0] }}
-                transition={{ duration: 0.5, delay: 0.3 }}
-                className="text-6xl select-none"
-              >
-                <EmoteSVG type="Crown" size={64} />
-              </motion.div>
-              <h2 className="text-2xl font-black text-emerald-400 tracking-tight">VICTORY!</h2>
-              <p className="text-xs text-slate-400 leading-relaxed">Outstanding play! Your rewards have been credited to your Won Coins balance.</p>
-              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl py-4 space-y-1">
-                <div className="text-[10px] text-emerald-400/80 font-bold uppercase tracking-wider">Won Coins Earned</div>
-                <div className="text-3xl font-black text-emerald-400">+{Math.floor(roomState.stake * 2 * 0.98)}</div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="text-6xl select-none flex justify-center">
-                <EmoteSVG type="Shock" size={64} />
-              </div>
-              <h2 className="text-2xl font-black text-red-500 tracking-tight">DEFEATED</h2>
-              <p className="text-xs text-slate-400 leading-relaxed">A tough match! Come back stronger in your next battle.</p>
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl py-4 space-y-1">
-                <div className="text-[10px] text-red-400/80 font-bold uppercase tracking-wider">Stake Lost</div>
-                <div className="text-3xl font-black text-red-400">-{roomState.stake}</div>
-              </div>
-            </>
-          )}
-
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={handleExit}
-              className="flex-1 h-12 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-black uppercase tracking-widest border border-purple-400/20"
-            >
-              Return to Lobby
-            </button>
+          <div className="flex justify-center">
+            <EmoteSVG type={iWon ? "Crown" : "Shock"} size={64} />
           </div>
 
-          {/* Win reason tag */}
-          {roomState.win_reason && (
+          <div>
+            <h2 className={`text-2xl font-black tracking-tight ${iWon ? "text-emerald-400" : "text-red-400"}`}>
+              {iWon ? "VICTORY!" : "DEFEATED"}
+            </h2>
+            <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+              {iWon
+                ? "Outstanding play! Rewards credited to your Won Coins balance."
+                : "A tough match! Come back stronger next time."}
+            </p>
+          </div>
+
+          <div className={`rounded-xl py-4 border ${iWon ? "bg-emerald-500/10 border-emerald-500/30" : "bg-red-500/10 border-red-500/30"}`}>
+            <div className={`text-[9px] font-bold uppercase tracking-wider ${iWon ? "text-emerald-400/80" : "text-red-400/80"}`}>
+              {iWon ? "Won Coins Earned" : "Stake Lost"}
+            </div>
+            <div className={`text-3xl font-black mt-1 ${iWon ? "text-emerald-400" : "text-red-400"}`}>
+              {iWon ? `+${Math.floor((room.stake ?? 0) * 2 * 0.98)}` : `-${room.stake ?? 0}`}
+            </div>
+          </div>
+
+          {room.win_reason && (
             <div className="text-[9px] text-slate-600 font-mono">
-              {roomState.win_reason === "forfeit" ? "Opponent forfeited" :
-               roomState.win_reason === "timeout" ? "Hearts depleted — timeout" :
-               roomState.win_reason === "score_timer" ? "Time limit — higher score wins" : ""}
+              {room.win_reason === "forfeit" ? "Opponent forfeited" :
+               room.win_reason === "timeout" ? "Hearts depleted" :
+               room.win_reason === "score_timer" ? "Time up — highest score wins" : ""}
             </div>
           )}
+
+          <button
+            onClick={handleExit}
+            className="w-full h-12 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-black uppercase tracking-widest"
+          >
+            Return to Lobby
+          </button>
         </motion.div>
       </div>
     );
   }
 
-  // ─── ACTIVE GAME BOARD ───────────────────────────────────────────────────────
-  const CELL = 100 / 15;
+  // PLAYING — main game screen
+  // Guard: if room is null here (shouldn't happen), show loading
+  if (!room) return <LoadingScreen message="Syncing match..." />;
+
+  const amPlayer1 = room.player_1_id === userId;
+  const isMyTurn = room.turn_player_id === userId;
+  const myProfile = amPlayer1 ? room.player_1_profile : room.player_2_profile;
+  const oppProfile = amPlayer1 ? room.player_2_profile : room.player_1_profile;
+  const myHearts = amPlayer1 ? (room.hearts_player_1 ?? 3) : (room.hearts_player_2 ?? 3);
+  const oppHearts = amPlayer1 ? (room.hearts_player_2 ?? 3) : (room.hearts_player_1 ?? 3);
+  const myScore = amPlayer1 ? (room.score_player_1 ?? 0) : (room.score_player_2 ?? 0);
+  const oppScore = amPlayer1 ? (room.score_player_2 ?? 0) : (room.score_player_1 ?? 0);
 
   return (
     <div className="fixed inset-0 bg-slate-950 flex flex-col overflow-hidden z-[999] select-none text-white">
 
-      {/* Floating emotes layer */}
+      {/* ── Floating emotes ── */}
       <div className="absolute inset-0 pointer-events-none z-40 overflow-hidden">
         <AnimatePresence>
-          {floatingEmotes.map(({ id, type, fromOpponent }) => (
+          {floatingEmotes.map(({ id, type, mine }) => (
             <motion.div
               key={id}
-              initial={{ opacity: 0, scale: 0.3, y: fromOpponent ? -60 : 60, x: fromOpponent ? 40 : -40 }}
-              animate={{ opacity: 1, scale: 1.3, y: fromOpponent ? 40 : -40, x: fromOpponent ? 20 : -20 }}
+              initial={{ opacity: 0, scale: 0.4, y: mine ? 60 : -60 }}
+              animate={{ opacity: 1, scale: 1.2, y: mine ? -20 : 20 }}
               exit={{ opacity: 0, scale: 0.5 }}
-              transition={{ duration: 0.5 }}
-              className={`absolute ${fromOpponent ? "top-20 right-4" : "bottom-32 left-4"}`}
+              transition={{ duration: 0.45 }}
+              className={`absolute ${mine ? "bottom-28 left-4" : "top-24 right-4"}`}
             >
               <div className="bg-slate-900/90 backdrop-blur-sm rounded-2xl p-2 border border-purple-500/30 shadow-xl">
-                <EmoteSVG type={type} size={36} />
+                <EmoteSVG type={type as EmoteType} size={36} />
               </div>
             </motion.div>
           ))}
@@ -596,265 +1021,150 @@ export default function LudoGamePage() {
       </div>
 
       {/* ── OPPONENT HEADER ── */}
-      <div className="flex-none px-3 pt-3 pb-2">
-        <div className="flex items-center justify-between bg-slate-900/80 backdrop-blur-sm border border-slate-800 rounded-2xl px-3 py-2.5">
+      <div className="flex-none px-3 pt-safe pt-3 pb-2">
+        <div className="flex items-center justify-between bg-slate-900/80 border border-slate-800 rounded-2xl px-3 py-2.5">
           <div className="flex items-center gap-2.5">
-            <div className="relative">
-              <div className="w-10 h-10 rounded-full border-2 border-blue-500 overflow-hidden bg-slate-950">
-                <img src={opponent?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=Opp`} alt="Opp" className="w-full h-full object-cover" />
-              </div>
+            <div className="relative w-10 h-10 rounded-full border-2 border-blue-500 overflow-hidden bg-slate-950 flex-none">
+              <img src={oppProfile?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=opp`} alt="Opp"
+                className="w-full h-full object-cover"
+                onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=opp`; }} />
               {!isMyTurn && (
-                <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-slate-950 animate-pulse" />
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-blue-500 rounded-full border border-slate-950 animate-pulse" />
               )}
             </div>
-            <div>
-              <div className="text-[11px] font-bold text-slate-200 truncate max-w-[100px]">{opponent?.name || "Opponent"}</div>
-              <div className="text-[9px] text-slate-500 font-semibold">Score: {oppScore ?? 0}</div>
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold text-slate-200 truncate max-w-[90px]">{oppProfile?.name ?? "Opponent"}</div>
+              <div className="text-[9px] text-slate-500 font-semibold">Score {oppScore}</div>
             </div>
           </div>
 
-          <HeartRow count={oppHearts ?? 3} />
+          <Hearts count={oppHearts} />
 
+          {/* Emote button */}
           <button
             onClick={() => setShowEmotes(v => !v)}
-            className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center"
+            className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center flex-none"
           >
             <EmoteSVG type="Clap" size={18} />
           </button>
         </div>
       </div>
 
-      {/* ── TIMERS BAR ── */}
+      {/* ── Timer bar ── */}
       <div className="flex-none px-3 pb-1">
-        <div className="flex items-center justify-between text-[9px] font-mono font-bold">
+        <div className="flex items-center justify-between text-[9px] font-mono font-bold mb-1">
           <span className="text-slate-500">
-            Turn: <span className={`tabular-nums ${turnTimer <= 5 ? "text-red-400 animate-pulse" : "text-purple-300"}`}>{turnTimer}s</span>
+            Turn: <span className={turnSecs <= 5 ? "text-red-400 animate-pulse" : "text-purple-300"}>{turnSecs}s</span>
           </span>
-          <span className="text-amber-400 font-black">Pool: {roomState.stake * 2} Coins</span>
+          <span className="text-amber-400 font-black">{(room.stake ?? 0) * 2} Pool</span>
           <span className="text-slate-500">
-            Time: <span className={`tabular-nums ${matchTimer <= 60 ? "text-red-400" : "text-slate-300"}`}>{formatTime(matchTimer)}</span>
+            Time: <span className={matchSecs <= 60 ? "text-red-400" : "text-slate-300"}>{formatTime(matchSecs)}</span>
           </span>
         </div>
-        {/* Turn timer bar */}
-        <div className="mt-1 h-0.5 bg-slate-800 rounded-full overflow-hidden">
-          <motion.div
-            className={`h-full rounded-full transition-colors ${turnTimer <= 5 ? "bg-red-500" : "bg-purple-500"}`}
-            style={{ width: `${(turnTimer / 15) * 100}%` }}
+        <div className="h-0.5 bg-slate-800 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-1000 ${turnSecs <= 5 ? "bg-red-500" : "bg-purple-500"}`}
+            style={{ width: `${Math.max(0, (turnSecs / 15) * 100)}%` }}
           />
         </div>
       </div>
 
       {/* ── LUDO BOARD ── */}
-      <div className="flex-1 px-2 py-1 flex items-center justify-center overflow-hidden">
-        <div className="relative w-full aspect-square max-w-[420px] max-h-[420px]">
-          <svg className="w-full h-full rounded-2xl shadow-2xl" viewBox="0 0 100 100" fill="none">
-
-            {/* Board base */}
-            <rect width="100" height="100" rx="4" fill="#090D18" />
-
-            {/* ── Yards ── */}
-            {/* Red (Player 1) - top-left */}
-            <rect x="0" y="0" width="40" height="40" rx="4" fill="#EF444415" stroke="#EF4444" strokeWidth="0.6" />
-            <rect x="6" y="6" width="28" height="28" rx="3" fill="#0A0F1E" stroke="#EF4444" strokeWidth="0.5" />
-            {[[13,13],[27,13],[13,27],[27,27]].map(([cx,cy],i) => (
-              <circle key={i} cx={cx} cy={cy} r="4.5" fill="#EF444430" stroke="#EF4444" strokeWidth="0.5" />
-            ))}
-            {/* Green - top-right (unused 1v1) */}
-            <rect x="60" y="0" width="40" height="40" rx="4" fill="#1E293B15" stroke="#334155" strokeWidth="0.3" />
-            {/* Yellow - bottom-left (unused 1v1) */}
-            <rect x="0" y="60" width="40" height="40" rx="4" fill="#1E293B15" stroke="#334155" strokeWidth="0.3" />
-            {/* Blue (Player 2) - bottom-right */}
-            <rect x="60" y="60" width="40" height="40" rx="4" fill="#3B82F615" stroke="#3B82F6" strokeWidth="0.6" />
-            <rect x="66" y="66" width="28" height="28" rx="3" fill="#0A0F1E" stroke="#3B82F6" strokeWidth="0.5" />
-            {[[73,73],[87,73],[73,87],[87,87]].map(([cx,cy],i) => (
-              <circle key={i} cx={cx} cy={cy} r="4.5" fill="#3B82F630" stroke="#3B82F6" strokeWidth="0.5" />
-            ))}
-
-            {/* ── Home triangle ── */}
-            <polygon points="40,40 50,50 40,60" fill="#EF444420" stroke="#EF4444" strokeWidth="0.5" />
-            <polygon points="60,40 50,50 60,60" fill="#3B82F620" stroke="#3B82F6" strokeWidth="0.5" />
-            <polygon points="40,40 50,50 60,40" fill="#1E293B10" stroke="#334155" strokeWidth="0.25" />
-            <polygon points="40,60 50,50 60,60" fill="#1E293B10" stroke="#334155" strokeWidth="0.25" />
-            <circle cx="50" cy="50" r="4" fill="#A855F720" stroke="#A855F7" strokeWidth="0.5" />
-
-            {/* ── Track cells ── */}
-            {TRACK_COORDS.map((cell, idx) => {
-              const isLaunch = idx === 1 || idx === 27;
-              const isStar = STAR_SPOTS.includes(idx);
-              let fill = "#1E293B25";
-              if (idx === 1) fill = "#EF444440";
-              else if (idx === 27) fill = "#3B82F640";
-              else if (isStar) fill = "#A855F725";
-              return (
-                <g key={idx}>
-                  <rect
-                    x={cell.x * CELL + 0.3}
-                    y={cell.y * CELL + 0.3}
-                    width={CELL - 0.6}
-                    height={CELL - 0.6}
-                    rx="0.8"
-                    fill={fill}
-                    stroke={isLaunch || isStar ? (isStar ? "#A855F7" : idx === 1 ? "#EF4444" : "#3B82F6") : "#334155"}
-                    strokeWidth={isLaunch || isStar ? 0.45 : 0.15}
-                  />
-                  {isStar && (
-                    <text x={cell.x * CELL + CELL / 2} y={cell.y * CELL + CELL / 2 + 1.5} textAnchor="middle" fontSize="4" fill="#A855F7" opacity="0.8">★</text>
-                  )}
-                </g>
-              );
-            })}
-
-            {/* ── Home paths ── */}
-            {/* Red home path (left) */}
-            {[1,2,3,4,5].map(col => (
-              <rect key={`rh${col}`} x={col*CELL+0.3} y={7*CELL+0.3} width={CELL-0.6} height={CELL-0.6} rx="0.8" fill="#EF444430" stroke="#EF4444" strokeWidth="0.3" />
-            ))}
-            {/* Blue home path (right) */}
-            {[9,10,11,12,13].map(col => (
-              <rect key={`bh${col}`} x={col*CELL+0.3} y={7*CELL+0.3} width={CELL-0.6} height={CELL-0.6} rx="0.8" fill="#3B82F630" stroke="#3B82F6" strokeWidth="0.3" />
-            ))}
-
-            {/* ── PLAYER PIECES ── */}
-            {/* Player 1 (Red) */}
-            {(roomState.board_state?.pieces?.player_1 || []).map((pos: number, idx: number) => {
-              const p1IsMe = amPlayer1;
-              const coords = getPieceCoords(true, pos, idx);
-              const stack = getStackOffset(roomState.board_state.pieces.player_1, pos, idx);
-              const cx = coords.x * CELL + CELL / 2 + stack.dx;
-              const cy = coords.y * CELL + CELL / 2 + stack.dy;
-              const canMove = p1IsMe && isMyTurn && roomState.dice_rolled && roomState.movable_pieces?.includes(idx);
-              return (
-                <g key={`p1-${idx}`} onClick={() => canMove && handleMove(idx)} style={{ cursor: canMove ? "pointer" : "default" }}>
-                  {canMove && (
-                    <circle cx={cx} cy={cy} r="4">
-                      <animate attributeName="r" values="3;4.5;3" dur="1s" repeatCount="indefinite" />
-                      <animate attributeName="opacity" values="0.6;0.2;0.6" dur="1s" repeatCount="indefinite" />
-                    </circle>
-                  )}
-                  {canMove && <circle cx={cx} cy={cy} r="4" fill="#EF444440" />}
-                  <circle cx={cx} cy={cy} r="2.8" fill="#EF4444" stroke="#FFFFFF" strokeWidth="0.6" />
-                  <circle cx={cx} cy={cy} r="1.3" fill="#7F1D1D" />
-                  {p1IsMe && pos === 0 && (
-                    <text x={cx} y={cy + 0.6} textAnchor="middle" fontSize="2.5" fill="white" fontWeight="bold">{idx+1}</text>
-                  )}
-                </g>
-              );
-            })}
-
-            {/* Player 2 (Blue) */}
-            {(roomState.board_state?.pieces?.player_2 || []).map((pos: number, idx: number) => {
-              const p2IsMe = !amPlayer1;
-              const coords = getPieceCoords(false, pos, idx);
-              const stack = getStackOffset(roomState.board_state.pieces.player_2, pos, idx);
-              const cx = coords.x * CELL + CELL / 2 + stack.dx;
-              const cy = coords.y * CELL + CELL / 2 + stack.dy;
-              const canMove = p2IsMe && isMyTurn && roomState.dice_rolled && roomState.movable_pieces?.includes(idx);
-              return (
-                <g key={`p2-${idx}`} onClick={() => canMove && handleMove(idx)} style={{ cursor: canMove ? "pointer" : "default" }}>
-                  {canMove && <circle cx={cx} cy={cy} r="4" fill="#3B82F640" />}
-                  {canMove && (
-                    <circle cx={cx} cy={cy} r="4">
-                      <animate attributeName="r" values="3;4.5;3" dur="1s" repeatCount="indefinite" />
-                      <animate attributeName="opacity" values="0.6;0.2;0.6" dur="1s" repeatCount="indefinite" />
-                    </circle>
-                  )}
-                  <circle cx={cx} cy={cy} r="2.8" fill="#3B82F6" stroke="#FFFFFF" strokeWidth="0.6" />
-                  <circle cx={cx} cy={cy} r="1.3" fill="#1E3A8A" />
-                </g>
-              );
-            })}
-
-          </svg>
+      <div className="flex-1 px-2 py-1 flex items-center justify-center min-h-0">
+        <div className="w-full aspect-square max-w-[400px] max-h-[400px]">
+          <LudoBoard
+            room={room}
+            amPlayer1={amPlayer1}
+            isMyTurn={isMyTurn}
+            onMove={handleMove}
+          />
         </div>
       </div>
 
       {/* ── MY PLAYER FOOTER ── */}
-      <div className="flex-none px-3 pt-1 pb-3">
-        <div className="flex items-center justify-between bg-slate-900/80 backdrop-blur-sm border border-slate-800 rounded-2xl px-3 py-2.5">
-          {/* My avatar + name */}
+      <div className="flex-none px-3 pt-1 pb-safe pb-3">
+        <div className="flex items-center justify-between bg-slate-900/80 border border-slate-800 rounded-2xl px-3 py-2.5">
           <div className="flex items-center gap-2.5">
-            <div className="relative">
-              <div className="w-10 h-10 rounded-full border-2 border-purple-500 overflow-hidden bg-slate-950">
-                <img src={myProfile?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=Me`} alt="Me" className="w-full h-full object-cover" />
-              </div>
+            <div className="relative w-10 h-10 rounded-full border-2 border-purple-500 overflow-hidden bg-slate-950 flex-none">
+              <img src={myProfile?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=me`} alt="Me"
+                className="w-full h-full object-cover"
+                onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=me`; }} />
               {isMyTurn && (
-                <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-purple-500 rounded-full border-2 border-slate-950 animate-pulse" />
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-purple-500 rounded-full border border-slate-950 animate-pulse" />
               )}
             </div>
-            <div>
-              <div className="text-[11px] font-bold text-slate-200 truncate max-w-[80px]">{myProfile?.name || "You"}</div>
-              <div className="text-[9px] text-slate-500 font-semibold">Score: {myScore ?? 0}</div>
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold text-slate-200 truncate max-w-[80px]">{myProfile?.name ?? "You"}</div>
+              <div className="text-[9px] text-slate-500 font-semibold">Score {myScore}</div>
             </div>
           </div>
 
-          <HeartRow count={myHearts ?? 3} />
+          <Hearts count={myHearts} />
 
           {/* Dice / action area */}
-          <div className="flex items-center gap-2">
-            {isMyTurn && roomState.status === "active" ? (
-              !roomState.dice_rolled ? (
+          <div className="flex-none">
+            {isMyTurn && room.status === "active" ? (
+              !room.dice_rolled ? (
                 <motion.button
-                  whileTap={{ scale: 0.9 }}
+                  whileTap={{ scale: 0.88 }}
                   disabled={rolling}
                   onClick={handleRoll}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-[10px] font-black uppercase tracking-wider border border-purple-400/30 disabled:opacity-60"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-[10px] font-black uppercase tracking-wider border border-purple-400/30 disabled:opacity-60 min-w-[80px]"
                 >
-                  {rolling ? (
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 0.3, repeat: Infinity, ease: "linear" }}
-                      className="w-4 h-4 border border-white/30 border-t-white rounded-full"
-                    />
-                  ) : (
-                    <DiceFace value={diceDisplay || 1} size={20} />
-                  )}
-                  {rolling ? "Rolling..." : "Roll!"}
+                  <DiceFace value={diceDisplay} size={18} rolling={rollingAnim} />
+                  {rolling ? "Rolling" : "Roll!"}
                 </motion.button>
               ) : (
                 <div className="flex items-center gap-1.5 bg-purple-950/50 border border-purple-500/30 px-2.5 py-1.5 rounded-xl">
                   <motion.div
-                    key={diceDisplay}
-                    initial={{ scale: 0.5, rotate: -180 }}
+                    key={room.last_roll}
+                    initial={{ scale: 0.4, rotate: -180 }}
                     animate={{ scale: 1, rotate: 0 }}
-                    transition={{ type: "spring", stiffness: 300 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 18 }}
                   >
-                    <DiceFace value={diceDisplay || roomState.last_roll} size={22} />
+                    <DiceFace value={room.last_roll || diceDisplay} size={22} />
                   </motion.div>
                   <div>
-                    <div className="text-[8px] text-purple-400 font-black uppercase">Rolled</div>
-                    <div className="text-sm font-black text-amber-400 tabular-nums">{roomState.last_roll}</div>
+                    <div className="text-[8px] text-purple-400 font-black uppercase leading-none">Rolled</div>
+                    <div className="text-sm font-black text-amber-400 tabular-nums">{room.last_roll}</div>
                   </div>
                 </div>
               )
             ) : (
-              <div className="flex items-center gap-1.5 bg-slate-900/60 border border-slate-800 px-2.5 py-1.5 rounded-xl">
-                {roomState.last_roll > 0 && <DiceFace value={roomState.last_roll} size={18} />}
-                <span className="text-[9px] text-slate-500 font-bold">
-                  {isMyTurn ? "Move a piece" : "Opponent's turn"}
+              <div className="bg-slate-900/50 border border-slate-800 px-2.5 py-1.5 rounded-xl text-center min-w-[70px]">
+                {room.last_roll > 0 && (
+                  <div className="flex justify-center mb-0.5">
+                    <DiceFace value={room.last_roll} size={16} />
+                  </div>
+                )}
+                <span className="text-[8px] text-slate-500 font-bold leading-none">
+                  {isMyTurn ? "Pick piece" : "Their turn"}
                 </span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Footer controls */}
+        {/* Action hint + forfeit row */}
         <div className="flex items-center justify-between mt-2 px-1">
           <button
             onClick={handleForfeit}
-            className="text-[9px] text-red-500/70 hover:text-red-500 font-bold uppercase tracking-wider py-1 px-2 rounded-lg border border-red-500/20 hover:border-red-500/40 transition-colors"
+            className="text-[9px] text-red-500/60 hover:text-red-500 font-bold uppercase tracking-wider py-1 px-2 rounded-lg border border-red-500/15 hover:border-red-500/30 transition-colors"
           >
             🏳 Forfeit
           </button>
 
-          {isMyTurn && roomState.dice_rolled && (
-            <div className="text-[9px] text-purple-400 font-black uppercase tracking-wider animate-pulse">
-              ← Tap a piece to move →
-            </div>
+          {isMyTurn && room.dice_rolled && (
+            <motion.div
+              animate={{ opacity: [1, 0.5, 1] }}
+              transition={{ duration: 1.2, repeat: Infinity }}
+              className="text-[9px] text-purple-400 font-black uppercase tracking-wider"
+            >
+              Tap a piece to move
+            </motion.div>
           )}
 
-          <div className="text-[9px] text-slate-600 font-mono">
-            {roomState.stake}c stake
-          </div>
+          <div className="text-[9px] text-slate-600 font-mono">{room.stake}c</div>
         </div>
       </div>
 
@@ -863,27 +1173,26 @@ export default function LudoGamePage() {
         {showEmotes && (
           <>
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 z-30"
               onClick={() => setShowEmotes(false)}
             />
             <motion.div
-              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              initial={{ opacity: 0, y: 16, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.95 }}
-              className="absolute top-20 right-4 z-40 bg-slate-950/98 backdrop-blur-xl border border-purple-500/30 rounded-2xl p-3 shadow-2xl"
+              exit={{ opacity: 0, y: 16, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              className="absolute top-[72px] right-3 z-40 bg-slate-950/98 border border-purple-500/30 rounded-2xl p-3 shadow-2xl"
             >
-              <div className="text-[9px] text-purple-400 font-black uppercase tracking-widest mb-2.5 px-1">Send Reaction</div>
+              <div className="text-[9px] text-purple-400 font-black uppercase tracking-widest mb-2 px-1">React</div>
               <div className="grid grid-cols-3 gap-2">
-                {EMOTES.map((type) => (
+                {EMOTES.map(type => (
                   <button
                     key={type}
                     onClick={() => handleEmote(type)}
                     className="flex flex-col items-center gap-1 p-2 rounded-xl bg-slate-900 hover:bg-purple-950/40 border border-slate-800 hover:border-purple-500/40 transition-all"
                   >
-                    <EmoteSVG type={type} size={28} />
+                    <EmoteSVG type={type} size={26} />
                     <span className="text-[8px] text-slate-400 font-semibold">{type}</span>
                   </button>
                 ))}
@@ -893,17 +1202,16 @@ export default function LudoGamePage() {
         )}
       </AnimatePresence>
 
-      {/* ── GAME OVER OVERLAY (when playing phase detects completed status) ── */}
-      {(roomState.status === "completed" || roomState.status === "forfeited") && phase === "playing" && (
-        <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center">
+      {/* ── Transitional overlay when match just ended ── */}
+      {(room.status === "completed" || room.status === "forfeited") && phase === "playing" && (
+        <div className="absolute inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center">
           <motion.div
             animate={{ rotate: 360 }}
-            transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
             className="w-10 h-10 border-2 border-purple-400/30 border-t-purple-400 rounded-full"
           />
         </div>
       )}
-
     </div>
   );
 }
