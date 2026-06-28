@@ -1097,7 +1097,7 @@ export default function LudoGamePage() {
         <div className="h-0.5 bg-slate-800 rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-1000 ${turnSecs <= 5 ? "bg-red-500" : "bg-purple-500"}`}
-            style={{ width: `${Math.max(0, (turnSecs / 18) * 100)}%` }}
+            style={{ width: `${Math.max(0, (turnSecs / 15) * 100)}%` }}
           />
         </div>
       </div>
