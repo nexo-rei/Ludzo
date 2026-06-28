@@ -3,6 +3,8 @@ import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const ALLOWED_REACTIONS = ["Laugh", "Angry", "Fire", "GG", "Crown", "Shock", "Cry", "Clap"] as const;
+type AllowedReaction = typeof ALLOWED_REACTIONS[number];
+
 const REACTION_COOLDOWN_MS = 2000;
 
 export async function POST(req: NextRequest) {
@@ -17,7 +19,7 @@ export async function POST(req: NextRequest) {
     if (!room_id) {
       return NextResponse.json({ success: false, error: "room_id is required" }, { status: 400 });
     }
-    if (!ALLOWED_REACTIONS.includes(reaction_type)) {
+    if (!ALLOWED_REACTIONS.includes(reaction_type as AllowedReaction)) {
       return NextResponse.json({ success: false, error: "Invalid reaction type" }, { status: 400 });
     }
 
@@ -25,7 +27,7 @@ export async function POST(req: NextRequest) {
     const userId   = auth.userId!;
     const now      = Date.now();
 
-    // ── Verify the player is in this room and match is active ─────────────────
+    // ── Verify player is in this room ─────────────────────────────────────────
     const { data: room, error: roomErr } = await supabase
       .from("ludo_rooms")
       .select("chat_reactions, player_1_id, player_2_id, status")
@@ -44,7 +46,7 @@ export async function POST(req: NextRequest) {
 
     // ── Server-side cooldown ──────────────────────────────────────────────────
     const existing: Array<{ player_id: string; type: string; timestamp: number }> =
-      room.chat_reactions ?? [];
+      Array.isArray(room.chat_reactions) ? room.chat_reactions : [];
 
     const myLast = existing
       .filter(r => r.player_id === userId)
@@ -57,39 +59,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const newReaction = {
-      player_id: userId,
-      type:      reaction_type,
-      timestamp: now,
-    };
+    const newReaction = { player_id: userId, type: reaction_type, timestamp: now };
 
-    // ── Update chat_reactions in ludo_rooms (polling-based sync) ─────────────
-    // Keep latest 20 to prevent JSONB bloat
+    // Keep last 20 only to prevent JSONB bloat
     const updatedReactions = [...existing, newReaction].slice(-20);
 
+    // ── Primary store: update chat_reactions on ludo_rooms ───────────────────
+    // This is the field both players poll every 1.2 s in /api/ludo/room/state.
+    // Writing it here means the opponent will see the reaction on the very next
+    // poll — typically within 1-2 seconds, which feels instant.
     const { error: updateErr } = await supabase
       .from("ludo_rooms")
-      .update({
-        chat_reactions: updatedReactions,
-        updated_at:     new Date().toISOString(),
-      })
+      .update({ chat_reactions: updatedReactions, updated_at: new Date().toISOString() })
       .eq("id", room_id);
 
     if (updateErr) {
-      console.error(`[LUDO REACTION] Failed to save reaction:`, updateErr.message);
+      console.error(`[LUDO REACTION] Failed to save:`, updateErr.message);
       return NextResponse.json({ success: false, error: "Failed to save reaction" }, { status: 500 });
     }
 
-    // ── Also write to ludo_reactions table for any realtime subscribers ───────
-    // This is a belt-and-suspenders approach: polling reads from ludo_rooms,
-    // realtime subscribers can read from ludo_reactions.
-    await supabase
+    // ── Secondary store: ludo_reactions table (fire-and-forget) ──────────────
+    // Errors here must NOT fail the request — the primary store already succeeded.
+    supabase
       .from("ludo_reactions")
-      .insert({
-        room_id:   room_id,
-        sender_id: userId,
-        reaction:  reaction_type,
-        sent_at:   new Date().toISOString(),
+      .insert({ room_id, sender_id: userId, reaction: reaction_type, sent_at: new Date().toISOString() })
+      .then(({ error }) => {
+        if (error) console.warn(`[LUDO REACTION] ludo_reactions insert failed (non-fatal):`, error.message);
       });
 
     console.log(`[LUDO REACTION] room=${room_id} player=${userId} type=${reaction_type}`);
