@@ -24,12 +24,12 @@ export async function POST(req: NextRequest) {
       .eq("id", room_id)
       .maybeSingle();
 
+    if (error) {
+      console.error("[LUDO FORFEIT] DB error:", (error as any).message ?? error);
+      return NextResponse.json({ success: false, error: "Database error" }, { status: 500 });
+    }
     if (!room) {
       return NextResponse.json({ success: false, error: "Room not found" }, { status: 404 });
-    }
-    if (error) {
-      console.error("[LUDO FORFEIT] DB error:", error.message);
-      return NextResponse.json({ success: false, error: "Database error" }, { status: 500 });
     }
 
     if (room.status !== "active" && room.status !== "countdown") {
