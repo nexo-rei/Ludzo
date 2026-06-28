@@ -14,7 +14,10 @@ export async function POST(req: NextRequest) {
     const { room_id, piece_index } = body;
 
     if (!room_id || piece_index === undefined || piece_index === null) {
-      return NextResponse.json({ success: false, error: "room_id and piece_index are required" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "room_id and piece_index are required" },
+        { status: 400 }
+      );
     }
 
     const pieceIdx = Number(piece_index);
@@ -25,7 +28,6 @@ export async function POST(req: NextRequest) {
     const supabase = createAdminClient();
     const userId   = auth.userId!;
 
-    // ── Fetch room ────────────────────────────────────────────────────────────
     const { data: room, error: roomErr } = await supabase
       .from("ludo_rooms")
       .select("*")
@@ -40,7 +42,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Room not found" }, { status: 404 });
     }
 
-    // ── Anti-cheat validations ────────────────────────────────────────────────
+    // ── Anti-cheat ────────────────────────────────────────────────────────────
     if (room.status !== "active") {
       return NextResponse.json({ success: false, error: "Match is not active" }, { status: 400 });
     }
@@ -54,39 +56,35 @@ export async function POST(req: NextRequest) {
 
     const movable: number[] = room.movable_pieces ?? [];
     if (!movable.includes(pieceIdx)) {
-      console.warn(`[LUDO MOVE] Illegal piece ${pieceIdx} not in movable=${JSON.stringify(movable)}`);
       return NextResponse.json({ success: false, error: "That piece cannot move" }, { status: 400 });
     }
 
-    // ── Set up board state ────────────────────────────────────────────────────
+    // ── Board setup ───────────────────────────────────────────────────────────
     const isPlayer1 = room.player_1_id === userId;
     const myKey     = isPlayer1 ? "player_1" : "player_2";
     const oppKey    = isPlayer1 ? "player_2" : "player_1";
 
-    // Deep clone to avoid mutating the original
     const boardState = JSON.parse(JSON.stringify(
       room.board_state ?? { pieces: { player_1: [0,0,0,0], player_2: [0,0,0,0] } }
     ));
     const myPieces:  number[] = boardState.pieces[myKey]  ?? [0,0,0,0];
     const oppPieces: number[] = boardState.pieces[oppKey] ?? [0,0,0,0];
-
     const roll = room.last_roll as number;
 
-    console.log(`[LUDO MOVE] room=${room_id} user=${userId} player=${myKey} piece=${pieceIdx} pos=${myPieces[pieceIdx]} roll=${roll}`);
+    console.log(
+      `[LUDO MOVE] room=${room_id} user=${userId} player=${myKey}` +
+      ` piece=${pieceIdx} pos=${myPieces[pieceIdx]} roll=${roll}`
+    );
 
-    // ── Apply move using shared engine ────────────────────────────────────────
+    // ── Apply move ────────────────────────────────────────────────────────────
     const result = applyMove(myPieces, oppPieces, pieceIdx, roll, isPlayer1);
 
     boardState.pieces[myKey]  = result.myPieces;
     boardState.pieces[oppKey] = result.oppPieces;
 
-    // ── Recalculate scores correctly (from updated pieces) ────────────────────
-    const score1 = isPlayer1
-      ? calcScore(result.myPieces)
-      : calcScore(result.oppPieces);
-    const score2 = isPlayer1
-      ? calcScore(result.oppPieces)
-      : calcScore(result.myPieces);
+    // Scores are always recalculated from the updated piece arrays
+    const score1 = isPlayer1 ? calcScore(result.myPieces)  : calcScore(result.oppPieces);
+    const score2 = isPlayer1 ? calcScore(result.oppPieces) : calcScore(result.myPieces);
 
     // ── Win detection ─────────────────────────────────────────────────────────
     if (result.isWin) {
@@ -99,45 +97,32 @@ export async function POST(req: NextRequest) {
 
       console.log(`[LUDO MOVE] WIN room=${room_id} winner=${userId} loser=${loserId} duration=${duration}s`);
 
-      // Save final board state
       await supabase
         .from("ludo_rooms")
-        .update({
-          board_state:    boardState,
-          score_player_1: score1,
-          score_player_2: score2,
-          updated_at:     new Date().toISOString(),
-        })
+        .update({ board_state: boardState, score_player_1: score1, score_player_2: score2, updated_at: new Date().toISOString() })
         .eq("id", room_id);
 
-      // Settle — NOTE: no p_board_state parameter (that was the bug)
-      const { data: settled, error: settleErr } = await supabase.rpc("settle_ludo_match", {
+      const { error: settleErr } = await supabase.rpc("settle_ludo_match", {
         p_room_id:    room_id,
         p_winner_id:  userId,
         p_loser_id:   loserId,
         p_win_reason: "normal",
         p_duration:   duration,
       });
-
-      if (settleErr) {
-        console.error(`[LUDO MOVE] settle_ludo_match error:`, settleErr.message);
-      }
+      if (settleErr) console.error(`[LUDO MOVE] settle error:`, settleErr.message);
 
       return NextResponse.json({
         success: true,
-        data: {
-          winner_id:   userId,
-          pieces:      result.myPieces,
-          has_capture: result.hasCapture,
-          extra_turn:  false,
-          is_win:      true,
-        },
+        data: { winner_id: userId, pieces: result.myPieces, has_capture: result.hasCapture, extra_turn: false, is_win: true },
       });
     }
 
-    // ── Determine next turn ───────────────────────────────────────────────────
-    const consecutiveSixes = (room.consecutive_sixes ?? 0) as number;
-    const extraTurn = getsExtraTurn(roll, result.hasCapture, result.reachedFinish, consecutiveSixes);
+    // ── Extra turn decision ───────────────────────────────────────────────────
+    // NOTE: getsExtraTurn does NOT receive consecutiveSixes.
+    // The triple-six check already happened in the roll route before the player
+    // was ever allowed to roll. If we reach here with roll=6, it was a valid six.
+    const extraTurn = getsExtraTurn(roll, result.hasCapture, result.reachedFinish);
+
     const nextTurnPlayerId = extraTurn
       ? userId
       : (isPlayer1 ? String(room.player_2_id) : String(room.player_1_id));
@@ -149,31 +134,36 @@ export async function POST(req: NextRequest) {
       console.log(`[LUDO MOVE] Turn passes to ${nextTurnPlayerId}`);
     }
 
-    // ── Save updated game state ───────────────────────────────────────────────
+    // ── Save state ────────────────────────────────────────────────────────────
+    // consecutive_sixes:
+    //   - When turn stays (extra turn from a 6): keep the current count from DB
+    //     (roll route already incremented and saved it)
+    //   - When turn passes or extra turn is from capture/finish (not a 6): reset to 0
+    const keepConsecutive = extraTurn && roll === 6;
+    const nextConsecutive = keepConsecutive ? (room.consecutive_sixes ?? 0) : 0;
+
+    const updatePayload: Record<string, unknown> = {
+      board_state:    boardState,
+      score_player_1: score1,
+      score_player_2: score2,
+      turn_player_id: nextTurnPlayerId,
+      turn_start_at:  new Date().toISOString(),
+      dice_rolled:    false,
+      last_roll:      0,
+      movable_pieces: [],
+      updated_at:     new Date().toISOString(),
+    };
+    // Only include consecutive_sixes if the column exists on this room row
+    if ("consecutive_sixes" in room) updatePayload.consecutive_sixes = nextConsecutive;
+
     const { error: saveErr } = await supabase
       .from("ludo_rooms")
-      .update({
-        board_state:      boardState,
-        score_player_1:   score1,
-        score_player_2:   score2,
-        turn_player_id:   nextTurnPlayerId,
-        turn_start_at:    new Date().toISOString(),
-        dice_rolled:      false,
-        last_roll:        0,
-        movable_pieces:   [],
-        // Reset consecutive six count only when turn actually passes
-        consecutive_sixes: extraTurn && roll === 6 ? consecutiveSixes : 0,
-        updated_at:       new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", room_id);
 
     if (saveErr) {
-      console.error(`[LUDO MOVE] Failed to save move:`, saveErr.message);
+      console.error(`[LUDO MOVE] Failed to save:`, saveErr.message);
       return NextResponse.json({ success: false, error: "Failed to save move" }, { status: 500 });
-    }
-
-    if (result.hasCapture) {
-      console.log(`[LUDO MOVE] Capture confirmed room=${room_id} by user=${userId}`);
     }
 
     return NextResponse.json({
