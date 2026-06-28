@@ -1,17 +1,18 @@
 "use client";
 
 /**
- * LUDZO — Ludo 1v1 Game Screen
- * ─────────────────────────────
+ * LUDZO — Ludo 1v1 Game Screen (Phase 5 — fully fixed)
+ * ─────────────────────────────────────────────────────
  * Route: /games/game/[roomId]
  *
- * Architecture decisions:
- *  - Full-screen fixed overlay (z-[999]) — no layout chrome
- *  - Single source of truth: server room state, polled every 1.2s
- *  - Phase machine: loading → pre-match → countdown → playing → ended
- *  - Reconnect-safe: on any reopen, if room is active → skip to playing
- *  - Zero null crashes: every server field has a safe default
- *  - No AnimatePresence on critical paths that can cause blank renders
+ * Key fixes in this version:
+ *  - Match timer is SERVER-AUTHORITATIVE: uses match_remaining_seconds from
+ *    the server on every poll.  Never restarts on refresh / reconnect.
+ *  - Turn timer is SERVER-AUTHORITATIVE: resyncs from turn_remaining_seconds
+ *    on every poll.  Resets correctly when the turn changes.
+ *  - Reconnect: room status "active" → skip countdown, restore full state.
+ *  - Emoji reactions: picked up via 1.2 s polling of chat_reactions.
+ *  - No client-side game logic — all dice / movement / settlement is server.
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -20,7 +21,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useApp } from "@/hooks/useApp";
 import { showToast } from "@/components/ui/Toast";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types ─────────────────────────────────────────────────────────────────
 type GamePhase = "loading" | "pre-match" | "countdown" | "playing" | "ended" | "error";
 
 interface PlayerProfile {
@@ -45,7 +46,12 @@ interface RoomState {
   player_2_profile: PlayerProfile;
   status: "countdown" | "active" | "completed" | "forfeited";
   turn_player_id: string;
+  /** Server-computed, seconds remaining in the current turn */
   turn_remaining_seconds: number;
+  /** Server-computed, seconds remaining in the whole match */
+  match_remaining_seconds: number;
+  /** ISO timestamp of when the match actually started (server-set) */
+  match_start_time: string;
   dice_rolled: boolean;
   last_roll: number;
   movable_pieces: number[];
@@ -57,10 +63,10 @@ interface RoomState {
   loser_id: string | null;
   win_reason: string | null;
   board_state: BoardState;
-  chat_reactions: Array<{ player_id: string; type: string; sent_at: string }>;
+  chat_reactions: Array<{ player_id: string; type: string; timestamp: number }>;
 }
 
-// ─── Ludo Board Track (15×15 grid, 52 cells clockwise) ───────────────────────
+// ─── Ludo board track (52 cells, clockwise) ────────────────────────────────
 const TRACK: { x: number; y: number }[] = [
   { x: 0, y: 6 }, { x: 1, y: 6 }, { x: 2, y: 6 }, { x: 3, y: 6 },
   { x: 4, y: 6 }, { x: 5, y: 6 }, { x: 6, y: 5 }, { x: 6, y: 4 },
@@ -76,15 +82,15 @@ const TRACK: { x: number; y: number }[] = [
   { x: 6, y: 9 }, { x: 5, y: 8 }, { x: 4, y: 8 }, { x: 3, y: 8 },
   { x: 2, y: 8 }, { x: 1, y: 8 }, { x: 0, y: 8 }, { x: 0, y: 7 },
 ];
-const SAFE_SPOTS = new Set([1, 9, 14, 22, 27, 35, 40, 48]);
-const STAR_SPOTS = new Set([9, 22, 35, 48]);
-const CELL = 100 / 15; // SVG units per grid cell
 
-// ─── Emote Definitions ────────────────────────────────────────────────────────
+const SAFE_SPOTS  = new Set([1, 9, 14, 22, 27, 35, 40, 48]);
+const STAR_SPOTS  = new Set([9, 22, 35, 48]);
+const CELL        = 100 / 15;
+
+// ─── Emote definitions ─────────────────────────────────────────────────────
 const EMOTES = ["Laugh", "Angry", "Fire", "Crown", "Clap", "Shock"] as const;
 type EmoteType = typeof EMOTES[number];
 
-// ─── SVG Emote ────────────────────────────────────────────────────────────────
 function EmoteSVG({ type, size = 24 }: { type: EmoteType | string; size?: number }) {
   switch (type) {
     case "Laugh":
@@ -150,7 +156,7 @@ function EmoteSVG({ type, size = 24 }: { type: EmoteType | string; size?: number
   }
 }
 
-// ─── Dice Face ────────────────────────────────────────────────────────────────
+// ─── Dice face ─────────────────────────────────────────────────────────────
 function DiceFace({ value, size = 40, rolling = false }: { value: number; size?: number; rolling?: boolean }) {
   const dotMap: Record<number, [number, number][]> = {
     1: [[50, 50]],
@@ -160,8 +166,7 @@ function DiceFace({ value, size = 40, rolling = false }: { value: number; size?:
     5: [[25, 25], [75, 25], [50, 50], [25, 75], [75, 75]],
     6: [[25, 20], [75, 20], [25, 50], [75, 50], [25, 80], [75, 80]],
   };
-  const dots: [number, number][] = dotMap[value] ?? dotMap[1];
-
+  const dots = dotMap[value] ?? dotMap[1];
   return (
     <motion.svg
       width={size} height={size} viewBox="0 0 100 100" fill="none"
@@ -176,7 +181,7 @@ function DiceFace({ value, size = 40, rolling = false }: { value: number; size?:
   );
 }
 
-// ─── Hearts Row ───────────────────────────────────────────────────────────────
+// ─── Hearts row ────────────────────────────────────────────────────────────
 function Hearts({ count, max = 3 }: { count: number; max?: number }) {
   return (
     <div className="flex gap-0.5">
@@ -194,7 +199,7 @@ function Hearts({ count, max = 3 }: { count: number; max?: number }) {
   );
 }
 
-// ─── Loading Screen ───────────────────────────────────────────────────────────
+// ─── Loading screen ────────────────────────────────────────────────────────
 function LoadingScreen({ message }: { message: string }) {
   return (
     <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[999] gap-5">
@@ -218,7 +223,7 @@ function LoadingScreen({ message }: { message: string }) {
   );
 }
 
-// ─── Error / Recovery Screen ──────────────────────────────────────────────────
+// ─── Error screen ──────────────────────────────────────────────────────────
 function ErrorScreen({ message, onBack }: { message: string; onBack: () => void }) {
   return (
     <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[999] p-6 gap-6">
@@ -241,7 +246,7 @@ function ErrorScreen({ message, onBack }: { message: string; onBack: () => void 
   );
 }
 
-// ─── Board Component ──────────────────────────────────────────────────────────
+// ─── Board component ───────────────────────────────────────────────────────
 function LudoBoard({
   room,
   amPlayer1,
@@ -256,22 +261,26 @@ function LudoBoard({
   const p1Yard: [number, number][] = [[13, 13], [27, 13], [13, 27], [27, 27]];
   const p2Yard: [number, number][] = [[73, 73], [87, 73], [73, 87], [87, 87]];
 
-  // Map a player's logical position to SVG (cx, cy) coordinates
-  const pieceXY = (isP1: boolean, pos: number, pieceIdx: number): [number, number] => {
+  /**
+   * Convert a player's relative position to SVG coordinates.
+   * Pos 0  → yard
+   * Pos 57 → home centre
+   * Pos 52-56 → home lane
+   * Pos 1-51  → main track
+   */
+  const pieceXY = (isP1: boolean, pos: number, idx: number): [number, number] => {
     if (pos === 0) {
-      // In yard
       const yard = isP1 ? p1Yard : p2Yard;
-      const [cx, cy] = yard[pieceIdx % 4];
+      const [cx, cy] = yard[idx % 4];
       return [cx, cy];
     }
     if (pos === 57) {
-      // Home centre
       return isP1
-        ? [50 - 4 + (pieceIdx % 2) * 4, 50 - 4 + Math.floor(pieceIdx / 2) * 4]
-        : [50 + (pieceIdx % 2) * 4, 50 + Math.floor(pieceIdx / 2) * 4];
+        ? [50 - 4 + (idx % 2) * 4, 50 - 4 + Math.floor(idx / 2) * 4]
+        : [50 + (idx % 2) * 4, 50 + Math.floor(idx / 2) * 4];
     }
     if (pos >= 52 && pos <= 56) {
-      // Home path
+      // Home lane cells (row 7, columns differ per player)
       const homeTrack: [number, number][] = isP1
         ? [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7]]
         : [[13, 7], [12, 7], [11, 7], [10, 7], [9, 7]];
@@ -281,79 +290,78 @@ function LudoBoard({
     // Main track
     const trackIdx = isP1
       ? (pos - 1) % TRACK.length
-      : (pos + 25) % TRACK.length;
+      : (pos - 1 + 26) % TRACK.length;
     const cell = TRACK[Math.min(trackIdx, TRACK.length - 1)];
     return [cell.x * CELL + CELL / 2, cell.y * CELL + CELL / 2];
   };
 
-  // Stack offset so overlapping pieces don't hide each other
   const stackOffset = (pieces: number[], pos: number, idx: number): [number, number] => {
     if (pos === 0 || pos === 57) return [0, 0];
-    const samePos = pieces.reduce<number[]>((a, p, i) => (p === pos ? [...a, i] : a), []);
-    if (samePos.length <= 1) return [0, 0];
-    const order = samePos.indexOf(idx);
-    const angle = (order * 2 * Math.PI) / samePos.length;
+    const same = pieces.reduce<number[]>((a, p, i) => (p === pos ? [...a, i] : a), []);
+    if (same.length <= 1) return [0, 0];
+    const order = same.indexOf(idx);
+    const angle = (order * 2 * Math.PI) / same.length;
     return [Math.cos(angle) * 1.5, Math.sin(angle) * 1.5];
   };
 
   const canMove = (idx: number) =>
     isMyTurn && room.dice_rolled && (room.movable_pieces ?? []).includes(idx);
 
-  const myPieces = amPlayer1
+  const myPieces  = amPlayer1
     ? room.board_state?.pieces?.player_1 ?? [0, 0, 0, 0]
     : room.board_state?.pieces?.player_2 ?? [0, 0, 0, 0];
-
   const oppPieces = amPlayer1
     ? room.board_state?.pieces?.player_2 ?? [0, 0, 0, 0]
     : room.board_state?.pieces?.player_1 ?? [0, 0, 0, 0];
 
   return (
     <svg className="w-full h-full rounded-2xl" viewBox="0 0 100 100" fill="none">
-      {/* ── Board background ── */}
+      {/* Board background */}
       <rect width="100" height="100" rx="4" fill="#080D18" />
 
-      {/* ── Red yard (top-left = Player 1) ── */}
+      {/* Red yard (top-left = Player 1) */}
       <rect x="0" y="0" width="40" height="40" rx="4" fill="#EF444412" stroke="#EF4444" strokeWidth="0.5" />
       <rect x="6" y="6" width="28" height="28" rx="3" fill="#090E1C" stroke="#EF4444" strokeWidth="0.4" />
       {p1Yard.map(([cx, cy], i) => (
-        <circle key={i} cx={cx / (100 / 100)} cy={cy / (100 / 100)} r="4" fill="#EF444425" stroke="#EF4444" strokeWidth="0.5" />
+        <circle key={i} cx={cx} cy={cy} r="4" fill="#EF444425" stroke="#EF4444" strokeWidth="0.5" />
       ))}
 
-      {/* ── Blue yard (bottom-right = Player 2) ── */}
+      {/* Blue yard (bottom-right = Player 2) */}
       <rect x="60" y="60" width="40" height="40" rx="4" fill="#3B82F612" stroke="#3B82F6" strokeWidth="0.5" />
       <rect x="66" y="66" width="28" height="28" rx="3" fill="#090E1C" stroke="#3B82F6" strokeWidth="0.4" />
       {p2Yard.map(([cx, cy], i) => (
-        <circle key={i} cx={cx / (100 / 100)} cy={cy / (100 / 100)} r="4" fill="#3B82F625" stroke="#3B82F6" strokeWidth="0.5" />
+        <circle key={i} cx={cx} cy={cy} r="4" fill="#3B82F625" stroke="#3B82F6" strokeWidth="0.5" />
       ))}
 
-      {/* ── Unused yards (grey, 1v1 mode) ── */}
+      {/* Unused yards (1v1 mode) */}
       <rect x="60" y="0" width="40" height="40" rx="4" fill="#0F172A" stroke="#1E293B" strokeWidth="0.3" />
       <rect x="0" y="60" width="40" height="40" rx="4" fill="#0F172A" stroke="#1E293B" strokeWidth="0.3" />
 
-      {/* ── Home triangles ── */}
+      {/* Home triangles */}
       <polygon points="40,40 50,50 40,60" fill="#EF444418" stroke="#EF4444" strokeWidth="0.4" />
       <polygon points="60,40 50,50 60,60" fill="#3B82F618" stroke="#3B82F6" strokeWidth="0.4" />
       <polygon points="40,40 50,50 60,40" fill="#0F172A" stroke="#1E293B" strokeWidth="0.2" />
       <polygon points="40,60 50,50 60,60" fill="#0F172A" stroke="#1E293B" strokeWidth="0.2" />
       <circle cx="50" cy="50" r="4" fill="#A855F718" stroke="#A855F7" strokeWidth="0.5" />
 
-      {/* ── Track cells ── */}
+      {/* Track cells */}
       {TRACK.map((cell, idx) => {
         const x = cell.x * CELL;
         const y = cell.y * CELL;
-        const isSafe = SAFE_SPOTS.has(idx);
-        const isStar = STAR_SPOTS.has(idx);
-        const isLaunchRed = idx === 1;
+        const isSafe  = SAFE_SPOTS.has(idx);
+        const isStar  = STAR_SPOTS.has(idx);
+        const isLaunchRed  = idx === 1;
         const isLaunchBlue = idx === 27;
-        let fill = "#0F172A30";
+        let fill   = "#0F172A30";
         let stroke = "#1E293B";
-        let sw = 0.15;
-        if (isLaunchRed) { fill = "#EF444435"; stroke = "#EF4444"; sw = 0.4; }
+        let sw     = 0.15;
+        if (isLaunchRed)  { fill = "#EF444435"; stroke = "#EF4444"; sw = 0.4; }
         else if (isLaunchBlue) { fill = "#3B82F635"; stroke = "#3B82F6"; sw = 0.4; }
-        else if (isStar) { fill = "#A855F720"; stroke = "#A855F7"; sw = 0.35; }
+        else if (isStar)  { fill = "#A855F720"; stroke = "#A855F7"; sw = 0.35; }
         return (
           <g key={idx}>
-            <rect x={x + 0.25} y={y + 0.25} width={CELL - 0.5} height={CELL - 0.5} rx="0.7" fill={fill} stroke={stroke} strokeWidth={sw} />
+            <rect x={x + 0.25} y={y + 0.25} width={CELL - 0.5} height={CELL - 0.5} rx="0.7"
+              fill={fill} stroke={stroke} strokeWidth={sw} />
             {isStar && (
               <text x={x + CELL / 2} y={y + CELL / 2 + 1.5} textAnchor="middle" fontSize="3.5" fill="#A855F7" opacity="0.9">★</text>
             )}
@@ -361,35 +369,33 @@ function LudoBoard({
         );
       })}
 
-      {/* ── Red home path (columns 1-5, row 7) ── */}
+      {/* Red home lane */}
       {[1, 2, 3, 4, 5].map(col => (
         <rect key={`rh${col}`} x={col * CELL + 0.25} y={7 * CELL + 0.25} width={CELL - 0.5} height={CELL - 0.5} rx="0.7"
           fill="#EF444428" stroke="#EF4444" strokeWidth="0.3" />
       ))}
-      {/* ── Blue home path (columns 9-13, row 7) ── */}
+      {/* Blue home lane */}
       {[9, 10, 11, 12, 13].map(col => (
         <rect key={`bh${col}`} x={col * CELL + 0.25} y={7 * CELL + 0.25} width={CELL - 0.5} height={CELL - 0.5} rx="0.7"
           fill="#3B82F628" stroke="#3B82F6" strokeWidth="0.3" />
       ))}
 
-      {/* ── Opponent pieces (always render behind mine) ── */}
+      {/* Opponent pieces (below mine) */}
       {oppPieces.map((pos: number, idx: number) => {
-        const isP1Piece = !amPlayer1; // if I'm P2, opponent is P1
+        const isP1Piece = !amPlayer1;
         const [baseCx, baseCy] = pieceXY(isP1Piece, pos, idx);
         const [dx, dy] = stackOffset(oppPieces, pos, idx);
-        const cx = baseCx + dx;
-        const cy = baseCy + dy;
         const color = isP1Piece ? "#EF4444" : "#3B82F6";
         const inner = isP1Piece ? "#7F1D1D" : "#1E3A8A";
         return (
           <g key={`opp-${idx}`}>
-            <circle cx={cx} cy={cy} r="2.6" fill={color} stroke="#FFFFFF" strokeWidth="0.5" />
-            <circle cx={cx} cy={cy} r="1.1" fill={inner} />
+            <circle cx={baseCx + dx} cy={baseCy + dy} r="2.6" fill={color} stroke="#FFFFFF" strokeWidth="0.5" />
+            <circle cx={baseCx + dx} cy={baseCy + dy} r="1.1" fill={inner} />
           </g>
         );
       })}
 
-      {/* ── My pieces (render on top, interactive) ── */}
+      {/* My pieces (interactive, on top) */}
       {myPieces.map((pos: number, idx: number) => {
         const [baseCx, baseCy] = pieceXY(amPlayer1, pos, idx);
         const [dx, dy] = stackOffset(myPieces, pos, idx);
@@ -403,7 +409,6 @@ function LudoBoard({
             onClick={() => canMoveThis && onMove(idx)}
             style={{ cursor: canMoveThis ? "pointer" : "default" }}
           >
-            {/* Pulse ring when movable */}
             {canMoveThis && (
               <>
                 <circle cx={cx} cy={cy} r="4" fill={color} opacity="0.25">
@@ -422,51 +427,59 @@ function LudoBoard({
   );
 }
 
-// ─── Main Game Page ───────────────────────────────────────────────────────────
+// ─── Main game page ────────────────────────────────────────────────────────
 export default function LudoGamePage() {
-  const router = useRouter();
-  const params = useParams();
-  const rawRoomId = params?.roomId;
-  const roomId = Array.isArray(rawRoomId) ? rawRoomId[0] : rawRoomId ?? "";
+  const router  = useRouter();
+  const params  = useParams();
+  const rawId   = params?.roomId;
+  const roomId  = Array.isArray(rawId) ? rawId[0] : rawId ?? "";
 
-  const { userId, refreshWallet, recordMatchResult } = useApp();
+  const { userId, refreshWallet } = useApp();
 
   // Phase machine
-  const [phase, setPhase] = useState<GamePhase>("loading");
+  const [phase, setPhase]         = useState<GamePhase>("loading");
   const [loadingMsg, setLoadingMsg] = useState("Loading Ludo Arena...");
-  const [errorMsg, setErrorMsg] = useState("");
-
-  // Countdown
+  const [errorMsg, setErrorMsg]   = useState("");
   const [countdown, setCountdown] = useState(3);
 
-  // Room state (server authoritative)
-  const [room, setRoom] = useState<RoomState | null>(null);
+  // Server-authoritative room state
+  const [room, setRoom]   = useState<RoomState | null>(null);
 
   // Local UI states
-  const [rolling, setRolling] = useState(false);
+  const [rolling, setRolling]         = useState(false);
   const [rollingAnim, setRollingAnim] = useState(false);
   const [diceDisplay, setDiceDisplay] = useState(1);
+  const [showEmotes, setShowEmotes]   = useState(false);
+  const [lastEmoteTime, setLastEmoteTime] = useState(0);
+
+  // Server-driven timers (display only — never restart the source-of-truth)
   const [matchSecs, setMatchSecs] = useState(480);
-  const [turnSecs, setTurnSecs] = useState(15);
-  const [showEmotes, setShowEmotes] = useState(false);
+  const [turnSecs,  setTurnSecs]  = useState(15);
+
+  // Floating emote overlays
   const [floatingEmotes, setFloatingEmotes] = useState<
     Array<{ id: string; type: string; mine: boolean }>
   >([]);
-  const [lastEmoteTime, setLastEmoteTime] = useState(0);
 
-  // Refs for stable callbacks
-  const phaseRef = useRef<GamePhase>("loading");
-  const roomRef = useRef<RoomState | null>(null);
-  const prevReactionLen = useRef(0);
-  const prevTurnPlayer = useRef<string | null>(null);
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const matchTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const turnTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Refs
+  const phaseRef             = useRef<GamePhase>("loading");
+  const roomRef              = useRef<RoomState | null>(null);
+  const prevReactionLen      = useRef(0);
+  const prevTurnPlayer       = useRef<string | null>(null);
+  const pollRef              = useRef<ReturnType<typeof setInterval> | null>(null);
+  const matchTickRef         = useRef<ReturnType<typeof setInterval> | null>(null);
+  const turnTickRef          = useRef<ReturnType<typeof setInterval> | null>(null);
+  const matchSecsRef         = useRef(480);
+  const turnSecsRef          = useRef(15);
+  const endedRef             = useRef(false);
 
   phaseRef.current = phase;
-  roomRef.current = room;
+  roomRef.current  = room;
 
-  // ── Sound & vibration ──────────────────────────────────────────────────────
+  const formatTime = (s: number) =>
+    `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
+  // ── Sound / vibration ────────────────────────────────────────────────────
   const playSound = useCallback((name: string) => {
     try {
       const a = new Audio(`/sounds/${name}.mp3`);
@@ -479,7 +492,7 @@ export default function LudoGamePage() {
     try { navigator.vibrate?.(pattern); } catch {}
   }, []);
 
-  // ── Lock game screen & prevent back nav ───────────────────────────────────
+  // ── Prevent accidental back navigation ───────────────────────────────────
   useEffect(() => {
     window.history.pushState(null, "", window.location.href);
     const onPop = () => window.history.pushState(null, "", window.location.href);
@@ -487,45 +500,47 @@ export default function LudoGamePage() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  // ── Core fetch ────────────────────────────────────────────────────────────
+  // ── Fetch room state from server ─────────────────────────────────────────
   const fetchRoom = useCallback(async (): Promise<RoomState | null> => {
     if (!roomId || !userId) return null;
     try {
       const res = await fetch(`/api/ludo/room/state?room_id=${roomId}`, {
         headers: {
           "Authorization": `Bearer ${userId}`,
-          "x-user-id": userId,
+          "x-user-id":     userId,
         },
         cache: "no-store",
       });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        console.error("[LudoGame] state fetch error:", res.status, body);
-        return null;
-      }
-
+      if (!res.ok) return null;
       const data = await res.json();
       if (!data.success || !data.data) return null;
       return data.data as RoomState;
-    } catch (err) {
-      console.error("[LudoGame] fetchRoom exception:", err);
+    } catch {
       return null;
     }
   }, [roomId, userId]);
 
-  // ── Apply room state update to UI ─────────────────────────────────────────
+  // ── Apply server state → UI (reactions, turn notification) ───────────────
   const applyRoomState = useCallback((state: RoomState) => {
     setRoom(state);
 
-    // Keep dice display in sync
     if (state.last_roll > 0) setDiceDisplay(state.last_roll);
+
+    // Sync server-provided timers (prevents client-side drift)
+    if (typeof state.match_remaining_seconds === "number") {
+      matchSecsRef.current = state.match_remaining_seconds;
+      setMatchSecs(state.match_remaining_seconds);
+    }
+    if (typeof state.turn_remaining_seconds === "number") {
+      turnSecsRef.current = state.turn_remaining_seconds;
+      setTurnSecs(state.turn_remaining_seconds);
+    }
 
     // Detect new opponent reactions
     const reactions = state.chat_reactions ?? [];
     if (reactions.length > prevReactionLen.current) {
       const latest = reactions[reactions.length - 1];
-      if (latest.player_id !== userId) {
+      if (latest && latest.player_id !== userId) {
         const id = `fe_${Date.now()}_${Math.random()}`;
         setFloatingEmotes(prev => [...prev.slice(-3), { id, type: latest.type, mine: false }]);
         setTimeout(() => setFloatingEmotes(prev => prev.filter(e => e.id !== id)), 2800);
@@ -534,7 +549,7 @@ export default function LudoGamePage() {
       prevReactionLen.current = reactions.length;
     }
 
-    // My turn notification
+    // Notify when my turn starts
     if (prevTurnPlayer.current !== null &&
         prevTurnPlayer.current !== state.turn_player_id &&
         state.turn_player_id === userId) {
@@ -545,34 +560,26 @@ export default function LudoGamePage() {
 
   // ── Handle match end ──────────────────────────────────────────────────────
   const handleMatchEnd = useCallback((state: RoomState) => {
-    if (phaseRef.current === "ended") return; // already handled
+    if (endedRef.current) return;
+    endedRef.current = true;
+
     const won = state.winner_id === userId;
     playSound(won ? "victory" : "defeat");
     vibe(won ? [200, 100, 200, 100, 300] : [150, 150, 150]);
-    recordMatchResult(won, state.stake ?? 0);
     refreshWallet();
     setPhase("ended");
-  }, [userId, playSound, vibe, recordMatchResult, refreshWallet]);
+  }, [userId, playSound, vibe, refreshWallet]);
 
-  // ── Initial load ──────────────────────────────────────────────────────────
+  // ── Initial load (supports reconnect) ────────────────────────────────────
   useEffect(() => {
-    if (!roomId) {
-      setErrorMsg("Invalid room link.");
-      setPhase("error");
-      return;
-    }
-    if (!userId) {
-      setErrorMsg("Not authenticated. Please reopen the app.");
-      setPhase("error");
-      return;
-    }
+    if (!roomId) { setErrorMsg("Invalid room link."); setPhase("error"); return; }
+    if (!userId) { setErrorMsg("Not authenticated. Please reopen the app."); setPhase("error"); return; }
 
     let cancelled = false;
 
     const init = async () => {
       setLoadingMsg("Loading Ludo Arena...");
       const state = await fetchRoom();
-
       if (cancelled) return;
 
       if (!state) {
@@ -580,8 +587,6 @@ export default function LudoGamePage() {
         setPhase("error");
         return;
       }
-
-      // Validate board state exists
       if (!state.board_state?.pieces?.player_1 || !state.board_state?.pieces?.player_2) {
         setErrorMsg("Match data is corrupt. Please return to lobby.");
         setPhase("error");
@@ -590,20 +595,19 @@ export default function LudoGamePage() {
 
       applyRoomState(state);
 
-      // Phase routing based on server status
       if (state.status === "completed" || state.status === "forfeited") {
         handleMatchEnd(state);
         return;
       }
 
+      // Reconnect: room is already active → go straight to playing (no countdown)
       if (state.status === "active") {
-        // Room is already active — skip countdown (reconnect case)
-        setLoadingMsg("Syncing match...");
+        setLoadingMsg("Reconnecting to match...");
         setPhase("playing");
         return;
       }
 
-      // status === "countdown" → show 3-2-1
+      // New match: countdown → playing
       setLoadingMsg("Match found!");
       setPhase("pre-match");
     };
@@ -612,8 +616,7 @@ export default function LudoGamePage() {
     return () => { cancelled = true; };
   }, [roomId, userId, fetchRoom, applyRoomState, handleMatchEnd]);
 
-  // ── Pre-match → countdown transition ─────────────────────────────────────
-  // Show opponent reveal for 1 second then kick off 3-2-1
+  // ── Pre-match (1 s opponent reveal) ──────────────────────────────────────
   useEffect(() => {
     if (phase !== "pre-match") return;
     const t = setTimeout(() => setPhase("countdown"), 1000);
@@ -627,77 +630,62 @@ export default function LudoGamePage() {
     let n = 3;
     const tick = () => {
       n -= 1;
-      if (n <= 0) {
-        playSound("match-found");
-        setPhase("playing");
-      } else {
-        setCountdown(n);
-        setTimeout(tick, 1000);
-      }
+      if (n <= 0) { playSound("match-found"); setPhase("playing"); }
+      else { setCountdown(n); setTimeout(tick, 1000); }
     };
     const t = setTimeout(tick, 1000);
     return () => clearTimeout(t);
   }, [phase, playSound]);
 
-  // ── Active game polling ───────────────────────────────────────────────────
+  // ── Active game polling (1.2 s) ───────────────────────────────────────────
   useEffect(() => {
     if (phase !== "playing") return;
 
     const poll = async () => {
       const state = await fetchRoom();
-      if (!state) return; // silent — next poll will retry
-
+      if (!state) return;
       applyRoomState(state);
-
       if (state.status === "completed" || state.status === "forfeited") {
         handleMatchEnd(state);
       }
     };
 
-    poll(); // immediate first fetch
-    pollTimerRef.current = setInterval(poll, 1200);
-    return () => {
-      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-    };
+    poll();
+    pollRef.current = setInterval(poll, 1200);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [phase, fetchRoom, applyRoomState, handleMatchEnd]);
 
-  // ── Match countdown timer (display only) ─────────────────────────────────
-  useEffect(() => {
-    if (phase !== "playing" || !room?.id) return;
-    if (matchTimerRef.current) clearInterval(matchTimerRef.current);
-
-    // Calculate remaining from server created_at
-    const recalc = () => {
-      try {
-        const elapsed = (Date.now() - new Date(roomRef.current?.id ? 0 : 0).getTime()) / 1000;
-        // We don't have created_at directly in RoomState — use local 480s countdown
-        setMatchSecs(prev => Math.max(0, prev - 1));
-      } catch {}
-    };
-
-    matchTimerRef.current = setInterval(recalc, 1000);
-    return () => {
-      if (matchTimerRef.current) clearInterval(matchTimerRef.current);
-    };
-  }, [phase, room?.id]);
-
-  // ── Turn timer (display only, server is authoritative) ────────────────────
+  // ── Match countdown tick (client-side interpolation between server syncs) ─
   useEffect(() => {
     if (phase !== "playing") return;
-    if (turnTimerRef.current) clearInterval(turnTimerRef.current);
+    if (matchTickRef.current) clearInterval(matchTickRef.current);
 
-    const remaining = room?.turn_remaining_seconds ?? 15;
-    setTurnSecs(remaining);
-
-    turnTimerRef.current = setInterval(() => {
-      setTurnSecs(prev => Math.max(0, prev - 1));
+    matchTickRef.current = setInterval(() => {
+      matchSecsRef.current = Math.max(0, matchSecsRef.current - 1);
+      setMatchSecs(matchSecsRef.current);
     }, 1000);
 
-    return () => {
-      if (turnTimerRef.current) clearInterval(turnTimerRef.current);
-    };
-    // Re-sync on turn player change
-  }, [phase, room?.turn_player_id, room?.turn_remaining_seconds]);
+    return () => { if (matchTickRef.current) clearInterval(matchTickRef.current); };
+  }, [phase]);
+
+  // ── Turn countdown tick — resets when turn_player_id changes ──────────────
+  useEffect(() => {
+    if (phase !== "playing") return;
+    if (turnTickRef.current) clearInterval(turnTickRef.current);
+
+    // Seed from last polled value
+    const seed = room?.turn_remaining_seconds ?? 15;
+    turnSecsRef.current = seed;
+    setTurnSecs(seed);
+
+    turnTickRef.current = setInterval(() => {
+      turnSecsRef.current = Math.max(0, turnSecsRef.current - 1);
+      setTurnSecs(turnSecsRef.current);
+    }, 1000);
+
+    return () => { if (turnTickRef.current) clearInterval(turnTickRef.current); };
+    // Re-run when the active player changes
+  }, [phase, room?.turn_player_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Roll dice ─────────────────────────────────────────────────────────────
   const handleRoll = useCallback(async () => {
@@ -711,7 +699,6 @@ export default function LudoGamePage() {
     playSound("dice-roll");
     vibe(30);
 
-    // Animated preview roll
     let ticks = 0;
     const anim = setInterval(() => {
       setDiceDisplay(Math.floor(Math.random() * 6) + 1);
@@ -728,10 +715,12 @@ export default function LudoGamePage() {
         },
         body: JSON.stringify({ room_id: roomId }),
       });
-
       const data = await res.json();
       if (data.success) {
         setDiceDisplay(data.data?.roll ?? 1);
+        if (data.data?.auto_passed) {
+          showToast("No moves available — turn passed", "info");
+        }
         const fresh = await fetchRoom();
         if (fresh) applyRoomState(fresh);
       } else {
@@ -761,7 +750,6 @@ export default function LudoGamePage() {
         },
         body: JSON.stringify({ room_id: roomId, piece_index: pieceIdx }),
       });
-
       const data = await res.json();
       if (data.success) {
         if (data.data?.has_capture) {
@@ -769,15 +757,23 @@ export default function LudoGamePage() {
           vibe([80, 40, 80]);
           showToast("Captured opponent piece!", "success");
         }
+        if (data.data?.extra_turn) {
+          showToast("Extra turn!", "success");
+        }
         const fresh = await fetchRoom();
-        if (fresh) applyRoomState(fresh);
+        if (fresh) {
+          applyRoomState(fresh);
+          if (fresh.status === "completed" || fresh.status === "forfeited") {
+            handleMatchEnd(fresh);
+          }
+        }
       } else {
         showToast(data.error ?? "Move failed", "error");
       }
     } catch {
       showToast("Connection error. Try again.", "error");
     }
-  }, [roomId, userId, playSound, vibe, fetchRoom, applyRoomState]);
+  }, [roomId, userId, playSound, vibe, fetchRoom, applyRoomState, handleMatchEnd]);
 
   // ── Send emote ────────────────────────────────────────────────────────────
   const handleEmote = useCallback(async (type: EmoteType) => {
@@ -830,53 +826,40 @@ export default function LudoGamePage() {
   }, [roomId, userId, fetchRoom, applyRoomState, handleMatchEnd]);
 
   // ── Exit to lobby ─────────────────────────────────────────────────────────
-  const handleExit = useCallback(() => {
-    router.replace("/games");
-  }, [router]);
+  const handleExit = useCallback(() => router.replace("/games"), [router]);
 
-  const formatTime = (s: number) =>
-    `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-
-  // ────────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
   // RENDER PHASES
-  // ────────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
 
   if (phase === "loading") return <LoadingScreen message={loadingMsg} />;
-  if (phase === "error") return <ErrorScreen message={errorMsg} onBack={handleExit} />;
+  if (phase === "error")   return <ErrorScreen message={errorMsg} onBack={handleExit} />;
 
-  // PRE-MATCH: opponent VS reveal (1 second before countdown)
+  // PRE-MATCH: opponent reveal
   if (phase === "pre-match" && room) {
-    const myProfile = room.player_1_id === userId ? room.player_1_profile : room.player_2_profile;
-    const oppProfile = room.player_1_id === userId ? room.player_2_profile : room.player_1_profile;
-
+    const myProf  = room.player_1_id === userId ? room.player_1_profile : room.player_2_profile;
+    const oppProf = room.player_1_id === userId ? room.player_2_profile : room.player_1_profile;
     return (
       <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[999] px-6">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="flex items-center gap-8"
-        >
-          {/* Me */}
+        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex items-center gap-8">
           <div className="flex flex-col items-center gap-2">
             <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-purple-500 shadow-[0_0_24px_rgba(168,85,247,0.5)] bg-slate-900">
-              <img src={myProfile?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=me`} alt="Me"
-                className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=me`; }} />
+              <img src={myProf?.avatar || "https://api.dicebear.com/7.x/adventurer/svg?seed=me"} alt="Me"
+                className="w-full h-full object-cover"
+                onError={e => { (e.target as HTMLImageElement).src = "https://api.dicebear.com/7.x/adventurer/svg?seed=me"; }} />
             </div>
-            <span className="text-xs font-black text-purple-300 max-w-[80px] truncate text-center">{myProfile?.name ?? "You"}</span>
+            <span className="text-xs font-black text-purple-300 max-w-[80px] truncate text-center">{myProf?.name ?? "You"}</span>
           </div>
-
           <div className="text-2xl font-black text-amber-400 animate-pulse">VS</div>
-
-          {/* Opponent */}
           <div className="flex flex-col items-center gap-2">
             <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-blue-500 shadow-[0_0_24px_rgba(59,130,246,0.5)] bg-slate-900">
-              <img src={oppProfile?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=opp`} alt="Opponent"
-                className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=opp`; }} />
+              <img src={oppProf?.avatar || "https://api.dicebear.com/7.x/adventurer/svg?seed=opp"} alt="Opponent"
+                className="w-full h-full object-cover"
+                onError={e => { (e.target as HTMLImageElement).src = "https://api.dicebear.com/7.x/adventurer/svg?seed=opp"; }} />
             </div>
-            <span className="text-xs font-black text-blue-300 max-w-[80px] truncate text-center">{oppProfile?.name ?? "Opponent"}</span>
+            <span className="text-xs font-black text-blue-300 max-w-[80px] truncate text-center">{oppProf?.name ?? "Opponent"}</span>
           </div>
         </motion.div>
-
         <div className="mt-8 text-center">
           <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Prize Pool</div>
           <div className="text-xl font-black text-amber-400">{(room.stake ?? 0) * 2} Coins</div>
@@ -887,64 +870,60 @@ export default function LudoGamePage() {
 
   // COUNTDOWN: 3-2-1
   if (phase === "countdown" && room) {
-    const myProfile = room.player_1_id === userId ? room.player_1_profile : room.player_2_profile;
-    const oppProfile = room.player_1_id === userId ? room.player_2_profile : room.player_1_profile;
-
+    const myProf  = room.player_1_id === userId ? room.player_1_profile : room.player_2_profile;
+    const oppProf = room.player_1_id === userId ? room.player_2_profile : room.player_1_profile;
     return (
       <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[999] px-6">
         <div className="flex items-center gap-8 mb-10">
           <div className="flex flex-col items-center gap-2">
             <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-purple-500 bg-slate-900">
-              <img src={myProfile?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=me`} alt="Me"
-                className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=me`; }} />
+              <img src={myProf?.avatar || "https://api.dicebear.com/7.x/adventurer/svg?seed=me"} alt="Me"
+                className="w-full h-full object-cover"
+                onError={e => { (e.target as HTMLImageElement).src = "https://api.dicebear.com/7.x/adventurer/svg?seed=me"; }} />
             </div>
-            <span className="text-[10px] font-black text-purple-300 max-w-[70px] truncate">{myProfile?.name ?? "You"}</span>
+            <span className="text-[10px] font-black text-purple-300 truncate max-w-[70px] text-center">{myProf?.name ?? "You"}</span>
           </div>
-          <span className="text-lg font-black text-amber-400">VS</span>
+          <div className="text-lg font-black text-amber-400">VS</div>
           <div className="flex flex-col items-center gap-2">
             <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-blue-500 bg-slate-900">
-              <img src={oppProfile?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=opp`} alt="Opponent"
-                className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=opp`; }} />
+              <img src={oppProf?.avatar || "https://api.dicebear.com/7.x/adventurer/svg?seed=opp"} alt="Opponent"
+                className="w-full h-full object-cover"
+                onError={e => { (e.target as HTMLImageElement).src = "https://api.dicebear.com/7.x/adventurer/svg?seed=opp"; }} />
             </div>
-            <span className="text-[10px] font-black text-blue-300 max-w-[70px] truncate">{oppProfile?.name ?? "Opponent"}</span>
+            <span className="text-[10px] font-black text-blue-300 truncate max-w-[70px] text-center">{oppProf?.name ?? "Opponent"}</span>
           </div>
         </div>
-
-        <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-3">Match starts in</div>
         <AnimatePresence mode="wait">
           <motion.div
             key={countdown}
-            initial={{ scale: 0.3, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 1.8, opacity: 0 }}
-            transition={{ duration: 0.35, type: "spring", stiffness: 300 }}
-            className={`text-[96px] font-black tabular-nums leading-none ${
-              countdown === 1 ? "text-red-400" : countdown === 2 ? "text-amber-400" : "text-purple-400"
-            }`}
-            style={{ textShadow: "0 0 40px currentColor" }}
+            initial={{ opacity: 0, scale: 2 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.5 }}
+            transition={{ duration: 0.4 }}
+            className="text-7xl font-black text-white"
           >
-            {countdown}
+            {countdown === 0 ? "GO!" : countdown}
           </motion.div>
         </AnimatePresence>
+        <p className="mt-6 text-[10px] text-purple-400/70 font-bold uppercase tracking-widest">Get ready to play!</p>
       </div>
     );
   }
 
-  // ENDED
+  // ENDED: victory / defeat screen
   if (phase === "ended" && room) {
     const iWon = room.winner_id === userId;
     return (
-      <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-[999] p-4">
+      <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-sm flex items-center justify-center z-[999] px-4">
         <motion.div
-          initial={{ scale: 0.85, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 200, damping: 20 }}
-          className="w-full max-w-sm rounded-3xl bg-slate-950 border border-purple-500/20 p-7 text-center space-y-5 shadow-2xl"
+          initial={{ opacity: 0, scale: 0.85, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 260, damping: 20 }}
+          className="w-full max-w-xs rounded-3xl bg-slate-950 border border-purple-500/20 p-7 text-center space-y-5 shadow-2xl"
         >
           <div className="flex justify-center">
             <EmoteSVG type={iWon ? "Crown" : "Shock"} size={64} />
           </div>
-
           <div>
             <h2 className={`text-2xl font-black tracking-tight ${iWon ? "text-emerald-400" : "text-red-400"}`}>
               {iWon ? "VICTORY!" : "DEFEATED"}
@@ -955,7 +934,6 @@ export default function LudoGamePage() {
                 : "A tough match! Come back stronger next time."}
             </p>
           </div>
-
           <div className={`rounded-xl py-4 border ${iWon ? "bg-emerald-500/10 border-emerald-500/30" : "bg-red-500/10 border-red-500/30"}`}>
             <div className={`text-[9px] font-bold uppercase tracking-wider ${iWon ? "text-emerald-400/80" : "text-red-400/80"}`}>
               {iWon ? "Won Coins Earned" : "Stake Lost"}
@@ -964,15 +942,13 @@ export default function LudoGamePage() {
               {iWon ? `+${Math.floor((room.stake ?? 0) * 2 * 0.98)}` : `-${room.stake ?? 0}`}
             </div>
           </div>
-
           {room.win_reason && (
             <div className="text-[9px] text-slate-600 font-mono">
-              {room.win_reason === "forfeit" ? "Opponent forfeited" :
-               room.win_reason === "timeout" ? "Hearts depleted" :
+              {room.win_reason === "forfeit"     ? "Opponent forfeited"         :
+               room.win_reason === "timeout"     ? "Hearts depleted"            :
                room.win_reason === "score_timer" ? "Time up — highest score wins" : ""}
             </div>
           )}
-
           <button
             onClick={handleExit}
             className="w-full h-12 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-black uppercase tracking-widest"
@@ -984,23 +960,22 @@ export default function LudoGamePage() {
     );
   }
 
-  // PLAYING — main game screen
-  // Guard: if room is null here (shouldn't happen), show loading
+  // PLAYING: main game screen
   if (!room) return <LoadingScreen message="Syncing match..." />;
 
   const amPlayer1 = room.player_1_id === userId;
-  const isMyTurn = room.turn_player_id === userId;
-  const myProfile = amPlayer1 ? room.player_1_profile : room.player_2_profile;
+  const isMyTurn  = room.turn_player_id === userId;
+  const myProfile  = amPlayer1 ? room.player_1_profile : room.player_2_profile;
   const oppProfile = amPlayer1 ? room.player_2_profile : room.player_1_profile;
-  const myHearts = amPlayer1 ? (room.hearts_player_1 ?? 3) : (room.hearts_player_2 ?? 3);
-  const oppHearts = amPlayer1 ? (room.hearts_player_2 ?? 3) : (room.hearts_player_1 ?? 3);
-  const myScore = amPlayer1 ? (room.score_player_1 ?? 0) : (room.score_player_2 ?? 0);
-  const oppScore = amPlayer1 ? (room.score_player_2 ?? 0) : (room.score_player_1 ?? 0);
+  const myHearts   = amPlayer1 ? (room.hearts_player_1 ?? 3) : (room.hearts_player_2 ?? 3);
+  const oppHearts  = amPlayer1 ? (room.hearts_player_2 ?? 3) : (room.hearts_player_1 ?? 3);
+  const myScore    = amPlayer1 ? (room.score_player_1 ?? 0) : (room.score_player_2 ?? 0);
+  const oppScore   = amPlayer1 ? (room.score_player_2 ?? 0) : (room.score_player_1 ?? 0);
 
   return (
     <div className="fixed inset-0 bg-slate-950 flex flex-col overflow-hidden z-[999] select-none text-white">
 
-      {/* ── Floating emotes ── */}
+      {/* Floating emotes */}
       <div className="absolute inset-0 pointer-events-none z-40 overflow-hidden">
         <AnimatePresence>
           {floatingEmotes.map(({ id, type, mine }) => (
@@ -1020,14 +995,14 @@ export default function LudoGamePage() {
         </AnimatePresence>
       </div>
 
-      {/* ── OPPONENT HEADER ── */}
+      {/* OPPONENT HEADER */}
       <div className="flex-none px-3 pt-safe pt-3 pb-2">
         <div className="flex items-center justify-between bg-slate-900/80 border border-slate-800 rounded-2xl px-3 py-2.5">
           <div className="flex items-center gap-2.5">
             <div className="relative w-10 h-10 rounded-full border-2 border-blue-500 overflow-hidden bg-slate-950 flex-none">
-              <img src={oppProfile?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=opp`} alt="Opp"
+              <img src={oppProfile?.avatar || "https://api.dicebear.com/7.x/adventurer/svg?seed=opp"} alt="Opp"
                 className="w-full h-full object-cover"
-                onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=opp`; }} />
+                onError={e => { (e.target as HTMLImageElement).src = "https://api.dicebear.com/7.x/adventurer/svg?seed=opp"; }} />
               {!isMyTurn && (
                 <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-blue-500 rounded-full border border-slate-950 animate-pulse" />
               )}
@@ -1037,10 +1012,7 @@ export default function LudoGamePage() {
               <div className="text-[9px] text-slate-500 font-semibold">Score {oppScore}</div>
             </div>
           </div>
-
           <Hearts count={oppHearts} />
-
-          {/* Emote button */}
           <button
             onClick={() => setShowEmotes(v => !v)}
             className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center flex-none"
@@ -1050,7 +1022,7 @@ export default function LudoGamePage() {
         </div>
       </div>
 
-      {/* ── Timer bar ── */}
+      {/* Timer bar */}
       <div className="flex-none px-3 pb-1">
         <div className="flex items-center justify-between text-[9px] font-mono font-bold mb-1">
           <span className="text-slate-500">
@@ -1069,7 +1041,7 @@ export default function LudoGamePage() {
         </div>
       </div>
 
-      {/* ── LUDO BOARD ── */}
+      {/* LUDO BOARD */}
       <div className="flex-1 px-2 py-1 flex items-center justify-center min-h-0">
         <div className="w-full aspect-square max-w-[400px] max-h-[400px]">
           <LudoBoard
@@ -1081,14 +1053,14 @@ export default function LudoGamePage() {
         </div>
       </div>
 
-      {/* ── MY PLAYER FOOTER ── */}
+      {/* MY PLAYER FOOTER */}
       <div className="flex-none px-3 pt-1 pb-safe pb-3">
         <div className="flex items-center justify-between bg-slate-900/80 border border-slate-800 rounded-2xl px-3 py-2.5">
           <div className="flex items-center gap-2.5">
             <div className="relative w-10 h-10 rounded-full border-2 border-purple-500 overflow-hidden bg-slate-950 flex-none">
-              <img src={myProfile?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=me`} alt="Me"
+              <img src={myProfile?.avatar || "https://api.dicebear.com/7.x/adventurer/svg?seed=me"} alt="Me"
                 className="w-full h-full object-cover"
-                onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=me`; }} />
+                onError={e => { (e.target as HTMLImageElement).src = "https://api.dicebear.com/7.x/adventurer/svg?seed=me"; }} />
               {isMyTurn && (
                 <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-purple-500 rounded-full border border-slate-950 animate-pulse" />
               )}
@@ -1098,10 +1070,7 @@ export default function LudoGamePage() {
               <div className="text-[9px] text-slate-500 font-semibold">Score {myScore}</div>
             </div>
           </div>
-
           <Hearts count={myHearts} />
-
-          {/* Dice / action area */}
           <div className="flex-none">
             {isMyTurn && room.status === "active" ? (
               !room.dice_rolled ? (
@@ -1145,7 +1114,7 @@ export default function LudoGamePage() {
           </div>
         </div>
 
-        {/* Action hint + forfeit row */}
+        {/* Action hint + forfeit */}
         <div className="flex items-center justify-between mt-2 px-1">
           <button
             onClick={handleForfeit}
@@ -1153,7 +1122,6 @@ export default function LudoGamePage() {
           >
             🏳 Forfeit
           </button>
-
           {isMyTurn && room.dice_rolled && (
             <motion.div
               animate={{ opacity: [1, 0.5, 1] }}
@@ -1163,12 +1131,11 @@ export default function LudoGamePage() {
               Tap a piece to move
             </motion.div>
           )}
-
           <div className="text-[9px] text-slate-600 font-mono">{room.stake}c</div>
         </div>
       </div>
 
-      {/* ── EMOTE PICKER ── */}
+      {/* EMOTE PICKER */}
       <AnimatePresence>
         {showEmotes && (
           <>
@@ -1202,7 +1169,7 @@ export default function LudoGamePage() {
         )}
       </AnimatePresence>
 
-      {/* ── Transitional overlay when match just ended ── */}
+      {/* Transitional overlay while match end propagates */}
       {(room.status === "completed" || room.status === "forfeited") && phase === "playing" && (
         <div className="absolute inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center">
           <motion.div
