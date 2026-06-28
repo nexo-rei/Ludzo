@@ -1,41 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-
-// ── Board constants ──────────────────────────────────────────────────────────
-
-/**
- * Safe TRACK indices (0-indexed, 0..51).
- * Pieces on these cells cannot be captured.
- * Indices 1, 9, 14, 22, 27, 35, 40, 48 correspond to the stars / launch squares
- * on the 15×15 Ludo board as defined in the frontend SAFE_SPOTS set.
- */
-const SAFE_TRACK_INDICES = new Set([1, 9, 14, 22, 27, 35, 40, 48]);
-
-/**
- * POSITION SYSTEM (relative, per-player):
- *   0       = in yard (home base)
- *   1       = starting square (launch cell)
- *   1..51   = main shared track
- *   52..56  = exclusive home lane (5 steps, safe from capture)
- *   57      = finished (in the centre home triangle)
- *
- * ABSOLUTE TRACK MAPPING (for collision / capture detection):
- *   Player 1 absolute cell = (relPos - 1)      % 52  (starts at index 0)
- *   Player 2 absolute cell = (relPos - 1 + 26) % 52  (starts at index 26)
- *
- * Only positions 1..51 are on the shared track; 52-56 and 57 are private.
- */
-
-function toAbsTrack(relPos: number, isPlayer1: boolean): number | null {
-  if (relPos < 1 || relPos > 51) return null;
-  const offset = isPlayer1 ? 0 : 26;
-  return (relPos - 1 + offset) % 52;
-}
-
-function isSafeCell(absIdx: number): boolean {
-  return SAFE_TRACK_INDICES.has(absIdx);
-}
+import { applyMove, getsExtraTurn, calcScore } from "@/lib/ludo-engine";
 
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
@@ -57,7 +23,7 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = createAdminClient();
-    const userId = auth.userId!;
+    const userId   = auth.userId!;
 
     // ── Fetch room ────────────────────────────────────────────────────────────
     const { data: room, error: roomErr } = await supabase
@@ -76,7 +42,6 @@ export async function POST(req: NextRequest) {
 
     // ── Anti-cheat validations ────────────────────────────────────────────────
     if (room.status !== "active") {
-      console.warn(`[LUDO MOVE] Room not active room=${room_id} status=${room.status} user=${userId}`);
       return NextResponse.json({ success: false, error: "Match is not active" }, { status: 400 });
     }
     if (room.turn_player_id !== userId) {
@@ -89,86 +54,52 @@ export async function POST(req: NextRequest) {
 
     const movable: number[] = room.movable_pieces ?? [];
     if (!movable.includes(pieceIdx)) {
-      console.warn(`[LUDO MOVE] Illegal piece ${pieceIdx} not in movable=${JSON.stringify(movable)} user=${userId}`);
+      console.warn(`[LUDO MOVE] Illegal piece ${pieceIdx} not in movable=${JSON.stringify(movable)}`);
       return NextResponse.json({ success: false, error: "That piece cannot move" }, { status: 400 });
     }
 
-    // ── Set up board pointers ─────────────────────────────────────────────────
+    // ── Set up board state ────────────────────────────────────────────────────
     const isPlayer1 = room.player_1_id === userId;
-    const myKey   = isPlayer1 ? "player_1" : "player_2";
-    const oppKey  = isPlayer1 ? "player_2" : "player_1";
+    const myKey     = isPlayer1 ? "player_1" : "player_2";
+    const oppKey    = isPlayer1 ? "player_2" : "player_1";
 
-    const boardState = JSON.parse(JSON.stringify(room.board_state)); // deep clone
-    const myPieces:  number[] = boardState.pieces[myKey]  ?? [0, 0, 0, 0];
-    const oppPieces: number[] = boardState.pieces[oppKey] ?? [0, 0, 0, 0];
+    // Deep clone to avoid mutating the original
+    const boardState = JSON.parse(JSON.stringify(
+      room.board_state ?? { pieces: { player_1: [0,0,0,0], player_2: [0,0,0,0] } }
+    ));
+    const myPieces:  number[] = boardState.pieces[myKey]  ?? [0,0,0,0];
+    const oppPieces: number[] = boardState.pieces[oppKey] ?? [0,0,0,0];
 
-    const roll       = room.last_roll as number;
-    const currPos    = myPieces[pieceIdx];
+    const roll = room.last_roll as number;
 
-    // ── Calculate new position ────────────────────────────────────────────────
-    let newPos: number;
-    if (currPos === 0) {
-      // Leaving yard with a 6 → move to start square (position 1)
-      newPos = 1;
-    } else {
-      newPos = currPos + roll;
-    }
+    console.log(`[LUDO MOVE] room=${room_id} user=${userId} player=${myKey} piece=${pieceIdx} pos=${myPieces[pieceIdx]} roll=${roll}`);
 
-    // Clamp to 57 (finished) — should never exceed due to movable pre-check
-    if (newPos > 57) newPos = 57;
+    // ── Apply move using shared engine ────────────────────────────────────────
+    const result = applyMove(myPieces, oppPieces, pieceIdx, roll, isPlayer1);
 
-    console.log(`[LUDO MOVE] room=${room_id} user=${userId} player=${myKey} piece=${pieceIdx} pos ${currPos}→${newPos} roll=${roll}`);
+    boardState.pieces[myKey]  = result.myPieces;
+    boardState.pieces[oppKey] = result.oppPieces;
 
-    myPieces[pieceIdx] = newPos;
-
-    // ── Capture logic ─────────────────────────────────────────────────────────
-    let hasCapture = false;
-
-    if (newPos >= 1 && newPos <= 51) {
-      // Only on the shared track (not in home lane or finished)
-      const myAbsCell = toAbsTrack(newPos, isPlayer1)!;
-
-      if (!isSafeCell(myAbsCell)) {
-        for (let i = 0; i < 4; i++) {
-          const oPos = oppPieces[i];
-          if (oPos < 1 || oPos > 51) continue; // yard, home lane, or finished — not capturable
-
-          const oppAbsCell = toAbsTrack(oPos, !isPlayer1)!;
-
-          if (oppAbsCell === myAbsCell) {
-            console.log(`[LUDO MOVE] CAPTURE! piece=${pieceIdx} at abs=${myAbsCell} captured opp piece=${i}`);
-            oppPieces[i] = 0; // send back to yard
-            hasCapture = true;
-          }
-        }
-      }
-    }
-
-    boardState.pieces[myKey]  = myPieces;
-    boardState.pieces[oppKey] = oppPieces;
-
-    // ── Recalculate scores (sum of all piece positions) ───────────────────────
+    // ── Recalculate scores correctly (from updated pieces) ────────────────────
     const score1 = isPlayer1
-      ? myPieces.reduce((s: number, p: number) => s + p, 0)
-      : room.score_player_1 as number;
-    const score2 = !isPlayer1
-      ? myPieces.reduce((s: number, p: number) => s + p, 0)
-      : room.score_player_2 as number;
+      ? calcScore(result.myPieces)
+      : calcScore(result.oppPieces);
+    const score2 = isPlayer1
+      ? calcScore(result.oppPieces)
+      : calcScore(result.myPieces);
 
-    // ── Win detection (all 4 pieces at position 57) ───────────────────────────
-    const isWin = myPieces.every((p: number) => p === 57);
-
-    if (isWin) {
+    // ── Win detection ─────────────────────────────────────────────────────────
+    if (result.isWin) {
       const loserId = isPlayer1 ? String(room.player_2_id) : String(room.player_1_id);
-      const now = Date.now();
-      const matchStart = room.match_start_time
+
+      const matchStartMs = room.match_start_time
         ? new Date(room.match_start_time).getTime()
         : new Date(room.created_at).getTime();
-      const duration = Math.floor((now - matchStart) / 1000);
+      const duration = Math.floor((Date.now() - matchStartMs) / 1000);
 
-      console.log(`[LUDO MOVE] WIN DETECTED room=${room_id} winner=${userId} loser=${loserId} duration=${duration}s`);
+      console.log(`[LUDO MOVE] WIN room=${room_id} winner=${userId} loser=${loserId} duration=${duration}s`);
 
-      // Save final board state then settle atomically
+      // Save final board state
       await supabase
         .from("ludo_rooms")
         .update({
@@ -179,47 +110,42 @@ export async function POST(req: NextRequest) {
         })
         .eq("id", room_id);
 
+      // Settle — NOTE: no p_board_state parameter (that was the bug)
       const { data: settled, error: settleErr } = await supabase.rpc("settle_ludo_match", {
-        p_room_id:     room_id,
-        p_winner_id:   userId,
-        p_loser_id:    loserId,
-        p_win_reason:  "normal",
-        p_duration:    duration,
-        p_board_state: boardState,
+        p_room_id:    room_id,
+        p_winner_id:  userId,
+        p_loser_id:   loserId,
+        p_win_reason: "normal",
+        p_duration:   duration,
       });
 
       if (settleErr) {
         console.error(`[LUDO MOVE] settle_ludo_match error:`, settleErr.message);
-      } else if (settled === false) {
-        console.warn(`[LUDO MOVE] settle_ludo_match returned false (already settled) room=${room_id}`);
-      } else {
-        console.log(`[LUDO MOVE] Settlement completed room=${room_id} winner=${userId}`);
       }
 
       return NextResponse.json({
         success: true,
         data: {
           winner_id:   userId,
-          pieces:      myPieces,
-          has_capture: hasCapture,
+          pieces:      result.myPieces,
+          has_capture: result.hasCapture,
           extra_turn:  false,
           is_win:      true,
         },
       });
     }
 
-    // ── Extra turn rules ──────────────────────────────────────────────────────
-    // Extra turn granted for: rolled 6, captured an opponent, or reached finish (57)
-    const reachedFinish = newPos === 57;
-    const getsExtraTurn = roll === 6 || hasCapture || reachedFinish;
+    // ── Determine next turn ───────────────────────────────────────────────────
+    const consecutiveSixes = (room.consecutive_sixes ?? 0) as number;
+    const extraTurn = getsExtraTurn(roll, result.hasCapture, result.reachedFinish, consecutiveSixes);
+    const nextTurnPlayerId = extraTurn
+      ? userId
+      : (isPlayer1 ? String(room.player_2_id) : String(room.player_1_id));
 
-    let nextTurnPlayerId: string;
-    if (getsExtraTurn) {
-      nextTurnPlayerId = userId;
-      const reason = roll === 6 ? "rolled 6" : hasCapture ? "captured" : "reached finish";
+    if (extraTurn) {
+      const reason = roll === 6 ? "rolled 6" : result.hasCapture ? "captured" : "reached finish";
       console.log(`[LUDO MOVE] EXTRA TURN for user=${userId} reason=${reason}`);
     } else {
-      nextTurnPlayerId = isPlayer1 ? String(room.player_2_id) : String(room.player_1_id);
       console.log(`[LUDO MOVE] Turn passes to ${nextTurnPlayerId}`);
     }
 
@@ -227,15 +153,17 @@ export async function POST(req: NextRequest) {
     const { error: saveErr } = await supabase
       .from("ludo_rooms")
       .update({
-        board_state:    boardState,
-        score_player_1: score1,
-        score_player_2: score2,
-        turn_player_id: nextTurnPlayerId,
-        turn_start_at:  new Date().toISOString(),
-        dice_rolled:    false,
-        last_roll:      0,
-        movable_pieces: [],
-        updated_at:     new Date().toISOString(),
+        board_state:      boardState,
+        score_player_1:   score1,
+        score_player_2:   score2,
+        turn_player_id:   nextTurnPlayerId,
+        turn_start_at:    new Date().toISOString(),
+        dice_rolled:      false,
+        last_roll:        0,
+        movable_pieces:   [],
+        // Reset consecutive six count only when turn actually passes
+        consecutive_sixes: extraTurn && roll === 6 ? consecutiveSixes : 0,
+        updated_at:       new Date().toISOString(),
       })
       .eq("id", room_id);
 
@@ -244,7 +172,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Failed to save move" }, { status: 500 });
     }
 
-    if (hasCapture) {
+    if (result.hasCapture) {
       console.log(`[LUDO MOVE] Capture confirmed room=${room_id} by user=${userId}`);
     }
 
@@ -252,9 +180,9 @@ export async function POST(req: NextRequest) {
       success: true,
       data: {
         winner_id:   null,
-        pieces:      myPieces,
-        has_capture: hasCapture,
-        extra_turn:  getsExtraTurn,
+        pieces:      result.myPieces,
+        has_capture: result.hasCapture,
+        extra_turn:  extraTurn,
         is_win:      false,
       },
     });
