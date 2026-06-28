@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+const ALLOWED_REACTIONS = ["Laugh", "Angry", "Fire", "GG", "Crown", "Shock", "Cry", "Clap"] as const;
+const REACTION_COOLDOWN_MS = 2000; // prevent spam — enforced server-side via DB timestamp
+
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
   if (!auth.ok) {
@@ -10,48 +13,75 @@ export async function POST(req: NextRequest) {
 
   try {
     const { room_id, reaction_type } = await req.json();
-    const allowedReactions = ["Laugh", "Angry", "Fire", "GG", "Crown", "Shock", "Cry"];
-    if (!room_id || !allowedReactions.includes(reaction_type)) {
-      return NextResponse.json({ success: false, error: "Invalid reaction parameters" }, { status: 400 });
+
+    if (!room_id) {
+      return NextResponse.json({ success: false, error: "room_id is required" }, { status: 400 });
+    }
+    if (!ALLOWED_REACTIONS.includes(reaction_type)) {
+      return NextResponse.json({ success: false, error: "Invalid reaction type" }, { status: 400 });
     }
 
     const supabase = createAdminClient();
     const userId = auth.userId!;
 
-    // Fetch Room Details
-    const { data: room, error } = await supabase
+    // ── Verify player is in this room and match is active ─────────────────────
+    const { data: room, error: roomErr } = await supabase
       .from("ludo_rooms")
-      .select("chat_reactions, player_1_id, player_2_id")
+      .select("chat_reactions, player_1_id, player_2_id, status")
       .eq("id", room_id)
       .maybeSingle();
 
-    if (!room) {
+    if (roomErr || !room) {
       return NextResponse.json({ success: false, error: "Room not found" }, { status: 404 });
     }
-
     if (room.player_1_id !== userId && room.player_2_id !== userId) {
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
+    if (room.status !== "active" && room.status !== "countdown") {
+      return NextResponse.json({ success: false, error: "Match is not active" }, { status: 400 });
+    }
 
-    const reactions = room.chat_reactions || [];
+    // ── Server-side cooldown: check last reaction by this player ─────────────
+    const existing: Array<{ player_id: string; type: string; timestamp: number }> =
+      room.chat_reactions ?? [];
+
+    const myLast = existing
+      .filter((r) => r.player_id === userId)
+      .sort((a, b) => b.timestamp - a.timestamp)[0];
+
+    if (myLast && Date.now() - myLast.timestamp < REACTION_COOLDOWN_MS) {
+      return NextResponse.json({ success: false, error: "Please wait before reacting again" }, { status: 429 });
+    }
+
+    // ── Append reaction and persist to ludo_rooms (realtime via polling) ──────
     const newReaction = {
       player_id: userId,
-      type: reaction_type,
-      timestamp: Date.now()
+      type:      reaction_type,
+      timestamp: Date.now(),
     };
 
-    // Keep only last 10 reactions in the room log to preserve size
-    const updatedReactions = [...reactions, newReaction].slice(-10);
+    // Keep last 20 reactions only (prevent JSONB bloat)
+    const updated = [...existing, newReaction].slice(-20);
 
-    await supabase
+    const { error: updateErr } = await supabase
       .from("ludo_rooms")
-      .update({ chat_reactions: updatedReactions })
+      .update({
+        chat_reactions: updated,
+        updated_at:     new Date().toISOString(),
+      })
       .eq("id", room_id);
+
+    if (updateErr) {
+      console.error(`[LUDO REACTION] Failed to save reaction:`, updateErr.message);
+      return NextResponse.json({ success: false, error: "Failed to save reaction" }, { status: 500 });
+    }
+
+    console.log(`[LUDO REACTION] room=${room_id} player=${userId} type=${reaction_type}`);
 
     return NextResponse.json({ success: true });
 
   } catch (err: any) {
-    console.error("[ludo_reaction]", err);
+    console.error("[LUDO REACTION] Unhandled exception:", err?.message ?? err);
     return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
   }
 }
