@@ -131,19 +131,21 @@ export async function GET(req: NextRequest) {
             p_hearts_p2:           hearts2,
           });
 
-          const { data: refreshed } = await supabase
+          // Static select so TypeScript can infer column types correctly
+          const { data: refreshedRaw } = await supabase
             .from("ludo_rooms")
-            .select("turn_player_id, turn_start_at, hearts_player_1, hearts_player_2" +
-                    (hasConsecutiveCol ? ", consecutive_sixes" : ""))
+            .select("turn_player_id, turn_start_at, hearts_player_1, hearts_player_2, consecutive_sixes")
             .eq("id", roomId)
             .maybeSingle();
 
-          if (refreshed) {
-            turnPlayerId     = refreshed.turn_player_id;
-            turnStartMs      = new Date(refreshed.turn_start_at).getTime();
-            hearts1          = refreshed.hearts_player_1;
-            hearts2          = refreshed.hearts_player_2;
-            if (hasConsecutiveCol) consecutiveSixes = refreshed.consecutive_sixes ?? 0;
+          if (refreshedRaw) {
+            // Cast to any to avoid Supabase's GenericStringError on dynamic selects
+            const r = refreshedRaw as unknown as Record<string, any>;
+            turnPlayerId     = r.turn_player_id;
+            turnStartMs      = new Date(r.turn_start_at as string).getTime();
+            hearts1          = r.hearts_player_1 as number;
+            hearts2          = r.hearts_player_2 as number;
+            consecutiveSixes = (r.consecutive_sixes as number) ?? 0;
           }
 
           diceRolled    = false;
