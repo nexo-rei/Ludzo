@@ -20,7 +20,6 @@ export async function POST(req: NextRequest) {
     const supabase = createAdminClient();
     const userId   = auth.userId!;
 
-    // ── Fetch and lock room ───────────────────────────────────────────────────
     const { data: room, error: roomErr } = await supabase
       .from("ludo_rooms")
       .select("*")
@@ -28,23 +27,21 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (roomErr) {
-      console.error(`[LUDO ROLL] DB error room=${room_id}:`, roomErr.message);
+      console.error(`[LUDO ROLL] DB error:`, roomErr.message);
       return NextResponse.json({ success: false, error: "Database error" }, { status: 500 });
     }
     if (!room) {
       return NextResponse.json({ success: false, error: "Room not found" }, { status: 404 });
     }
 
-    // ── Anti-cheat validations ────────────────────────────────────────────────
     if (room.status !== "active") {
       return NextResponse.json({ success: false, error: "Match is not active" }, { status: 400 });
     }
     if (room.turn_player_id !== userId) {
-      console.warn(`[LUDO ROLL] Turn violation — user=${userId}, turn=${room.turn_player_id}`);
       return NextResponse.json({ success: false, error: "Not your turn" }, { status: 403 });
     }
+    // Idempotent: if already rolled this turn, return current state so client can sync
     if (room.dice_rolled) {
-      // Already rolled this turn — idempotent: return the current state
       return NextResponse.json({
         success: true,
         data: {
@@ -58,48 +55,47 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ── Server-side dice roll (cryptographically random) ─────────────────────
+    // ── Server-side roll ──────────────────────────────────────────────────────
     const roll = Math.floor(Math.random() * 6) + 1;
 
-    const isPlayer1  = room.player_1_id === userId;
-    const playerKey  = isPlayer1 ? "player_1" : "player_2";
+    const isPlayer1 = room.player_1_id === userId;
+    const playerKey = isPlayer1 ? "player_1" : "player_2";
     const pieces: number[] = room.board_state?.pieces?.[playerKey] ?? [0, 0, 0, 0];
 
-    // Track consecutive sixes (needed for triple-six rule)
+    // consecutive_sixes may not exist on older rooms — default to 0
     const prevConsecutive = (room.consecutive_sixes ?? 0) as number;
     const newConsecutive  = roll === 6 ? prevConsecutive + 1 : 0;
 
-    console.log(`[LUDO ROLL] room=${room_id} user=${userId} roll=${roll} consecutiveSixes=${newConsecutive} pieces=${JSON.stringify(pieces)}`);
+    const nextPlayer = isPlayer1 ? String(room.player_2_id) : String(room.player_1_id);
 
-    // ── Triple-six: forfeit the turn ─────────────────────────────────────────
+    console.log(
+      `[LUDO ROLL] room=${room_id} user=${userId} roll=${roll}` +
+      ` consecutive=${newConsecutive} pieces=${JSON.stringify(pieces)}`
+    );
+
+    // ── Triple-six → forfeit turn immediately (before calculating moves) ──────
     if (roll === 6 && newConsecutive >= MAX_CONSECUTIVE_SIXES) {
-      const nextTurn = isPlayer1 ? String(room.player_2_id) : String(room.player_1_id);
-      console.log(`[LUDO ROLL] TRIPLE SIX — forfeit turn, pass to ${nextTurn}`);
+      console.log(`[LUDO ROLL] TRIPLE SIX — forfeit turn to ${nextPlayer}`);
 
-      const { error: updateErr } = await supabase
-        .from("ludo_rooms")
-        .update({
-          last_roll:        roll,
-          dice_rolled:      false,
-          movable_pieces:   [],
-          turn_player_id:   nextTurn,
-          turn_start_at:    new Date().toISOString(),
-          consecutive_sixes: 0,
-          updated_at:       new Date().toISOString(),
-        })
-        .eq("id", room_id);
+      const updatePayload: Record<string, unknown> = {
+        last_roll:      roll,
+        dice_rolled:    false,
+        movable_pieces: [],
+        turn_player_id: nextPlayer,
+        turn_start_at:  new Date().toISOString(),
+        updated_at:     new Date().toISOString(),
+      };
+      // Only write consecutive_sixes if the column exists (safe guard)
+      if ("consecutive_sixes" in room) updatePayload.consecutive_sixes = 0;
 
-      if (updateErr) {
-        console.error(`[LUDO ROLL] Failed to forfeit triple six:`, updateErr.message);
-        return NextResponse.json({ success: false, error: "Failed to process roll" }, { status: 500 });
-      }
+      await supabase.from("ludo_rooms").update(updatePayload).eq("id", room_id);
 
       return NextResponse.json({
         success: true,
         data: {
           roll,
           movable_pieces: [],
-          turn_player_id: nextTurn,
+          turn_player_id: nextPlayer,
           dice_rolled:    false,
           auto_passed:    true,
           triple_six:     true,
@@ -109,54 +105,48 @@ export async function POST(req: NextRequest) {
 
     // ── Calculate movable pieces ──────────────────────────────────────────────
     const movable = calcMovablePieces(pieces, roll);
+    console.log(`[LUDO ROLL] movable=${JSON.stringify(movable)}`);
 
-    console.log(`[LUDO ROLL] movable pieces: ${JSON.stringify(movable)}`);
-
-    // ── No moves available → auto-pass turn ──────────────────────────────────
+    // ── No moves → auto-pass turn ─────────────────────────────────────────────
     if (movable.length === 0) {
-      const nextTurn = isPlayer1 ? String(room.player_2_id) : String(room.player_1_id);
-      console.log(`[LUDO ROLL] No moves for user=${userId} on roll=${roll}. Auto-passing turn to ${nextTurn}`);
+      console.log(`[LUDO ROLL] No moves — auto-pass to ${nextPlayer}`);
 
-      const { error: updateErr } = await supabase
-        .from("ludo_rooms")
-        .update({
-          last_roll:        roll,
-          dice_rolled:      false,
-          movable_pieces:   [],
-          turn_player_id:   nextTurn,
-          turn_start_at:    new Date().toISOString(),
-          consecutive_sixes: 0,
-          updated_at:       new Date().toISOString(),
-        })
-        .eq("id", room_id);
+      const updatePayload: Record<string, unknown> = {
+        last_roll:      roll,
+        dice_rolled:    false,
+        movable_pieces: [],
+        turn_player_id: nextPlayer,
+        turn_start_at:  new Date().toISOString(),
+        updated_at:     new Date().toISOString(),
+      };
+      if ("consecutive_sixes" in room) updatePayload.consecutive_sixes = 0;
 
-      if (updateErr) {
-        console.error(`[LUDO ROLL] Failed to auto-pass turn:`, updateErr.message);
-        return NextResponse.json({ success: false, error: "Failed to process roll" }, { status: 500 });
-      }
+      await supabase.from("ludo_rooms").update(updatePayload).eq("id", room_id);
 
       return NextResponse.json({
         success: true,
         data: {
           roll,
           movable_pieces: [],
-          turn_player_id: nextTurn,
+          turn_player_id: nextPlayer,
           dice_rolled:    false,
           auto_passed:    true,
         },
       });
     }
 
-    // ── Save roll result ──────────────────────────────────────────────────────
+    // ── Normal roll — wait for player to choose a piece ───────────────────────
+    const updatePayload: Record<string, unknown> = {
+      last_roll:      roll,
+      dice_rolled:    true,
+      movable_pieces: movable,
+      updated_at:     new Date().toISOString(),
+    };
+    if ("consecutive_sixes" in room) updatePayload.consecutive_sixes = newConsecutive;
+
     const { error: saveErr } = await supabase
       .from("ludo_rooms")
-      .update({
-        last_roll:        roll,
-        dice_rolled:      true,
-        movable_pieces:   movable,
-        consecutive_sixes: newConsecutive,
-        updated_at:       new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", room_id);
 
     if (saveErr) {
@@ -168,10 +158,10 @@ export async function POST(req: NextRequest) {
       success: true,
       data: {
         roll,
-        movable_pieces: movable,
-        turn_player_id: userId,
-        dice_rolled:    true,
-        auto_passed:    false,
+        movable_pieces:  movable,
+        turn_player_id:  userId,
+        dice_rolled:     true,
+        auto_passed:     false,
       },
     });
 
