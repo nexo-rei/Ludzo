@@ -1,19 +1,22 @@
 "use client";
 
 /**
- * LUDZO — Ludo 1v1 Game Screen (Phase 5 — fully fixed)
- //rebuild
- * ─────────────────────────────────────────────────────
- * Route: /games/game/[roomId]
+ * LUDZO — Ludo 1v1 Game Screen
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Architecture: SERVER-AUTHORITATIVE
  *
- * Key fixes in this version:
- *  - Match timer is SERVER-AUTHORITATIVE: uses match_remaining_seconds from
- *    the server on every poll.  Never restarts on refresh / reconnect.
- *  - Turn timer is SERVER-AUTHORITATIVE: resyncs from turn_remaining_seconds
- *    on every poll.  Resets correctly when the turn changes.
- *  - Reconnect: room status "active" → skip countdown, restore full state.
- *  - Emoji reactions: picked up via 1.2 s polling of chat_reactions.
- *  - No client-side game logic — all dice / movement / settlement is server.
+ * The client ONLY renders server state. It never computes game outcomes.
+ * All logic (dice, movement, captures, timers, turns) lives in the API routes.
+ *
+ * Key design decisions:
+ *  - Match timer: never restarts. Server provides match_remaining_seconds
+ *    on every poll. Client tick counts down between polls (interpolation only).
+ *  - Turn timer: server provides turn_remaining_seconds. Client resets its
+ *    local tick whenever turn_player_id changes in the polled state.
+ *  - Reactions: detected by comparing the latest reaction timestamp seen,
+ *    NOT by array length (which breaks when reactions are trimmed at 20).
+ *  - Reconnect: initial fetch reads room.status. If "active", skip countdown.
+ *  - No client-side game authority. Clicking Roll/Move → POST → re-fetch state.
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -22,7 +25,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useApp } from "@/hooks/useApp";
 import { showToast } from "@/components/ui/Toast";
 
-// ─── Types ─────────────────────────────────────────────────────────────────
+// ─── Types ──────────────────────────────────────────────────────────────────
 type GamePhase = "loading" | "pre-match" | "countdown" | "playing" | "ended" | "error";
 
 interface PlayerProfile {
@@ -47,11 +50,8 @@ interface RoomState {
   player_2_profile: PlayerProfile;
   status: "countdown" | "active" | "completed" | "forfeited";
   turn_player_id: string;
-  /** Server-computed, seconds remaining in the current turn */
   turn_remaining_seconds: number;
-  /** Server-computed, seconds remaining in the whole match */
   match_remaining_seconds: number;
-  /** ISO timestamp of when the match actually started (server-set) */
   match_start_time: string;
   dice_rolled: boolean;
   last_roll: number;
@@ -65,9 +65,12 @@ interface RoomState {
   win_reason: string | null;
   board_state: BoardState;
   chat_reactions: Array<{ player_id: string; type: string; timestamp: number }>;
+  consecutive_sixes: number;
 }
 
-// ─── Ludo board track (52 cells, clockwise) ────────────────────────────────
+// ─── Ludo board track (52 cells, clockwise, 15×15 grid) ───────────────────
+// Index 0  = P1 start (col 0, row 6)
+// Index 26 = P2 start (col 14, row 8)
 const TRACK: { x: number; y: number }[] = [
   { x: 0, y: 6 }, { x: 1, y: 6 }, { x: 2, y: 6 }, { x: 3, y: 6 },
   { x: 4, y: 6 }, { x: 5, y: 6 }, { x: 6, y: 5 }, { x: 6, y: 4 },
@@ -84,11 +87,23 @@ const TRACK: { x: number; y: number }[] = [
   { x: 2, y: 8 }, { x: 1, y: 8 }, { x: 0, y: 8 }, { x: 0, y: 7 },
 ];
 
-const SAFE_SPOTS  = new Set([1, 9, 14, 22, 27, 35, 40, 48]);
-const STAR_SPOTS  = new Set([9, 22, 35, 48]);
-const CELL        = 100 / 15;
+const SAFE_SPOTS = new Set([1, 9, 14, 22, 27, 35, 40, 48]);
+const STAR_SPOTS = new Set([9, 22, 35, 48]);
+const CELL       = 100 / 15;  // cell size in SVG units
 
-// ─── Emote definitions ─────────────────────────────────────────────────────
+// P1 home lane: row 7, columns 1-5 (colour: red)
+const P1_HOME_LANE: [number, number][] = [
+  [1, 7], [2, 7], [3, 7], [4, 7], [5, 7],
+];
+
+// P2 home lane: row 7, columns 9-13 (colour: blue)
+// NOTE: column 14 is the far wall; column 13 is the outermost lane cell.
+// Pieces enter from col 14 side (pos 52) and move inward (pos 56 → col 9).
+const P2_HOME_LANE: [number, number][] = [
+  [13, 7], [12, 7], [11, 7], [10, 7], [9, 7],
+];
+
+// ─── Emotes ────────────────────────────────────────────────────────────────
 const EMOTES = ["Laugh", "Angry", "Fire", "Crown", "Clap", "Shock"] as const;
 type EmoteType = typeof EMOTES[number];
 
@@ -167,7 +182,7 @@ function DiceFace({ value, size = 40, rolling = false }: { value: number; size?:
     5: [[25, 25], [75, 25], [50, 50], [25, 75], [75, 75]],
     6: [[25, 20], [75, 20], [25, 50], [75, 50], [25, 80], [75, 80]],
   };
-  const dots = dotMap[value] ?? dotMap[1];
+  const dots = dotMap[Math.max(1, Math.min(6, value))] ?? dotMap[1];
   return (
     <motion.svg
       width={size} height={size} viewBox="0 0 100 100" fill="none"
@@ -263,11 +278,13 @@ function LudoBoard({
   const p2Yard: [number, number][] = [[73, 73], [87, 73], [73, 87], [87, 87]];
 
   /**
-   * Convert a player's relative position to SVG coordinates.
-   * Pos 0  → yard
-   * Pos 57 → home centre
-   * Pos 52-56 → home lane
-   * Pos 1-51  → main track
+   * Convert a player's relative position to SVG viewport coordinates.
+   *
+   * POSITIONS:
+   *   0       → yard slot
+   *   1..51   → main track (TRACK array)
+   *   52..56  → home lane (5 private cells)
+   *   57      → finished (centre home triangle)
    */
   const pieceXY = (isP1: boolean, pos: number, idx: number): [number, number] => {
     if (pos === 0) {
@@ -276,19 +293,18 @@ function LudoBoard({
       return [cx, cy];
     }
     if (pos === 57) {
-      return isP1
-        ? [50 - 4 + (idx % 2) * 4, 50 - 4 + Math.floor(idx / 2) * 4]
-        : [50 + (idx % 2) * 4, 50 + Math.floor(idx / 2) * 4];
+      // Cluster finished pieces near the centre (50, 50)
+      const offsets: [number, number][] = [[-3, -3], [3, -3], [-3, 3], [3, 3]];
+      const [dx, dy] = offsets[idx % 4];
+      return [50 + dx, 50 + dy];
     }
     if (pos >= 52 && pos <= 56) {
-      // Home lane cells (row 7, columns differ per player)
-      const homeTrack: [number, number][] = isP1
-        ? [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7]]
-        : [[13, 7], [12, 7], [11, 7], [10, 7], [9, 7]];
-      const cell = homeTrack[(pos - 52) % 5];
+      // Home lane: pos 52 is the first cell, 56 is the last (closest to centre)
+      const laneIdx = pos - 52;   // 0-4
+      const cell    = isP1 ? P1_HOME_LANE[laneIdx] : P2_HOME_LANE[laneIdx];
       return [cell[0] * CELL + CELL / 2, cell[1] * CELL + CELL / 2];
     }
-    // Main track
+    // Main track (1..51)
     const trackIdx = isP1
       ? (pos - 1) % TRACK.length
       : (pos - 1 + 26) % TRACK.length;
@@ -296,6 +312,7 @@ function LudoBoard({
     return [cell.x * CELL + CELL / 2, cell.y * CELL + CELL / 2];
   };
 
+  /** Slight offset for stacked pieces on the same cell */
   const stackOffset = (pieces: number[], pos: number, idx: number): [number, number] => {
     if (pos === 0 || pos === 57) return [0, 0];
     const same = pieces.reduce<number[]>((a, p, i) => (p === pos ? [...a, i] : a), []);
@@ -309,11 +326,11 @@ function LudoBoard({
     isMyTurn && room.dice_rolled && (room.movable_pieces ?? []).includes(idx);
 
   const myPieces  = amPlayer1
-    ? room.board_state?.pieces?.player_1 ?? [0, 0, 0, 0]
-    : room.board_state?.pieces?.player_2 ?? [0, 0, 0, 0];
+    ? (room.board_state?.pieces?.player_1 ?? [0, 0, 0, 0])
+    : (room.board_state?.pieces?.player_2 ?? [0, 0, 0, 0]);
   const oppPieces = amPlayer1
-    ? room.board_state?.pieces?.player_2 ?? [0, 0, 0, 0]
-    : room.board_state?.pieces?.player_1 ?? [0, 0, 0, 0];
+    ? (room.board_state?.pieces?.player_2 ?? [0, 0, 0, 0])
+    : (room.board_state?.pieces?.player_1 ?? [0, 0, 0, 0]);
 
   return (
     <svg className="w-full h-full rounded-2xl" viewBox="0 0 100 100" fill="none">
@@ -334,35 +351,39 @@ function LudoBoard({
         <circle key={i} cx={cx} cy={cy} r="4" fill="#3B82F625" stroke="#3B82F6" strokeWidth="0.5" />
       ))}
 
-      {/* Unused yards (1v1 mode) */}
+      {/* Unused yards (1v1 mode — greyed out) */}
       <rect x="60" y="0" width="40" height="40" rx="4" fill="#0F172A" stroke="#1E293B" strokeWidth="0.3" />
       <rect x="0" y="60" width="40" height="40" rx="4" fill="#0F172A" stroke="#1E293B" strokeWidth="0.3" />
 
-      {/* Home triangles */}
+      {/* Centre home triangles */}
       <polygon points="40,40 50,50 40,60" fill="#EF444418" stroke="#EF4444" strokeWidth="0.4" />
       <polygon points="60,40 50,50 60,60" fill="#3B82F618" stroke="#3B82F6" strokeWidth="0.4" />
       <polygon points="40,40 50,50 60,40" fill="#0F172A" stroke="#1E293B" strokeWidth="0.2" />
       <polygon points="40,60 50,50 60,60" fill="#0F172A" stroke="#1E293B" strokeWidth="0.2" />
       <circle cx="50" cy="50" r="4" fill="#A855F718" stroke="#A855F7" strokeWidth="0.5" />
 
-      {/* Track cells */}
+      {/* Main track cells */}
       {TRACK.map((cell, idx) => {
         const x = cell.x * CELL;
         const y = cell.y * CELL;
-        const isSafe  = SAFE_SPOTS.has(idx);
-        const isStar  = STAR_SPOTS.has(idx);
-        const isLaunchRed  = idx === 1;
-        const isLaunchBlue = idx === 27;
+        const isSafe        = SAFE_SPOTS.has(idx);
+        const isStar        = STAR_SPOTS.has(idx);
+        const isLaunchRed   = idx === 1;    // P1 starting square
+        const isLaunchBlue  = idx === 27;   // P2 starting square
         let fill   = "#0F172A30";
         let stroke = "#1E293B";
         let sw     = 0.15;
-        if (isLaunchRed)  { fill = "#EF444435"; stroke = "#EF4444"; sw = 0.4; }
-        else if (isLaunchBlue) { fill = "#3B82F635"; stroke = "#3B82F6"; sw = 0.4; }
-        else if (isStar)  { fill = "#A855F720"; stroke = "#A855F7"; sw = 0.35; }
+        if (isLaunchRed)        { fill = "#EF444435"; stroke = "#EF4444"; sw = 0.4; }
+        else if (isLaunchBlue)  { fill = "#3B82F635"; stroke = "#3B82F6"; sw = 0.4; }
+        else if (isStar)        { fill = "#A855F720"; stroke = "#A855F7"; sw = 0.35; }
         return (
           <g key={idx}>
-            <rect x={x + 0.25} y={y + 0.25} width={CELL - 0.5} height={CELL - 0.5} rx="0.7"
-              fill={fill} stroke={stroke} strokeWidth={sw} />
+            <rect
+              x={x + 0.25} y={y + 0.25}
+              width={CELL - 0.5} height={CELL - 0.5}
+              rx="0.7"
+              fill={fill} stroke={stroke} strokeWidth={sw}
+            />
             {isStar && (
               <text x={x + CELL / 2} y={y + CELL / 2 + 1.5} textAnchor="middle" fontSize="3.5" fill="#A855F7" opacity="0.9">★</text>
             )}
@@ -370,18 +391,29 @@ function LudoBoard({
         );
       })}
 
-      {/* Red home lane */}
-      {[1, 2, 3, 4, 5].map(col => (
-        <rect key={`rh${col}`} x={col * CELL + 0.25} y={7 * CELL + 0.25} width={CELL - 0.5} height={CELL - 0.5} rx="0.7"
-          fill="#EF444428" stroke="#EF4444" strokeWidth="0.3" />
-      ))}
-      {/* Blue home lane */}
-      {[9, 10, 11, 12, 13].map(col => (
-        <rect key={`bh${col}`} x={col * CELL + 0.25} y={7 * CELL + 0.25} width={CELL - 0.5} height={CELL - 0.5} rx="0.7"
-          fill="#3B82F628" stroke="#3B82F6" strokeWidth="0.3" />
+      {/* P1 (red) home lane: row 7, columns 1-5 */}
+      {P1_HOME_LANE.map(([col, row], i) => (
+        <rect
+          key={`rh${i}`}
+          x={col * CELL + 0.25} y={row * CELL + 0.25}
+          width={CELL - 0.5} height={CELL - 0.5}
+          rx="0.7"
+          fill="#EF444428" stroke="#EF4444" strokeWidth="0.3"
+        />
       ))}
 
-      {/* Opponent pieces (below mine) */}
+      {/* P2 (blue) home lane: row 7, columns 9-13 */}
+      {P2_HOME_LANE.map(([col, row], i) => (
+        <rect
+          key={`bh${i}`}
+          x={col * CELL + 0.25} y={row * CELL + 0.25}
+          width={CELL - 0.5} height={CELL - 0.5}
+          rx="0.7"
+          fill="#3B82F628" stroke="#3B82F6" strokeWidth="0.3"
+        />
+      ))}
+
+      {/* Opponent pieces (rendered below mine so mine is always tappable) */}
       {oppPieces.map((pos: number, idx: number) => {
         const isP1Piece = !amPlayer1;
         const [baseCx, baseCy] = pieceXY(isP1Piece, pos, idx);
@@ -396,7 +428,7 @@ function LudoBoard({
         );
       })}
 
-      {/* My pieces (interactive, on top) */}
+      {/* My pieces (interactive, rendered on top) */}
       {myPieces.map((pos: number, idx: number) => {
         const [baseCx, baseCy] = pieceXY(amPlayer1, pos, idx);
         const [dx, dy] = stackOffset(myPieces, pos, idx);
@@ -406,7 +438,8 @@ function LudoBoard({
         const color = amPlayer1 ? "#EF4444" : "#3B82F6";
         const inner = amPlayer1 ? "#7F1D1D" : "#1E3A8A";
         return (
-          <g key={`my-${idx}`}
+          <g
+            key={`my-${idx}`}
             onClick={() => canMoveThis && onMove(idx)}
             style={{ cursor: canMoveThis ? "pointer" : "default" }}
           >
@@ -438,41 +471,42 @@ export default function LudoGamePage() {
   const { userId, refreshWallet } = useApp();
 
   // Phase machine
-  const [phase, setPhase]         = useState<GamePhase>("loading");
+  const [phase, setPhase]          = useState<GamePhase>("loading");
   const [loadingMsg, setLoadingMsg] = useState("Loading Ludo Arena...");
-  const [errorMsg, setErrorMsg]   = useState("");
-  const [countdown, setCountdown] = useState(3);
+  const [errorMsg, setErrorMsg]    = useState("");
+  const [countdown, setCountdown]  = useState(3);
 
-  // Server-authoritative room state
-  const [room, setRoom]   = useState<RoomState | null>(null);
+  // Server room state
+  const [room, setRoom] = useState<RoomState | null>(null);
 
-  // Local UI states
+  // Local UI-only states
   const [rolling, setRolling]         = useState(false);
   const [rollingAnim, setRollingAnim] = useState(false);
   const [diceDisplay, setDiceDisplay] = useState(1);
   const [showEmotes, setShowEmotes]   = useState(false);
   const [lastEmoteTime, setLastEmoteTime] = useState(0);
 
-  // Server-driven timers (display only — never restart the source-of-truth)
+  // Server-driven timer display values (interpolated between polls)
   const [matchSecs, setMatchSecs] = useState(480);
-  const [turnSecs,  setTurnSecs]  = useState(15);
+  const [turnSecs, setTurnSecs]   = useState(15);
 
   // Floating emote overlays
   const [floatingEmotes, setFloatingEmotes] = useState<
     Array<{ id: string; type: string; mine: boolean }>
   >([]);
 
-  // Refs
-  const phaseRef             = useRef<GamePhase>("loading");
-  const roomRef              = useRef<RoomState | null>(null);
-  const prevReactionLen      = useRef(0);
-  const prevTurnPlayer       = useRef<string | null>(null);
-  const pollRef              = useRef<ReturnType<typeof setInterval> | null>(null);
-  const matchTickRef         = useRef<ReturnType<typeof setInterval> | null>(null);
-  const turnTickRef          = useRef<ReturnType<typeof setInterval> | null>(null);
-  const matchSecsRef         = useRef(480);
-  const turnSecsRef          = useRef(15);
-  const endedRef             = useRef(false);
+  // Refs to avoid stale closures in intervals
+  const phaseRef           = useRef<GamePhase>("loading");
+  const roomRef            = useRef<RoomState | null>(null);
+  const matchSecsRef       = useRef(480);
+  const turnSecsRef        = useRef(15);
+  const prevTurnPlayer     = useRef<string | null>(null);
+  const pollRef            = useRef<ReturnType<typeof setInterval> | null>(null);
+  const matchTickRef       = useRef<ReturnType<typeof setInterval> | null>(null);
+  const turnTickRef        = useRef<ReturnType<typeof setInterval> | null>(null);
+  const endedRef           = useRef(false);
+  // Reaction dedup: track the highest timestamp we've already shown
+  const lastReactionTsRef  = useRef<number>(0);
 
   phaseRef.current = phase;
   roomRef.current  = room;
@@ -480,7 +514,7 @@ export default function LudoGamePage() {
   const formatTime = (s: number) =>
     `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
-  // ── Sound / vibration ────────────────────────────────────────────────────
+  // ── Sound / vibration ──────────────────────────────────────────────────────
   const playSound = useCallback((name: string) => {
     try {
       const a = new Audio(`/sounds/${name}.mp3`);
@@ -493,7 +527,7 @@ export default function LudoGamePage() {
     try { navigator.vibrate?.(pattern); } catch {}
   }, []);
 
-  // ── Prevent accidental back navigation ───────────────────────────────────
+  // ── Prevent accidental back navigation ────────────────────────────────────
   useEffect(() => {
     window.history.pushState(null, "", window.location.href);
     const onPop = () => window.history.pushState(null, "", window.location.href);
@@ -501,7 +535,7 @@ export default function LudoGamePage() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  // ── Fetch room state from server ─────────────────────────────────────────
+  // ── Fetch room state from server ──────────────────────────────────────────
   const fetchRoom = useCallback(async (): Promise<RoomState | null> => {
     if (!roomId || !userId) return null;
     try {
@@ -521,13 +555,13 @@ export default function LudoGamePage() {
     }
   }, [roomId, userId]);
 
-  // ── Apply server state → UI (reactions, turn notification) ───────────────
+  // ── Apply server state to local UI ────────────────────────────────────────
   const applyRoomState = useCallback((state: RoomState) => {
     setRoom(state);
 
     if (state.last_roll > 0) setDiceDisplay(state.last_roll);
 
-    // Sync server-provided timers (prevents client-side drift)
+    // Sync server-provided timers (prevents timer drift/reset on reconnect)
     if (typeof state.match_remaining_seconds === "number") {
       matchSecsRef.current = state.match_remaining_seconds;
       setMatchSecs(state.match_remaining_seconds);
@@ -537,29 +571,38 @@ export default function LudoGamePage() {
       setTurnSecs(state.turn_remaining_seconds);
     }
 
-    // Detect new opponent reactions
+    // ── Reaction detection (timestamp-based, not length-based) ───────────────
+    // This correctly handles the 20-reaction cap and avoids showing old reactions.
     const reactions = state.chat_reactions ?? [];
-    if (reactions.length > prevReactionLen.current) {
-      const latest = reactions[reactions.length - 1];
-      if (latest && latest.player_id !== userId) {
-        const id = `fe_${Date.now()}_${Math.random()}`;
-        setFloatingEmotes(prev => [...prev.slice(-3), { id, type: latest.type, mine: false }]);
-        setTimeout(() => setFloatingEmotes(prev => prev.filter(e => e.id !== id)), 2800);
-        playSound("piece-move");
+    const opponentReactions = reactions.filter(
+      r => r.player_id !== userId && r.timestamp > lastReactionTsRef.current
+    );
+    for (const reaction of opponentReactions) {
+      const id = `fe_${reaction.timestamp}_${Math.random()}`;
+      setFloatingEmotes(prev => [...prev.slice(-3), { id, type: reaction.type, mine: false }]);
+      setTimeout(() => setFloatingEmotes(prev => prev.filter(e => e.id !== id)), 2800);
+      playSound("piece-move");
+    }
+    // Update the high-water mark
+    if (reactions.length > 0) {
+      const maxTs = Math.max(...reactions.map(r => r.timestamp));
+      if (maxTs > lastReactionTsRef.current) {
+        lastReactionTsRef.current = maxTs;
       }
-      prevReactionLen.current = reactions.length;
     }
 
     // Notify when my turn starts
-    if (prevTurnPlayer.current !== null &&
-        prevTurnPlayer.current !== state.turn_player_id &&
-        state.turn_player_id === userId) {
+    if (
+      prevTurnPlayer.current !== null &&
+      prevTurnPlayer.current !== state.turn_player_id &&
+      state.turn_player_id === userId
+    ) {
       vibe(40);
     }
     prevTurnPlayer.current = state.turn_player_id;
   }, [userId, playSound, vibe]);
 
-  // ── Handle match end ──────────────────────────────────────────────────────
+  // ── Handle match end ───────────────────────────────────────────────────────
   const handleMatchEnd = useCallback((state: RoomState) => {
     if (endedRef.current) return;
     endedRef.current = true;
@@ -571,7 +614,7 @@ export default function LudoGamePage() {
     setPhase("ended");
   }, [userId, playSound, vibe, refreshWallet]);
 
-  // ── Initial load (supports reconnect) ────────────────────────────────────
+  // ── Initial load (handles both new match and reconnect) ───────────────────
   useEffect(() => {
     if (!roomId) { setErrorMsg("Invalid room link."); setPhase("error"); return; }
     if (!userId) { setErrorMsg("Not authenticated. Please reopen the app."); setPhase("error"); return; }
@@ -594,6 +637,13 @@ export default function LudoGamePage() {
         return;
       }
 
+      // Seed the reaction high-water mark from whatever reactions already exist
+      // so we don't re-show reactions from a previous session on reconnect
+      const reactions = state.chat_reactions ?? [];
+      if (reactions.length > 0) {
+        lastReactionTsRef.current = Math.max(...reactions.map(r => r.timestamp));
+      }
+
       applyRoomState(state);
 
       if (state.status === "completed" || state.status === "forfeited") {
@@ -601,14 +651,14 @@ export default function LudoGamePage() {
         return;
       }
 
-      // Reconnect: room is already active → go straight to playing (no countdown)
+      // Reconnect: match already active → skip countdown, go straight to playing
       if (state.status === "active") {
         setLoadingMsg("Reconnecting to match...");
         setPhase("playing");
         return;
       }
 
-      // New match: countdown → playing
+      // New match: show pre-match screen then countdown
       setLoadingMsg("Match found!");
       setPhase("pre-match");
     };
@@ -617,14 +667,14 @@ export default function LudoGamePage() {
     return () => { cancelled = true; };
   }, [roomId, userId, fetchRoom, applyRoomState, handleMatchEnd]);
 
-  // ── Pre-match (1 s opponent reveal) ──────────────────────────────────────
+  // ── Pre-match (1 s opponent reveal) ───────────────────────────────────────
   useEffect(() => {
     if (phase !== "pre-match") return;
     const t = setTimeout(() => setPhase("countdown"), 1000);
     return () => clearTimeout(t);
   }, [phase]);
 
-  // ── 3-2-1 countdown ──────────────────────────────────────────────────────
+  // ── 3-2-1 countdown ───────────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== "countdown") return;
     setCountdown(3);
@@ -638,7 +688,7 @@ export default function LudoGamePage() {
     return () => clearTimeout(t);
   }, [phase, playSound]);
 
-  // ── Active game polling (1.2 s) ───────────────────────────────────────────
+  // ── Active game polling (1.2 s) ────────────────────────────────────────────
   useEffect(() => {
     if (phase !== "playing") return;
 
@@ -656,7 +706,7 @@ export default function LudoGamePage() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [phase, fetchRoom, applyRoomState, handleMatchEnd]);
 
-  // ── Match countdown tick (client-side interpolation between server syncs) ─
+  // ── Match timer tick (client interpolation between server syncs) ───────────
   useEffect(() => {
     if (phase !== "playing") return;
     if (matchTickRef.current) clearInterval(matchTickRef.current);
@@ -669,13 +719,14 @@ export default function LudoGamePage() {
     return () => { if (matchTickRef.current) clearInterval(matchTickRef.current); };
   }, [phase]);
 
-  // ── Turn countdown tick — resets when turn_player_id changes ──────────────
+  // ── Turn timer tick — resets when turn_player_id changes ──────────────────
+  // This effect re-runs whenever the active player changes (from applyRoomState).
   useEffect(() => {
     if (phase !== "playing") return;
     if (turnTickRef.current) clearInterval(turnTickRef.current);
 
-    // Seed from last polled value
-    const seed = room?.turn_remaining_seconds ?? 15;
+    // Seed from the latest server-provided value
+    const seed = roomRef.current?.turn_remaining_seconds ?? 15;
     turnSecsRef.current = seed;
     setTurnSecs(seed);
 
@@ -685,10 +736,10 @@ export default function LudoGamePage() {
     }, 1000);
 
     return () => { if (turnTickRef.current) clearInterval(turnTickRef.current); };
-    // Re-run when the active player changes
-  }, [phase, room?.turn_player_id]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, room?.turn_player_id]);
 
-  // ── Roll dice ─────────────────────────────────────────────────────────────
+  // ── Roll dice ──────────────────────────────────────────────────────────────
   const handleRoll = useCallback(async () => {
     if (!roomId || !userId || rolling) return;
     if (room?.turn_player_id !== userId) return;
@@ -700,6 +751,7 @@ export default function LudoGamePage() {
     playSound("dice-roll");
     vibe(30);
 
+    // Animate dice face while waiting for server
     let ticks = 0;
     const anim = setInterval(() => {
       setDiceDisplay(Math.floor(Math.random() * 6) + 1);
@@ -708,20 +760,25 @@ export default function LudoGamePage() {
 
     try {
       const res = await fetch("/api/ludo/room/roll", {
-        method: "POST",
+        method:  "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type":  "application/json",
           "Authorization": `Bearer ${userId}`,
-          "x-user-id": userId,
+          "x-user-id":     userId,
         },
         body: JSON.stringify({ room_id: roomId }),
       });
       const data = await res.json();
       if (data.success) {
-        setDiceDisplay(data.data?.roll ?? 1);
-        if (data.data?.auto_passed) {
+        const roll = data.data?.roll ?? 1;
+        setDiceDisplay(roll);
+
+        if (data.data?.triple_six) {
+          showToast("Triple six! Turn forfeited.", "info");
+        } else if (data.data?.auto_passed) {
           showToast("No moves available — turn passed", "info");
         }
+
         const fresh = await fetchRoom();
         if (fresh) applyRoomState(fresh);
       } else {
@@ -735,7 +792,7 @@ export default function LudoGamePage() {
     }
   }, [roomId, userId, rolling, room, playSound, vibe, fetchRoom, applyRoomState]);
 
-  // ── Move piece ────────────────────────────────────────────────────────────
+  // ── Move piece ─────────────────────────────────────────────────────────────
   const handleMove = useCallback(async (pieceIdx: number) => {
     if (!roomId || !userId) return;
     playSound("piece-move");
@@ -743,11 +800,11 @@ export default function LudoGamePage() {
 
     try {
       const res = await fetch("/api/ludo/room/move", {
-        method: "POST",
+        method:  "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type":  "application/json",
           "Authorization": `Bearer ${userId}`,
-          "x-user-id": userId,
+          "x-user-id":     userId,
         },
         body: JSON.stringify({ room_id: roomId, piece_index: pieceIdx }),
       });
@@ -776,41 +833,45 @@ export default function LudoGamePage() {
     }
   }, [roomId, userId, playSound, vibe, fetchRoom, applyRoomState, handleMatchEnd]);
 
-  // ── Send emote ────────────────────────────────────────────────────────────
+  // ── Send emote ─────────────────────────────────────────────────────────────
   const handleEmote = useCallback(async (type: EmoteType) => {
     if (!roomId || !userId) return;
     if (Date.now() - lastEmoteTime < 2000) return;
-    setLastEmoteTime(Date.now());
+    const ts = Date.now();
+    setLastEmoteTime(ts);
     setShowEmotes(false);
 
-    const id = `fe_${Date.now()}`;
+    const id = `fe_${ts}`;
     setFloatingEmotes(prev => [...prev.slice(-3), { id, type, mine: true }]);
     setTimeout(() => setFloatingEmotes(prev => prev.filter(e => e.id !== id)), 2800);
 
+    // Mark our own reaction timestamp so we don't redisplay it when polling
+    lastReactionTsRef.current = Math.max(lastReactionTsRef.current, ts);
+
     try {
       await fetch("/api/ludo/room/reaction", {
-        method: "POST",
+        method:  "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type":  "application/json",
           "Authorization": `Bearer ${userId}`,
-          "x-user-id": userId,
+          "x-user-id":     userId,
         },
         body: JSON.stringify({ room_id: roomId, reaction_type: type }),
       });
     } catch {}
   }, [roomId, userId, lastEmoteTime]);
 
-  // ── Forfeit ───────────────────────────────────────────────────────────────
+  // ── Forfeit ────────────────────────────────────────────────────────────────
   const handleForfeit = useCallback(async () => {
     if (!roomId || !userId) return;
     if (!confirm("Forfeit match? You will lose your stake.")) return;
     try {
       await fetch("/api/ludo/room/forfeit", {
-        method: "POST",
+        method:  "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type":  "application/json",
           "Authorization": `Bearer ${userId}`,
-          "x-user-id": userId,
+          "x-user-id":     userId,
         },
         body: JSON.stringify({ room_id: roomId }),
       });
@@ -826,11 +887,10 @@ export default function LudoGamePage() {
     }
   }, [roomId, userId, fetchRoom, applyRoomState, handleMatchEnd]);
 
-  // ── Exit to lobby ─────────────────────────────────────────────────────────
   const handleExit = useCallback(() => router.replace("/games"), [router]);
 
   // ─────────────────────────────────────────────────────────────────────────
-  // RENDER PHASES
+  // RENDER
   // ─────────────────────────────────────────────────────────────────────────
 
   if (phase === "loading") return <LoadingScreen message={loadingMsg} />;
@@ -911,7 +971,7 @@ export default function LudoGamePage() {
     );
   }
 
-  // ENDED: victory / defeat screen
+  // ENDED: victory / defeat
   if (phase === "ended" && room) {
     const iWon = room.winner_id === userId;
     return (
@@ -945,8 +1005,8 @@ export default function LudoGamePage() {
           </div>
           {room.win_reason && (
             <div className="text-[9px] text-slate-600 font-mono">
-              {room.win_reason === "forfeit"     ? "Opponent forfeited"         :
-               room.win_reason === "timeout"     ? "Hearts depleted"            :
+              {room.win_reason === "forfeit"     ? "Opponent forfeited"          :
+               room.win_reason === "timeout"     ? "Hearts depleted"             :
                room.win_reason === "score_timer" ? "Time up — highest score wins" : ""}
             </div>
           )}
@@ -964,8 +1024,8 @@ export default function LudoGamePage() {
   // PLAYING: main game screen
   if (!room) return <LoadingScreen message="Syncing match..." />;
 
-  const amPlayer1 = room.player_1_id === userId;
-  const isMyTurn  = room.turn_player_id === userId;
+  const amPlayer1  = room.player_1_id === userId;
+  const isMyTurn   = room.turn_player_id === userId;
   const myProfile  = amPlayer1 ? room.player_1_profile : room.player_2_profile;
   const oppProfile = amPlayer1 ? room.player_2_profile : room.player_1_profile;
   const myHearts   = amPlayer1 ? (room.hearts_player_1 ?? 3) : (room.hearts_player_2 ?? 3);
@@ -1037,7 +1097,7 @@ export default function LudoGamePage() {
         <div className="h-0.5 bg-slate-800 rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-1000 ${turnSecs <= 5 ? "bg-red-500" : "bg-purple-500"}`}
-            style={{ width: `${Math.max(0, (turnSecs / 15) * 100)}%` }}
+            style={{ width: `${Math.max(0, (turnSecs / 18) * 100)}%` }}
           />
         </div>
       </div>
