@@ -121,8 +121,8 @@ export async function GET(req: NextRequest) {
             ? String(room.player_2_id)
             : String(room.player_1_id);
 
-          // Atomic RPC prevents double-advance from concurrent polls
-          await supabase.rpc("advance_ludo_turn", {
+          // Best-effort atomic RPC (may be a no-op if the RPC is unavailable).
+          const { error: advErr } = await supabase.rpc("advance_ludo_turn", {
             p_room_id:             roomId,
             p_expected_turn:       turnPlayerId,
             p_expected_turn_start: room.turn_start_at,
@@ -130,27 +130,65 @@ export async function GET(req: NextRequest) {
             p_hearts_p1:           hearts1,
             p_hearts_p2:           hearts2,
           });
+          if (advErr) console.error(`[LUDO STATE] advance_ludo_turn error:`, advErr.message);
 
-          // Static select so TypeScript can infer column types correctly
-          const { data: refreshedRaw } = await supabase
+          // Authoritative compare-and-swap fallback. This persists the turn
+          // switch WITHOUT depending on the RPC existing, and the WHERE clause
+          // (same player + same turn_start_at) makes it atomic against
+          // concurrent polls — only one advance can win, so a timed-out player
+          // is reliably switched out and can never be double-advanced.
+          const nowIso = new Date(now).toISOString();
+          const casPayload: Record<string, unknown> = {
+            turn_player_id:  nextTurn,
+            turn_start_at:   nowIso,
+            dice_rolled:     false,
+            last_roll:       0,
+            movable_pieces:  [],
+            hearts_player_1: hearts1,
+            hearts_player_2: hearts2,
+            updated_at:      nowIso,
+          };
+          if (hasConsecutiveCol) casPayload.consecutive_sixes = 0;
+
+          const { data: casRow } = await supabase
             .from("ludo_rooms")
-            .select("turn_player_id, turn_start_at, hearts_player_1, hearts_player_2, consecutive_sixes")
+            .update(casPayload)
             .eq("id", roomId)
+            .eq("turn_player_id", turnPlayerId)
+            .eq("turn_start_at", room.turn_start_at)
+            .select("turn_player_id, turn_start_at, hearts_player_1, hearts_player_2")
             .maybeSingle();
 
-          if (refreshedRaw) {
-            // Cast to any to avoid Supabase's GenericStringError on dynamic selects
-            const r = refreshedRaw as unknown as Record<string, any>;
-            turnPlayerId     = r.turn_player_id;
-            turnStartMs      = new Date(r.turn_start_at as string).getTime();
-            hearts1          = r.hearts_player_1 as number;
-            hearts2          = r.hearts_player_2 as number;
-            consecutiveSixes = (r.consecutive_sixes as number) ?? 0;
-          }
+          // Reflect the switch locally so THIS response already reports the new
+          // turn — the client never has to wait for a later poll.
+          turnPlayerId     = nextTurn;
+          turnStartMs      = now;
+          consecutiveSixes = 0;
+          diceRolled       = false;
+          lastRoll         = 0;
+          movablePieces    = [];
 
-          diceRolled    = false;
-          lastRoll      = 0;
-          movablePieces = [];
+          if (!casRow) {
+            // The turn was already advanced (RPC or a concurrent poll won the
+            // CAS). Read the authoritative current turn so we don't report a
+            // wrong player. Only guaranteed columns are selected.
+            const { data: cur } = await supabase
+              .from("ludo_rooms")
+              .select("turn_player_id, turn_start_at, hearts_player_1, hearts_player_2")
+              .eq("id", roomId)
+              .maybeSingle();
+            if (cur) {
+              const r = cur as unknown as Record<string, any>;
+              turnPlayerId = (r.turn_player_id as string) ?? turnPlayerId;
+              turnStartMs  = r.turn_start_at ? new Date(r.turn_start_at as string).getTime() : turnStartMs;
+              hearts1      = (r.hearts_player_1 as number) ?? hearts1;
+              hearts2      = (r.hearts_player_2 as number) ?? hearts2;
+            }
+          } else {
+            const r = casRow as unknown as Record<string, any>;
+            hearts1 = (r.hearts_player_1 as number) ?? hearts1;
+            hearts2 = (r.hearts_player_2 as number) ?? hearts2;
+          }
         } else {
           stateModified = true;
         }
@@ -345,6 +383,9 @@ export async function GET(req: NextRequest) {
         board_state:             boardState,
         chat_reactions:          room.chat_reactions ?? [],
         consecutive_sixes:       consecutiveSixes,
+        // Monotonic version stamp — the client uses this to reject stale/out-of
+        // -order poll responses so they can never revert fresher local state.
+        updated_at:              new Date(now).toISOString(),
       },
     });
 
