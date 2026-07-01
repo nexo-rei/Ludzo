@@ -65,6 +65,7 @@ interface RoomState {
   board_state: BoardState;
   chat_reactions: Array<{ player_id: string; type: string; timestamp: number }>;
   consecutive_sixes: number;
+  updated_at?: string;
 }
 
 // ─── Ludo board track (52 cells, clockwise, 15×15 grid) ───────────────────
@@ -480,6 +481,14 @@ export default function LudoGamePage() {
   const turnTickRef        = useRef<ReturnType<typeof setInterval> | null>(null);
   const endedRef           = useRef(false);
   const lastReactionTsRef  = useRef<number>(0);
+  // Key-based reaction dedupe (`player_id:timestamp`) — immune to clock skew.
+  const seenReactionsRef   = useRef<Set<string>>(new Set());
+  // Monotonic version guard — rejects poll responses older than what we already
+  // applied, so an out-of-order/stale poll can never revert fresher state.
+  const lastAppliedTsRef   = useRef<number>(0);
+  // Mutation epoch — bumped when the player rolls/moves so any poll that was
+  // already in flight is discarded (its own authoritative fetch wins instead).
+  const mutationEpochRef   = useRef(0);
 
   // ── FIX 1: Synchronous in-flight locks (refs, not state) ──────────────────
   // React state updates are batched/async — using a ref means the lock is set
@@ -535,6 +544,16 @@ export default function LudoGamePage() {
 
   // ── Apply server state ────────────────────────────────────────────────────
   const applyRoomState = useCallback((state: RoomState) => {
+    // ── Version guard ─────────────────────────────────────────────────────────
+    // Only accept state that is at least as fresh as what we last applied.
+    // Terminal states (match over) are always applied. This is what stops a
+    // stale poll from reverting an optimistic roll/move (unlimited-roll,
+    // home-token, and desync bugs all trace back to stale overwrites).
+    const isTerminal = state.status === "completed" || state.status === "forfeited";
+    const ts = state.updated_at ? Date.parse(state.updated_at) : 0;
+    if (!isTerminal && ts && ts < lastAppliedTsRef.current) return;
+    if (ts) lastAppliedTsRef.current = ts;
+
     setRoom(state);
     if (state.last_roll > 0) setDiceDisplay(state.last_roll);
 
@@ -547,20 +566,18 @@ export default function LudoGamePage() {
       setTurnSecs(state.turn_remaining_seconds);
     }
 
-    // Reaction detection — timestamp-based, never re-shows old reactions
+    // Reaction detection — key-based dedupe so every opponent reaction is shown
+    // exactly once, regardless of clock skew or duplicate timestamps.
     const reactions = state.chat_reactions ?? [];
-    const newOppReactions = reactions.filter(
-      r => r.player_id !== userId && r.timestamp > lastReactionTsRef.current
-    );
-    for (const reaction of newOppReactions) {
+    for (const reaction of reactions) {
+      const key = `${reaction.player_id}:${reaction.timestamp}`;
+      if (seenReactionsRef.current.has(key)) continue;
+      seenReactionsRef.current.add(key);
+      if (reaction.player_id === userId) continue; // own reaction already shown locally
       const id = `fe_${reaction.timestamp}_${Math.random()}`;
       setFloatingEmotes(prev => [...prev.slice(-3), { id, type: reaction.type, mine: false }]);
       setTimeout(() => setFloatingEmotes(prev => prev.filter(e => e.id !== id)), 2800);
       playSound("piece-move");
-    }
-    if (reactions.length > 0) {
-      const maxTs = Math.max(...reactions.map(r => r.timestamp));
-      if (maxTs > lastReactionTsRef.current) lastReactionTsRef.current = maxTs;
     }
 
     if (
@@ -614,9 +631,10 @@ export default function LudoGamePage() {
         return;
       }
 
+      // Seed the seen-set with existing reactions so they don't replay on load.
       const reactions = state.chat_reactions ?? [];
-      if (reactions.length > 0) {
-        lastReactionTsRef.current = Math.max(...reactions.map(r => r.timestamp));
+      for (const r of reactions) {
+        seenReactionsRef.current.add(`${r.player_id}:${r.timestamp}`);
       }
 
       applyRoomState(state);
@@ -664,8 +682,13 @@ export default function LudoGamePage() {
     if (phase !== "playing") return;
 
     const poll = async () => {
+      // Never poll over an in-flight mutation — its own fetch is authoritative.
+      if (rollInFlightRef.current || moveInFlightRef.current) return;
+      const epoch = mutationEpochRef.current;
       const state = await fetchRoom();
       if (!state) return;
+      // A roll/move started while this poll was in flight — discard the result.
+      if (epoch !== mutationEpochRef.current) return;
       applyRoomState(state);
       if (state.status === "completed" || state.status === "forfeited") {
         handleMatchEnd(state);
@@ -716,6 +739,7 @@ export default function LudoGamePage() {
   //   • Home tokens with roll=6 light up without waiting for the network re-fetch
   const handleRoll = useCallback(async () => {
     if (!roomId || !userId) return;
+    if (endedRef.current) return;                  // match already over / left
     if (rollInFlightRef.current) return;           // synchronous lock
     if (roomRef.current?.turn_player_id !== userId) return;
     if (roomRef.current?.dice_rolled) return;
@@ -723,6 +747,7 @@ export default function LudoGamePage() {
 
     // Set lock synchronously — prevents any subsequent tap from passing the guard
     rollInFlightRef.current = true;
+    mutationEpochRef.current += 1;                  // invalidate any in-flight poll
     setIsRollingDisplay(true);
     setRollingAnim(true);
     playSound("dice-roll");
@@ -779,8 +804,10 @@ export default function LudoGamePage() {
           showToast("No moves available — turn passed", "info");
         }
 
-        // Background sync to get full authoritative state
-        fetchRoom().then(fresh => { if (fresh) applyRoomState(fresh); });
+        // Authoritative sync — awaited so the in-flight lock is held until the
+        // real server state is applied, so no stale poll can revert the roll.
+        const fresh = await fetchRoom();
+        if (fresh) applyRoomState(fresh);
       } else {
         showToast(data.error ?? "Roll failed", "error");
       }
@@ -798,9 +825,11 @@ export default function LudoGamePage() {
   // moveInFlightRef prevents duplicate submissions from double-taps.
   const handleMove = useCallback(async (pieceIdx: number) => {
     if (!roomId || !userId) return;
+    if (endedRef.current) return;                  // match already over / left
     if (moveInFlightRef.current) return;           // synchronous lock
 
     moveInFlightRef.current = true;
+    mutationEpochRef.current += 1;                 // invalidate any in-flight poll
     playSound("piece-move");
     vibe(20);
 
