@@ -60,7 +60,9 @@ export async function POST(req: NextRequest) {
 
     const isPlayer1 = room.player_1_id === userId;
     const playerKey = isPlayer1 ? "player_1" : "player_2";
-    const pieces: number[] = room.board_state?.pieces?.[playerKey] ?? [0, 0, 0, 0];
+    const oppKey    = isPlayer1 ? "player_2" : "player_1";
+    const pieces: number[]    = room.board_state?.pieces?.[playerKey] ?? [0, 0, 0, 0];
+    const oppPieces: number[] = room.board_state?.pieces?.[oppKey]    ?? [0, 0, 0, 0];
 
     // consecutive_sixes may not exist on older rooms — default to 0
     const prevConsecutive = (room.consecutive_sixes ?? 0) as number;
@@ -103,8 +105,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ── Calculate movable pieces ──────────────────────────────────────────────
-    const movable = calcMovablePieces(pieces, roll);
+    // ── Calculate movable pieces (block/barrier-aware) ────────────────────────
+    const movable = calcMovablePieces(pieces, roll, oppPieces, isPlayer1);
     console.log(`[LUDO ROLL] movable=${JSON.stringify(movable)}`);
 
     // ── No moves → auto-pass turn ─────────────────────────────────────────────
