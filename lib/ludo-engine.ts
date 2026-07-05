@@ -18,6 +18,14 @@
  *
  * SAFE CELLS (capture-immune absolute indices):
  *   1, 9, 14, 22, 27, 35, 40, 48
+ *
+ * BLOCK / BARRIER RULE (adapted from the reference Ludo `allBlockState` logic):
+ *   When a player has TWO OR MORE of their own pieces on the same shared-track
+ *   cell, those pieces form a "block" (barrier). An opponent piece may neither
+ *   land on nor pass over that cell. Blocks only exist on the shared track
+ *   (positions 1..51); the private home lane (52..56) can never be blocked.
+ *   Blocks are derived on the server from board_state.pieces at evaluation time
+ *   — there is no stored block column, so no schema change is required.
  */
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -46,18 +54,79 @@ export function canAdvance(pos: number, roll: number): boolean {
   return pos + roll <= 57;
 }
 
-// ── Movable piece calculation ─────────────────────────────────────────────────
+// ── Block / barrier detection ─────────────────────────────────────────────────
 
-export function calcMovablePieces(pieces: number[], roll: number): number[] {
+/**
+ * Absolute shared-track cells where the given owner has a block (≥2 pieces).
+ * Only track positions 1..51 are considered; home-lane cells cannot form blocks.
+ *
+ * @param ownerPieces  The four relative positions of the block owner.
+ * @param ownerIsP1    true if the owner is player_1 (for abs-track mapping).
+ */
+export function getBlockedAbsCells(ownerPieces: number[], ownerIsP1: boolean): Set<number> {
+  const counts = new Map<number, number>();
+  for (const p of ownerPieces) {
+    if (p < 1 || p > 51) continue;
+    const abs = toAbsTrack(p, ownerIsP1);
+    if (abs === null) continue;
+    counts.set(abs, (counts.get(abs) ?? 0) + 1);
+  }
+  const blocked = new Set<number>();
+  for (const [abs, count] of counts) {
+    if (count >= 2) blocked.add(abs);
+  }
+  return blocked;
+}
+
+/**
+ * True if moving a piece from `fromPos` to `toPos` (relative positions of the
+ * MOVING player) would land on or pass over any opponent block cell. Only the
+ * shared track (1..51) is checked; the home lane is never blocked.
+ *
+ * `fromPos` may be 0 (leaving the yard); the destination cell (pos 1) is then
+ * the only cell tested.
+ */
+export function pathCrossesBlock(
+  fromPos: number,
+  toPos: number,
+  moverIsP1: boolean,
+  blockedAbsCells: Set<number>
+): boolean {
+  if (blockedAbsCells.size === 0) return false;
+  for (let p = fromPos + 1; p <= toPos; p++) {
+    if (p < 1 || p > 51) continue; // only shared-track cells can be blocked
+    const abs = toAbsTrack(p, moverIsP1);
+    if (abs !== null && blockedAbsCells.has(abs)) return true;
+  }
+  return false;
+}
+
+// ── Movable piece calculation ─────────────────────────────────────────────────
+//
+// `oppPieces` + `amPlayer1` enable the block/barrier rule: a piece cannot move
+// if its path lands on or crosses a cell where the opponent has a block (≥2
+// pieces). They default to no-opponent so legacy callers stay behaviour-safe,
+// but every real caller passes them.
+export function calcMovablePieces(
+  pieces: number[],
+  roll: number,
+  oppPieces: number[] = [],
+  amPlayer1: boolean = true
+): number[] {
+  const blocked = getBlockedAbsCells(oppPieces, !amPlayer1);
   const movable: number[] = [];
   for (let i = 0; i < 4; i++) {
     const pos = pieces[i];
     if (pos === 57) continue;
     if (pos === 0) {
-      if (roll === 6) movable.push(i);
+      // Leaving the yard requires a 6 AND the start cell must not be blocked.
+      if (roll === 6 && !pathCrossesBlock(0, 1, amPlayer1, blocked)) movable.push(i);
       continue;
     }
-    if (canAdvance(pos, roll)) movable.push(i);
+    if (canAdvance(pos, roll)) {
+      const newPos = pos + roll;
+      if (!pathCrossesBlock(pos, newPos, amPlayer1, blocked)) movable.push(i);
+    }
   }
   return movable;
 }
