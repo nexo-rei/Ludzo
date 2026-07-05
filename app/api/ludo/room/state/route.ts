@@ -215,7 +215,9 @@ export async function GET(req: NextRequest) {
         // Bot rolls
         const roll         = Math.floor(Math.random() * 6) + 1;
         const botPieces    = boardState.pieces.player_2 as number[];
-        const allowedMoves = calcMovablePieces(botPieces, roll);
+        const botOppPieces = boardState.pieces.player_1 as number[];
+        // Bot is player_2, so amPlayer1 = false; block/barrier-aware.
+        const allowedMoves = calcMovablePieces(botPieces, roll, botOppPieces, false);
         const newConsec    = roll === 6 ? consecutiveSixes + 1 : 0;
 
         console.log(`[LUDO STATE] BOT ROLL room=${roomId} roll=${roll} movable=${JSON.stringify(allowedMoves)}`);
