@@ -90,7 +90,22 @@ export async function POST(req: NextRequest) {
       // Only write consecutive_sixes if the column exists (safe guard)
       if ("consecutive_sixes" in room) updatePayload.consecutive_sixes = 0;
 
-      await supabase.from("ludo_rooms").update(updatePayload).eq("id", room_id);
+      // CAS: only the request that still owns an un-rolled turn may write.
+      const { data: passed } = await supabase
+        .from("ludo_rooms")
+        .update(updatePayload)
+        .eq("id", room_id)
+        .eq("turn_player_id", userId)
+        .eq("dice_rolled", false)
+        .select("id")
+        .maybeSingle();
+
+      if (!passed) {
+        return NextResponse.json(
+          { success: false, error: "Turn already advanced" },
+          { status: 409 }
+        );
+      }
 
       return NextResponse.json({
         success: true,
@@ -123,7 +138,22 @@ export async function POST(req: NextRequest) {
       };
       if ("consecutive_sixes" in room) updatePayload.consecutive_sixes = 0;
 
-      await supabase.from("ludo_rooms").update(updatePayload).eq("id", room_id);
+      // CAS: only the request that still owns an un-rolled turn may write.
+      const { data: passed } = await supabase
+        .from("ludo_rooms")
+        .update(updatePayload)
+        .eq("id", room_id)
+        .eq("turn_player_id", userId)
+        .eq("dice_rolled", false)
+        .select("id")
+        .maybeSingle();
+
+      if (!passed) {
+        return NextResponse.json(
+          { success: false, error: "Turn already advanced" },
+          { status: 409 }
+        );
+      }
 
       return NextResponse.json({
         success: true,
@@ -146,14 +176,26 @@ export async function POST(req: NextRequest) {
     };
     if ("consecutive_sixes" in room) updatePayload.consecutive_sixes = newConsecutive;
 
-    const { error: saveErr } = await supabase
+    // CAS: prevents a double-tap / second tab from rolling twice on one turn.
+    const { data: saved, error: saveErr } = await supabase
       .from("ludo_rooms")
       .update(updatePayload)
-      .eq("id", room_id);
+      .eq("id", room_id)
+      .eq("turn_player_id", userId)
+      .eq("dice_rolled", false)
+      .select("id")
+      .maybeSingle();
 
     if (saveErr) {
       console.error(`[LUDO ROLL] Failed to save roll:`, saveErr.message);
       return NextResponse.json({ success: false, error: "Failed to save roll" }, { status: 500 });
+    }
+    if (!saved) {
+      console.warn(`[LUDO ROLL] Stale roll rejected room=${room_id} user=${userId}`);
+      return NextResponse.json(
+        { success: false, error: "Turn already advanced — please sync" },
+        { status: 409 }
+      );
     }
 
     return NextResponse.json({

@@ -61,21 +61,34 @@ export async function POST(req: NextRequest) {
 
     const newReaction = { player_id: userId, type: reaction_type, timestamp: now };
 
-    // Keep last 20 only to prevent JSONB bloat
-    const updatedReactions = [...existing, newReaction].slice(-20);
-
-    // ── Primary store: update chat_reactions on ludo_rooms ───────────────────
+    // ── Primary store: chat_reactions on ludo_rooms ──────────────────────────
     // This is the field both players poll every 1.2 s in /api/ludo/room/state.
-    // Writing it here means the opponent will see the reaction on the very next
-    // poll — typically within 1-2 seconds, which feels instant.
-    const { error: updateErr } = await supabase
-      .from("ludo_rooms")
-      .update({ chat_reactions: updatedReactions, updated_at: new Date().toISOString() })
-      .eq("id", room_id);
+    //
+    // Appended ATOMICALLY in SQL (append_ludo_reaction) so two players reacting
+    // in the same second don't overwrite each other — the old read-modify-write
+    // dropped one of the two reactions. Falls back to RMW if the RPC has not
+    // been installed yet (see sql/02_ludo_fixes.sql).
+    const { error: rpcErr } = await supabase.rpc("append_ludo_reaction", {
+      p_room_id:  room_id,
+      p_reaction: newReaction,
+      p_keep:     20,                       // cap the array to prevent JSONB bloat
+    });
 
-    if (updateErr) {
-      console.error(`[LUDO REACTION] Failed to save:`, updateErr.message);
-      return NextResponse.json({ success: false, error: "Failed to save reaction" }, { status: 500 });
+    if (rpcErr) {
+      if (!/append_ludo_reaction/i.test(rpcErr.message)) {
+        console.error(`[LUDO REACTION] append_ludo_reaction failed:`, rpcErr.message);
+        return NextResponse.json({ success: false, error: "Failed to save reaction" }, { status: 500 });
+      }
+      console.warn(`[LUDO REACTION] append_ludo_reaction RPC missing — using non-atomic fallback. Run sql/02_ludo_fixes.sql.`);
+      const updatedReactions = [...existing, newReaction].slice(-20);
+      const { error: updateErr } = await supabase
+        .from("ludo_rooms")
+        .update({ chat_reactions: updatedReactions, updated_at: new Date().toISOString() })
+        .eq("id", room_id);
+      if (updateErr) {
+        console.error(`[LUDO REACTION] Failed to save:`, updateErr.message);
+        return NextResponse.json({ success: false, error: "Failed to save reaction" }, { status: 500 });
+      }
     }
 
     // ── Secondary store: ludo_reactions table (fire-and-forget) ──────────────
