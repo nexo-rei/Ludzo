@@ -19,6 +19,8 @@ export default function MatchesPage() {
   });
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const loadStats = async () => {
@@ -32,17 +34,23 @@ export default function MatchesPage() {
           if (data.success && data.data) {
             setStats(data.data.stats);
             setHistory(data.data.history);
+            setError(false);
+          } else {
+            setError(true);
           }
+        } else {
+          setError(true);
         }
       } catch (err) {
         console.error("Failed to load matches stats:", err);
+        setError(true);
       } finally {
         setLoading(false);
       }
     };
 
     loadStats();
-  }, [userId]);
+  }, [userId, reloadKey]);
 
   return (
     <div className="min-h-screen w-full bg-slate-950 text-white pb-24">
@@ -117,6 +125,16 @@ export default function MatchesPage() {
               {[...Array(3)].map((_, i) => (
                 <div key={i} className="h-16 rounded-xl bg-slate-900/50 animate-pulse border border-slate-900" />
               ))}
+            </div>
+          ) : error ? (
+            <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-6 text-center space-y-3">
+              <p className="text-xs text-slate-300 font-semibold">Match history load nahi ho payi.</p>
+              <button
+                onClick={() => { setLoading(true); setError(false); setReloadKey(k => k + 1); }}
+                className="px-5 py-2 rounded-xl bg-purple-600 text-white text-[10px] font-black uppercase tracking-wider"
+              >
+                Retry
+              </button>
             </div>
           ) : history.length === 0 ? (
             <EmptyState type="history" message="Your completed matches will appear here." />

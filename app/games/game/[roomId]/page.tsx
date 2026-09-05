@@ -16,6 +16,11 @@
  *  4. Forfeit/Exit:     stopGame() helper clears all timers and polling, then
  *                       calls forfeit API and redirects. Works even if the
  *                       forfeit response is slow or fetchRoom returns stale data.
+ *  5. Two tokens:       LUDZO 1v1 is played with TWO tokens per player (both
+ *                       must reach home). Yard slots, finish offsets and the
+ *                       defaults below render a 2-token board; legacy 4-token
+ *                       rooms (pre-upgrade matches) still render via idx-mod
+ *                       fallbacks.
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -305,8 +310,11 @@ function LudoBoard({
   isMyTurn: boolean;
   onMove: (idx: number) => void;
 }) {
-  const p1Yard: [number, number][] = [[13, 13], [27, 13], [13, 27], [27, 27]];
-  const p2Yard: [number, number][] = [[73, 73], [87, 73], [73, 87], [87, 87]];
+  // Yard token slots. A 2-token game uses the TOP ROW ([0] and [1]); the two
+  // bottom slots stay painted (classic yard look) and only serve legacy
+  // 4-token rooms via idx % 4.
+  const p1Yard: [number, number][] = [[15, 15], [25, 15], [15, 26], [25, 26]];
+  const p2Yard: [number, number][] = [[75, 74], [85, 74], [75, 85], [85, 85]];
 
   const pieceXY = (isP1: boolean, pos: number, idx: number): [number, number] => {
     if (pos === 0) {
@@ -315,8 +323,9 @@ function LudoBoard({
       return [cx, cy];
     }
     if (pos === 57) {
-      const offsets: [number, number][] = [[-3, -3], [3, -3], [-3, 3], [3, 3]];
-      const [dx, dy] = offsets[idx % 4];
+      // 2-token layout: finished tokens rest above / below the centre circle.
+      const offsets: [number, number][] = [[0, -3.4], [0, 3.4], [-3, -3], [3, -3]];
+      const [dx, dy] = offsets[idx % 2 === idx && idx < 2 ? idx : idx % 4];
       return [50 + dx, 50 + dy];
     }
     if (pos >= 52 && pos <= 56) {
@@ -356,28 +365,28 @@ function LudoBoard({
     isMyTurn && room.dice_rolled && (room.movable_pieces ?? []).includes(idx);
 
   const myPieces  = amPlayer1
-    ? (room.board_state?.pieces?.player_1 ?? [0, 0, 0, 0])
-    : (room.board_state?.pieces?.player_2 ?? [0, 0, 0, 0]);
+    ? (room.board_state?.pieces?.player_1 ?? [0, 0])
+    : (room.board_state?.pieces?.player_2 ?? [0, 0]);
   const oppPieces = amPlayer1
-    ? (room.board_state?.pieces?.player_2 ?? [0, 0, 0, 0])
-    : (room.board_state?.pieces?.player_1 ?? [0, 0, 0, 0]);
+    ? (room.board_state?.pieces?.player_2 ?? [0, 0])
+    : (room.board_state?.pieces?.player_1 ?? [0, 0]);
 
   return (
-    <svg className="w-full h-full rounded-2xl" viewBox="0 0 100 100" fill="none">
+    <svg className="absolute inset-0 w-full h-full rounded-2xl" viewBox="0 0 100 100" fill="none" preserveAspectRatio="xMidYMid meet">
       <rect width="100" height="100" rx="4" fill="#080D18" />
 
       {/* Red yard (Player 1) */}
       <rect x="0" y="0" width="40" height="40" rx="4" fill="#EF444412" stroke="#EF4444" strokeWidth="0.5" />
       <rect x="6" y="6" width="28" height="28" rx="3" fill="#090E1C" stroke="#EF4444" strokeWidth="0.4" />
       {p1Yard.map(([cx, cy], i) => (
-        <circle key={i} cx={cx} cy={cy} r="4" fill="#EF444425" stroke="#EF4444" strokeWidth="0.5" />
+        <circle key={i} cx={cx} cy={cy} r={i < 2 ? 4.4 : 3.6} fill="#EF444425" stroke="#EF4444" strokeWidth={i < 2 ? 0.6 : 0.35} />
       ))}
 
       {/* Blue yard (Player 2) */}
       <rect x="60" y="60" width="40" height="40" rx="4" fill="#3B82F612" stroke="#3B82F6" strokeWidth="0.5" />
       <rect x="66" y="66" width="28" height="28" rx="3" fill="#090E1C" stroke="#3B82F6" strokeWidth="0.4" />
       {p2Yard.map(([cx, cy], i) => (
-        <circle key={i} cx={cx} cy={cy} r="4" fill="#3B82F625" stroke="#3B82F6" strokeWidth="0.5" />
+        <circle key={i} cx={cx} cy={cy} r={i < 2 ? 4.4 : 3.6} fill="#3B82F625" stroke="#3B82F6" strokeWidth={i < 2 ? 0.6 : 0.35} />
       ))}
 
       {/* Unused yards */}
@@ -852,6 +861,7 @@ export default function LudoGamePage() {
         const movablePcs: number[] = data.data?.movable_pieces ?? [];
         const nextTurn    = data.data?.turn_player_id ?? userId;
         const diceRolled  = data.data?.dice_rolled ?? false;
+        const consec      = data.data?.consecutive_sixes;
 
         setDiceDisplay(roll);
 
@@ -866,6 +876,7 @@ export default function LudoGamePage() {
             dice_rolled:    diceRolled,
             movable_pieces: movablePcs,
             turn_player_id: nextTurn,
+            ...(typeof consec === "number" ? { consecutive_sixes: consec } : {}),
             // Reset turn timer display if turn auto-passed
             turn_remaining_seconds: (autoPassd || tripleSix) ? TURN_TIMEOUT_SECS : prev.turn_remaining_seconds,
           } : prev);
@@ -1231,16 +1242,37 @@ export default function LudoGamePage() {
             </div>
             <div className="min-w-0">
               <div className="text-[11px] font-bold text-slate-200 truncate max-w-[90px]">{oppProfile?.name ?? "Opponent"}</div>
-              <div className="text-[9px] text-slate-500 font-semibold">Score {oppScore}</div>
+              <div className="text-[9px] text-slate-500 font-semibold">
+                Score {oppScore}
+                {room.status === "active" && !isMyTurn && (
+                  <span className="ml-1 text-blue-400 animate-pulse">
+                    {room.dice_rolled ? "· moving…" : "· thinking…"}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <Hearts count={oppHearts} />
-          <button
-            onClick={() => setShowEmotes(v => !v)}
-            className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center flex-none"
-          >
-            <EmoteSVG type="Clap" size={18} />
-          </button>
+          <div className="flex items-center gap-1.5 flex-none">
+            <button
+              onClick={() => setShowEmotes(v => !v)}
+              className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center"
+              aria-label="Emotes"
+            >
+              <EmoteSVG type="Clap" size={18} />
+            </button>
+            {/* Exit — always visible, opens the confirm modal (native confirm()
+                is blocked inside Telegram's WebView, so never use window.confirm). */}
+            <button
+              onClick={handleForfeit}
+              className="w-8 h-8 rounded-lg bg-red-950/60 border border-red-500/30 flex items-center justify-center"
+              aria-label="Exit match"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M3 3 L11 11 M11 3 L3 11" stroke="#F87171" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1263,9 +1295,11 @@ export default function LudoGamePage() {
         </div>
       </div>
 
-      {/* LUDO BOARD */}
-      <div className="flex-1 px-2 py-1 flex items-center justify-center min-h-0">
-        <div className="w-full aspect-square max-w-[400px] max-h-[400px]">
+      {/* LUDO BOARD — fills whatever space the device gives it. The SVG keeps
+          its 1:1 ratio via preserveAspectRatio, so the board can never overflow
+          on small phones, tall screens, or landscape. */}
+      <div className="flex-1 min-h-0 px-2 py-1 flex items-center justify-center">
+        <div className="relative w-full h-full max-w-[440px] max-h-[440px]">
           <LudoBoard
             room={room}
             amPlayer1={amPlayer1}
@@ -1352,6 +1386,18 @@ export default function LudoGamePage() {
             >
               Tap a piece to move
             </motion.div>
+          )}
+          {/* 6-streak dots: 2 sixes = bonus roll earned; a 3rd six forfeits. */}
+          {isMyTurn && (room.consecutive_sixes ?? 0) > 0 && (
+            <div className="flex items-center gap-1">
+              {[1, 2].map(n => (
+                <span
+                  key={n}
+                  className={`w-1.5 h-1.5 rounded-full ${n <= (room.consecutive_sixes ?? 0) ? "bg-amber-400" : "bg-slate-700"}`}
+                />
+              ))}
+              <span className="text-[8px] text-amber-400/80 font-black uppercase">6-streak</span>
+            </div>
           )}
           <div className="text-[9px] text-slate-600 font-mono">{room.stake}c</div>
         </div>

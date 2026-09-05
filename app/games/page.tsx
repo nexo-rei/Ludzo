@@ -42,7 +42,7 @@ const QUEUE_POLL_MS = 1500;
 
 export default function GamesPage() {
   const router = useRouter();
-  const { isInGamingHub, setIsInGamingHub, wallet, refreshWallet, userId } = useApp();
+  const { isInGamingHub, setIsInGamingHub, wallet, refreshWallet, userId, user } = useApp();
 
   // Stake selection
   const [showStakes, setShowStakes]     = useState(false);
@@ -248,11 +248,29 @@ export default function GamesPage() {
         </div>
 
         <div className="relative z-10 space-y-5">
-          {/* Header Row */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-black text-slate-100 tracking-tight">Ludo Arena</h1>
-              <p className="text-[10px] text-purple-400 font-extrabold uppercase tracking-widest mt-0.5">Real PvP Matchmaking</p>
+          {/* Header Row — main account profile feeds this screen */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="relative w-11 h-11 rounded-2xl overflow-hidden border border-purple-500/50 bg-slate-900 shadow-[0_0_14px_rgba(168,85,247,0.35)] flex-none">
+                <img
+                  src={user?.photo_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${userId ?? "me"}`}
+                  alt="Me"
+                  className="w-full h-full object-cover"
+                  onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${userId ?? "me"}`; }}
+                />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-base font-black text-slate-100 tracking-tight truncate max-w-[150px]">
+                  {user?.first_name ?? "Ludo Arena"}
+                </h1>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <CoinIcon size={12} className="text-amber-400 flex-none" />
+                  <span className="text-[11px] font-black text-amber-400 tabular-nums">
+                    {wallet?.coin_balance ?? 0}
+                  </span>
+                  <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">coins</span>
+                </div>
+              </div>
             </div>
 
             <motion.button
@@ -261,7 +279,7 @@ export default function GamesPage() {
                 router.push("/home");
               }}
               whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-slate-900 border border-purple-500/40 text-purple-300 hover:text-white transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-slate-900 border border-purple-500/40 text-purple-300 hover:text-white transition-colors flex-none"
             >
               Exit Hub
             </motion.button>
@@ -337,6 +355,34 @@ export default function GamesPage() {
             </div>
           </motion.div>
         </div>
+
+        {/* HOW TO PLAY — the exact rules the server enforces */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 space-y-2.5"
+        >
+          <div className="flex items-center justify-between">
+            <h3 className="text-[11px] font-black uppercase tracking-widest text-purple-300">How to Play</h3>
+            <span className="text-[9px] text-slate-500 font-bold uppercase">2 Tokens · 1v1</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { icon: "🎲", text: "Roll a 6 to bring a token out of the yard" },
+              { icon: "🎯", text: "Both tokens must reach home to win the pool" },
+              { icon: "🔁", text: "Rolled a 6, captured, or finished a token? Bonus roll!" },
+              { icon: "⚠️", text: "Three 6s in a row — the third one is forfeited" },
+              { icon: "🛡️", text: "★ cells are safe — nobody can capture you there" },
+              { icon: "⏱️", text: "18s per turn, 8 min per match. 3 hearts!" },
+            ].map((r, i) => (
+              <div key={i} className="flex items-start gap-2 rounded-xl bg-slate-950/50 border border-slate-800/60 px-2.5 py-2">
+                <span className="text-sm leading-none mt-0.5 flex-none">{r.icon}</span>
+                <span className="text-[10px] text-slate-300 font-semibold leading-snug">{r.text}</span>
+              </div>
+            ))}
+          </div>
+        </motion.div>
 
         {/* --- STAKES SELECTION POPUP --- */}
         <AnimatePresence>
@@ -490,10 +536,17 @@ export default function GamesPage() {
 
                 <div className="flex items-center justify-center gap-6 w-full py-2">
                   <div className="flex flex-col items-center gap-1.5">
-                    <div className="w-12 h-12 rounded-full border-2 border-purple-500 flex items-center justify-center text-xs font-black text-white bg-gradient-to-tr from-purple-600 to-indigo-600 ring-4 ring-purple-500/20">
-                      ME
+                    <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-purple-500 ring-4 ring-purple-500/20 bg-slate-900">
+                      <img
+                        src={user?.photo_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${userId ?? "me"}`}
+                        alt="Me"
+                        className="w-full h-full object-cover"
+                        onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${userId ?? "me"}`; }}
+                      />
                     </div>
-                    <span className="text-[10px] font-extrabold text-slate-300 truncate max-w-[70px]">@you</span>
+                    <span className="text-[10px] font-extrabold text-slate-300 truncate max-w-[70px]">
+                      {user?.first_name ?? "You"}
+                    </span>
                   </div>
 
                   <div className="text-xs font-black text-purple-400 px-3 py-1 bg-purple-950/30 border border-purple-500/20 rounded-lg animate-pulse">VS</div>

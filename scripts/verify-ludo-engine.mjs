@@ -270,8 +270,8 @@ ok("bot heuristic is seat-agnostic (amPlayer1 = true still picks the winner)",
 section("8. FUZZ — 300 full self-play matches");
 // ════════════════════════════════════════════════════════════════════════════
 
-function playOneMatch(rng) {
-  const pieces = { 1: [0, 0, 0, 0], 2: [0, 0, 0, 0] };
+function playOneMatch(rng, tokensPerPlayer = 4) {
+  const pieces = { 1: Array(tokensPerPlayer).fill(0), 2: Array(tokensPerPlayer).fill(0) };
   const sixes  = { 1: 0, 2: 0 };
   let turn = 1, plies = 0;
 
@@ -300,10 +300,10 @@ function playOneMatch(rng) {
       if (!Number.isInteger(p) || p < 0 || p > 57) return { fail: `piece out of range: ${p}`, plies };
     }
     for (const side of [1, 2]) {
-      if (pieces[side].length !== 4) return { fail: "piece array length changed", plies };
+      if (pieces[side].length !== tokensPerPlayer) return { fail: "piece array length changed", plies };
       const finished = pieces[side].filter((p) => p === 57).length;
       // a finished piece can never come back to the yard
-      if (finished > 4) return { fail: "impossible finish count", plies };
+      if (finished > tokensPerPlayer) return { fail: "impossible finish count", plies };
     }
     // no piece may sit on an opponent barrier cell
     for (const side of [1, 2]) {
@@ -350,6 +350,30 @@ ok("both seats win roughly equally (no seat advantage in the engine)",
 ok("average match length is sane",
    totalPlies / 300 > 40 && totalPlies / 300 < 400,
    `avg ${(totalPlies / 300).toFixed(1)} plies, max ${maxPlies}`);
+
+// ════════════════════════════════════════════════════════════════════════════
+section("9. FUZZ — 300 two-token matches (production LUDZO format)");
+// ════════════════════════════════════════════════════════════════════════════
+// LUDZO rooms are seeded with TWO tokens per player (PIECES_PER_PLAYER = 2).
+// The same invariants must hold on the 2-token board the app actually ships.
+
+const rng2 = mulberry32(20260906);
+let tw1 = 0, tw2 = 0, tunf = 0, ttp = 0, tmx = 0;
+let fuzz2Fail = null;
+for (let i = 0; i < 300 && !fuzz2Fail; i++) {
+  const r = playOneMatch(rng2, 2);
+  if (r.fail) { fuzz2Fail = `match #${i + 1}: ${r.fail}`; break; }
+  if (r.winner === 1) tw1++; else if (r.winner === 2) tw2++; else tunf++;
+  ttp += r.plies;
+  tmx = Math.max(tmx, r.plies);
+}
+
+ok("300 two-token matches completed with zero rule violations", fuzz2Fail === null, fuzz2Fail ?? "");
+ok("every two-token match produced a winner (no stalemate)", tunf === 0, `${tunf} unfinished`);
+ok("both seats win roughly equally on the two-token board",
+   Math.abs(tw1 - tw2) < 60, `P1=${tw1} P2=${tw2}`);
+ok("two-token matches terminate in a sane number of plies",
+   ttp / 300 > 20 && ttp / 300 < 600, `avg ${(ttp / 300).toFixed(1)} plies, max ${tmx}`);
 
 // ════════════════════════════════════════════════════════════════════════════
 console.log("\n" + "═".repeat(70));

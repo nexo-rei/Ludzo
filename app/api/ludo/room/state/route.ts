@@ -12,7 +12,16 @@ import {
   TURN_TIMEOUT_SECS,
   MATCH_DURATION_SECS,
   MAX_CONSECUTIVE_SIXES,
+  PIECES_PER_PLAYER,
 } from "@/lib/ludo-engine";
+
+/** Default (empty) board for a fresh room: 2 tokens per player. */
+const EMPTY_BOARD = {
+  pieces: {
+    player_1: Array(PIECES_PER_PLAYER).fill(0) as number[],
+    player_2: Array(PIECES_PER_PLAYER).fill(0) as number[],
+  },
+};
 
 /** Seconds a room spends in 'countdown' before it opens for play. */
 const COUNTDOWN_SECS = 10;
@@ -57,9 +66,7 @@ export async function GET(req: NextRequest) {
 
     // ── Working copies ────────────────────────────────────────────────────────
     let status         = room.status        as string;
-    let boardState     = JSON.parse(JSON.stringify(
-      room.board_state ?? { pieces: { player_1: [0,0,0,0], player_2: [0,0,0,0] } }
-    ));
+    let boardState     = JSON.parse(JSON.stringify(room.board_state ?? EMPTY_BOARD));
     let turnPlayerId   = room.turn_player_id as string;
     let turnStartMs    = new Date(room.turn_start_at).getTime();
     let diceRolled     = room.dice_rolled    as boolean;
@@ -111,7 +118,8 @@ export async function GET(req: NextRequest) {
             last_roll:        0,
             movable_pieces:   [],
             board_state:      {
-              pieces: { player_1: [0, 0, 0, 0], player_2: [0, 0, 0, 0] },
+              ...EMPTY_BOARD,
+              pieces: { ...EMPTY_BOARD.pieces },
               ...(boardState?.bot_profile ? { bot_profile: boardState.bot_profile } : {}),
             },
             updated_at:       startIso,
@@ -257,8 +265,8 @@ export async function GET(req: NextRequest) {
     // a free win for whoever got seated first. decideTimerWinner() is symmetric:
     // most pieces home → most hearts left → most progress → coin flip.
     if (status === "active" && matchElapsedSecs >= MATCH_DURATION_SECS) {
-      const p1Pieces = (boardState?.pieces?.player_1 ?? [0, 0, 0, 0]) as number[];
-      const p2Pieces = (boardState?.pieces?.player_2 ?? [0, 0, 0, 0]) as number[];
+      const p1Pieces = (boardState?.pieces?.player_1 ?? (EMPTY_BOARD.pieces.player_1 as number[])) as number[];
+      const p2Pieces = (boardState?.pieces?.player_2 ?? (EMPTY_BOARD.pieces.player_2 as number[])) as number[];
       const winnerSeat = decideTimerWinner({
         pieces1: p1Pieces, pieces2: p2Pieces,
         score1, score2,
@@ -292,8 +300,8 @@ export async function GET(req: NextRequest) {
     // Three hearts later the human lost by 'timeout' without ever rolling.
     if (status === "active" && turnPlayerId.startsWith("bot_")) {
       const botElapsed = (now - turnStartMs) / 1000;
-      const botPieces    = (boardState?.pieces?.player_2 ?? [0, 0, 0, 0]) as number[];
-      const botOppPieces = (boardState?.pieces?.player_1 ?? [0, 0, 0, 0]) as number[];
+      const botPieces    = (boardState?.pieces?.player_2 ?? (EMPTY_BOARD.pieces.player_2 as number[])) as number[];
+      const botOppPieces = (boardState?.pieces?.player_1 ?? (EMPTY_BOARD.pieces.player_1 as number[])) as number[];
 
       /** Hand the turn to the human with a fresh clock. */
       const passToHuman = (reason: string) => {

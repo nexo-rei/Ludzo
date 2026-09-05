@@ -84,6 +84,12 @@ const expect = (cond, m) => cond ? ok(m) : fail(m);
   await exec(cronSql);
   ok("03 applied twice (janitor function installed, schedule step skipped gracefully)");
 
+  step = "04_ludo_two_tokens_cleanup.sql";
+  const sql04 = read("sql/04_ludo_two_tokens_cleanup.sql");
+  await exec(sql04);
+  await exec(sql04);   // idempotent re-run
+  ok("04 applied twice (2-token boards + janitor one-shot, cron step skipped gracefully)");
+
   step = "99_verify.sql";
   const verifyResults = await db.exec(read("sql/99_verify.sql"));
   const verifyRows = verifyResults.find(r => r.rows && r.rows.length && r.rows[0].status)?.rows ?? [];
@@ -133,8 +139,23 @@ const expect = (cond, m) => cond ? ok(m) : fail(m);
   let [room] = await q(`SELECT * FROM ludo_rooms WHERE id='${roomId}'`);
   expect(room.status === "countdown", "room starts in countdown");
   expect(room.player_1_id === u1.id && room.player_2_id === u2.id, "longer-waiting player is player_1");
-  expect(JSON.stringify(room.board_state.pieces.player_1) === "[0,0,0,0]", "board_state.pieces seeded");
+  expect(JSON.stringify(room.board_state.pieces.player_1) === "[0,0]", "fresh room seeded with 2-token board");
   expect(room.turn_player_id === u1.id, "turn_player_id set");
+
+  step = "legacy 4-token board compatibility";
+  {
+    const [uL] = await q(`INSERT INTO users (first_name) VALUES ('Legacy') RETURNING id`);
+    const [{ id: legacyId }] = await q(
+      `INSERT INTO ludo_rooms (stake, player_1_id, player_2_id, status, board_state, turn_player_id)
+       VALUES (50, '${uL.id}', 'bot_legacy', 'countdown',
+               '{"pieces":{"player_1":[0,0,0,0],"player_2":[0,0,0,0]}}', '${uL.id}') RETURNING id`);
+    await q(`SELECT activate_ludo_room('${legacyId}')`);
+    const [lr] = await q(`SELECT status, board_state FROM ludo_rooms WHERE id='${legacyId}'`);
+    expect(lr.status === "active" &&
+           JSON.stringify(lr.board_state.pieces.player_1) === "[0,0,0,0]",
+           "legacy 4-token board preserved through activation (engine is length-generic)");
+    await q(`DELETE FROM ludo_rooms WHERE id='${legacyId}'`);
+  }
 
   step = "cannot join queue while in a live room";
   threw = false;

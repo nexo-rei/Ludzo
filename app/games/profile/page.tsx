@@ -6,7 +6,7 @@ import { useApp } from "@/hooks/useApp";
 import { TrophyIcon, CoinIcon } from "@/components/ui/Icons";
 
 export default function ProfilePage() {
-  const { wallet, userId } = useApp();
+  const { wallet, userId, user } = useApp();
   const [stats, setStats] = useState<any>({
     wins: 0,
     losses: 0,
@@ -60,24 +60,40 @@ export default function ProfilePage() {
           </div>
         </motion.div>
 
-        {/* User Card */}
+        {/* User Card — live data from the main account */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           className="relative rounded-2xl border border-purple-500/20 bg-slate-900/40 p-5 flex items-center gap-4"
         >
-          <div className="w-16 h-16 rounded-full border-2 border-purple-500 overflow-hidden bg-slate-950 shadow-lg">
+          <div className="w-16 h-16 rounded-full border-2 border-purple-500 overflow-hidden bg-slate-950 shadow-lg flex-none">
             <img
-              src="https://api.dicebear.com/7.x/adventurer/svg?seed=You"
+              src={user?.photo_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${userId ?? "me"}`}
               alt="Avatar"
-              className="w-full h-full"
+              className="w-full h-full object-cover"
+              onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${userId ?? "me"}`; }}
             />
           </div>
-          <div>
-            <h2 className="text-base font-black text-slate-100">Player Profile</h2>
-            <span className="text-[10px] text-purple-400 font-extrabold uppercase tracking-wider block mt-1">LUDO PRO DIVISION</span>
+          <div className="min-w-0">
+            <h2 className="text-base font-black text-slate-100 truncate">{user?.first_name ?? "Player"}</h2>
+            {user?.username && (
+              <span className="text-[10px] text-slate-400 font-bold block truncate">@{user.username}</span>
+            )}
+            <span className="text-[10px] text-purple-400 font-extrabold uppercase tracking-wider block mt-1">Ludo Pro Division</span>
           </div>
         </motion.div>
+
+        {/* Wallet mini-cards */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="rounded-xl border border-amber-500/15 bg-amber-500/5 p-3">
+            <span className="text-[9px] text-amber-400/80 font-black uppercase tracking-wider block">Coin Balance</span>
+            <span className="text-base font-black text-amber-400 mt-0.5 block tabular-nums">{wallet?.coin_balance ?? 0}</span>
+          </div>
+          <div className="rounded-xl border border-emerald-500/15 bg-emerald-500/5 p-3">
+            <span className="text-[9px] text-emerald-400/80 font-black uppercase tracking-wider block">Won Coins</span>
+            <span className="text-base font-black text-emerald-400 mt-0.5 block tabular-nums">{wallet?.won_coins_balance ?? 0}</span>
+          </div>
+        </div>
 
         {/* Pro Stats Cards Grid */}
         <div className="space-y-3.5">

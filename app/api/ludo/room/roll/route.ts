@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { calcMovablePieces, MAX_CONSECUTIVE_SIXES } from "@/lib/ludo-engine";
+import { calcMovablePieces, MAX_CONSECUTIVE_SIXES, PIECES_PER_PLAYER } from "@/lib/ludo-engine";
 
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
@@ -61,8 +61,10 @@ export async function POST(req: NextRequest) {
     const isPlayer1 = room.player_1_id === userId;
     const playerKey = isPlayer1 ? "player_1" : "player_2";
     const oppKey    = isPlayer1 ? "player_2" : "player_1";
-    const pieces: number[]    = room.board_state?.pieces?.[playerKey] ?? [0, 0, 0, 0];
-    const oppPieces: number[] = room.board_state?.pieces?.[oppKey]    ?? [0, 0, 0, 0];
+    // Fresh rooms are seeded with 2 tokens per player (PIECES_PER_PLAYER);
+    // legacy 4-token rooms keep playing — the engine is length-generic.
+    const pieces: number[]    = room.board_state?.pieces?.[playerKey] ?? Array(PIECES_PER_PLAYER).fill(0);
+    const oppPieces: number[] = room.board_state?.pieces?.[oppKey]    ?? Array(PIECES_PER_PLAYER).fill(0);
 
     // consecutive_sixes may not exist on older rooms — default to 0
     const prevConsecutive = (room.consecutive_sixes ?? 0) as number;
@@ -206,6 +208,7 @@ export async function POST(req: NextRequest) {
         turn_player_id:  userId,
         dice_rolled:     true,
         auto_passed:     false,
+        consecutive_sixes: newConsecutive,
       },
     });
 
