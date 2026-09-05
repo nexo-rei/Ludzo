@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "verify:engine": "node --experimental-strip-types scripts/verify-ludo-engine.mjs",
+    "verify:sql": "npx -y -p @electric-sql/pglite@0.2.17 node scripts/verify-ludo-sql.js",
+    "verify": "npm run verify:engine && npm run verify:sql"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.47.0",

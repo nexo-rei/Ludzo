@@ -17,6 +17,42 @@
 
 ---
 
+## ✅ FIX STATUS (updated 2026-09-05, branch `arena/01a07143-ludzo`)
+
+Legend: ✅ fixed in this branch · 🗄️ fixed, **needs SQL run** (`sql/02_ludo_fixes.sql` + `sql/03_ludo_cron.sql`) · ⏳ not yet
+
+| ID | Issue | Status | Where |
+|---|---|---|---|
+| B1 | Missing RPCs `match_ludo_queue` / `activate_ludo_room` / `advance_ludo_turn` | 🗄️ | `sql/02_ludo_fixes.sql` §4–6 (+ `append_ludo_reaction` §7). State route also has a CAS fallback so activation works even before the SQL lands |
+| B2 | Missing columns `match_start_time`, `consecutive_sixes` | 🗄️ | `sql/02_ludo_fixes.sql` §1 |
+| B3 | Bot turn never resets `turn_start_at` | ✅ | `state/route.ts` §4 — `passToHuman()` sets `turnStartMs = now` on every hand-over |
+| B4 | No cron → stuck rooms / queue escrow never refunded | 🗄️ | `sql/03_ludo_cron.sql` — `ludo_janitor()` every minute via pg_cron |
+| C2 | SECURITY DEFINER RPCs callable by anon/authenticated | 🗄️ | `sql/02_ludo_fixes.sql` §10 — `REVOKE … FROM anon, authenticated; GRANT … TO service_role`; `SET search_path = public` |
+| C3 | Queue double-stake race | 🗄️ | `sql/02_ludo_fixes.sql` §2 — partial unique index + refund of existing dupes; `join_ludo_queue` blocks while a live room exists |
+| C4 | Abandoned queue refund | 🗄️ | `ludo_janitor()` §A |
+| C5 | Settle: no audit, bot wins destroy coins, weak idempotency | 🗄️ | `settle_ludo_match` rewritten — seat validation, row lock, `ludo_settlements` audit row (fee + bot pool), real bot name in history |
+| G1 | Track offset off-by-one (0/26 → 1/27) | ✅ | `lib/ludo-engine.ts` `toAbsTrack` + client `pieceXY` — both changed together; 56-check suite proves spawn = launch cell, launch is safe, home-entry adjacent |
+| G2 | `applyMove` ignores blocks + double-capture | ✅ | `applyMove` now returns `illegal` for barrier cross/land; move route → 400 |
+| G3 | `canAdvance` vs clamp contradiction | ✅ | overshoot is rejected, never clamped |
+| G4 | Timer tie always player_1 | ✅ | `decideTimerWinner()` — finished → hearts → score → coin flip; `activate_ludo_room` also randomises first move |
+| G5 | 18 s server vs 15 s client bar | ✅ | client `TURN_TIMEOUT_SECS = 18` |
+| G7 | No CAS on roll/move | ✅ | `.eq("turn_player_id").eq("dice_rolled").eq("last_roll")` on every update; client resyncs on 409 |
+| **NEW** | **Safe-cell barrier soft-lock** (found by fuzzer): 2 pieces parked on the opponent's launch square blocked their yard forever | ✅ | `getBlockedAbsCells` never treats a safe cell as a barrier |
+| U1 | Duplicate dead game in `app/games/page.tsx` (+ `showStakes` collision) | ✅ | lobby rewritten, 1281 → ~430 lines, single game screen |
+| U2 | `/support-disputes` 404 | ✅ | file → `app/support-disputes/page.tsx` |
+| U3 | `/matches` reads localStorage | ✅ | now reads `/api/ludo/stats` like `/games/matches` |
+| U4 | GG / Cry emotes invisible | ✅ | SVGs added + fallback glyph for unknown types |
+| U5 | `confirm()` in Telegram WebView | ✅ | in-app forfeit modal |
+| — | Reaction RMW race | 🗄️ | `append_ludo_reaction` RPC (route falls back to RMW until SQL is run) |
+| — | Overlapping polls / frozen board after backgrounding | ✅ | poll mutex + `visibilitychange` resync |
+| C1 | `requireAuth` trusts bare header | ⏳ | next PR (needs Telegram initData → signed session) |
+| C6–C11 | admin hash, middleware, webhook secret, next CVE, initData replay, localStorage wallet | ⏳ | next PR |
+| G6 | Bot only moves when human polls; `skill_level` unused | ⏳ | janitor settles abandoned bot rooms; true server-driven bot ticks = next PR |
+
+**Verify locally:** `npm run verify` (engine: 56 checks · SQL: full flow on real PostgreSQL 16 via PGlite, no install needed).
+
+---
+
 ## SEVERITY LEGEND
 
 - 🔴 **S0 — BLOCKER**: iske wajah se game chalega hi nahi / paisa atka hai

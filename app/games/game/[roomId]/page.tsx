@@ -89,6 +89,12 @@ const SAFE_SPOTS = new Set([1, 9, 14, 22, 27, 35, 40, 48]);
 const STAR_SPOTS = new Set([9, 22, 35, 48]);
 const CELL       = 100 / 15;
 
+// MUST equal TURN_TIMEOUT_SECS in lib/ludo-engine.ts. The server sends
+// turn_remaining_seconds counting down from 18; the timer bar used to divide by
+// 15, so it rendered at 120% width for the first three seconds of every turn.
+const TURN_TIMEOUT_SECS   = 18;
+const MATCH_DURATION_SECS = 480;
+
 const P1_HOME_LANE: [number, number][] = [
   [1, 7], [2, 7], [3, 7], [4, 7], [5, 7],
 ];
@@ -97,7 +103,10 @@ const P2_HOME_LANE: [number, number][] = [
 ];
 
 // ─── Emotes ────────────────────────────────────────────────────────────────
-const EMOTES = ["Laugh", "Angry", "Fire", "Crown", "Clap", "Shock"] as const;
+// Must stay a subset of ALLOWED_REACTIONS in app/api/ludo/room/reaction/route.ts.
+// GG and Cry were accepted by the server but had no artwork here, so a reaction
+// sent from an older client (or the API) rendered as an empty bubble.
+const EMOTES = ["Laugh", "Angry", "Fire", "Crown", "Clap", "Shock", "GG", "Cry"] as const;
 type EmoteType = typeof EMOTES[number];
 
 function EmoteSVG({ type, size = 24 }: { type: EmoteType | string; size?: number }) {
@@ -160,8 +169,37 @@ function EmoteSVG({ type, size = 24 }: { type: EmoteType | string; size?: number
           <ellipse cx="16" cy="22" rx="3.5" ry="4" fill="#1E1B4B" />
         </svg>
       );
+    case "GG":
+      return (
+        <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+          <rect x="1.5" y="6" width="29" height="20" rx="5" fill="#0F172A" stroke="#22C55E" strokeWidth="1.5" />
+          <text x="16" y="21.5" textAnchor="middle" fontSize="12" fontWeight="900" fontFamily="system-ui, sans-serif" fill="#22C55E" letterSpacing="0.5">GG</text>
+        </svg>
+      );
+    case "Cry":
+      return (
+        <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="16" r="15" fill="#60A5FA" stroke="#3B82F6" strokeWidth="1.5" />
+          <path d="M8 12 Q11 10 14 12" stroke="#1E3A8A" strokeWidth="2" strokeLinecap="round" fill="none" />
+          <path d="M18 12 Q21 10 24 12" stroke="#1E3A8A" strokeWidth="2" strokeLinecap="round" fill="none" />
+          <ellipse cx="11" cy="15" rx="2" ry="2.3" fill="#1E3A8A" />
+          <ellipse cx="21" cy="15" rx="2" ry="2.3" fill="#1E3A8A" />
+          <path d="M9 18 Q8.5 22 10 23.5 Q11.5 22 11 18Z" fill="#DBEAFE" />
+          <path d="M21 18 Q20.5 22 22 23.5 Q23.5 22 23 18Z" fill="#DBEAFE" />
+          <path d="M11 25 Q16 21 21 25" stroke="#1E3A8A" strokeWidth="2" strokeLinecap="round" fill="none" />
+        </svg>
+      );
     default:
-      return null;
+      // Unknown type from a newer server build — show a neutral bubble instead
+      // of nothing, so the toast never appears "empty".
+      return (
+        <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="16" r="15" fill="#334155" stroke="#475569" strokeWidth="1.5" />
+          <circle cx="11" cy="14" r="2" fill="#E2E8F0" />
+          <circle cx="21" cy="14" r="2" fill="#E2E8F0" />
+          <path d="M11 21 L21 21" stroke="#E2E8F0" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      );
   }
 }
 
@@ -286,9 +324,18 @@ function LudoBoard({
       const cell    = isP1 ? P1_HOME_LANE[laneIdx] : P2_HOME_LANE[laneIdx];
       return [cell[0] * CELL + CELL / 2, cell[1] * CELL + CELL / 2];
     }
+    // MUST mirror toAbsTrack() in lib/ludo-engine.ts:
+    //   P1 abs = (relPos - 1 + 1)  % 52  =  relPos % 52
+    //   P2 abs = (relPos - 1 + 27) % 52  = (relPos + 26) % 52
+    // relPos 1 therefore lands on TRACK[1] (red launch) / TRACK[27] (blue
+    // launch) — the cells this board actually paints as launch squares — and
+    // relPos 51 lands on TRACK[51] (0,7) / TRACK[25] (14,7), which are the cells
+    // adjacent to each home lane. The old (pos - 1) / (pos - 1 + 26) offsets were
+    // one cell short: pieces spawned behind the launch square, the launch square
+    // was not safe, and tokens teleported diagonally into the home lane.
     const trackIdx = isP1
-      ? (pos - 1) % TRACK.length
-      : (pos - 1 + 26) % TRACK.length;
+      ? pos % TRACK.length
+      : (pos + 26) % TRACK.length;
     const cell = TRACK[Math.min(trackIdx, TRACK.length - 1)];
     return [cell.x * CELL + CELL / 2, cell.y * CELL + CELL / 2];
   };
@@ -349,14 +396,19 @@ function LudoBoard({
         const x = cell.x * CELL;
         const y = cell.y * CELL;
         const isStar        = STAR_SPOTS.has(idx);
+        // Launch squares are exactly the cells each player's relPos 1 maps to,
+        // i.e. TRACK[1] (red) and TRACK[27] (blue) — same numbers the server's
+        // toAbsTrack() now uses, so art and logic finally agree.
         const isLaunchRed   = idx === 1;
         const isLaunchBlue  = idx === 27;
+        const isSafe        = SAFE_SPOTS.has(idx);
         let fill   = "#0F172A30";
         let stroke = "#1E293B";
         let sw     = 0.15;
         if (isLaunchRed)       { fill = "#EF444435"; stroke = "#EF4444"; sw = 0.4; }
         else if (isLaunchBlue) { fill = "#3B82F635"; stroke = "#3B82F6"; sw = 0.4; }
         else if (isStar)       { fill = "#A855F720"; stroke = "#A855F7"; sw = 0.35; }
+        else if (isSafe)       { fill = "#A855F712"; stroke = "#A855F7"; sw = 0.25; }
         return (
           <g key={idx}>
             <rect
@@ -461,10 +513,11 @@ export default function LudoGamePage() {
   const [rollingAnim, setRollingAnim] = useState(false);
   const [diceDisplay, setDiceDisplay] = useState(1);
   const [showEmotes, setShowEmotes]   = useState(false);
+  const [showForfeitConfirm, setShowForfeitConfirm] = useState(false);
   const [lastEmoteTime, setLastEmoteTime] = useState(0);
 
-  const [matchSecs, setMatchSecs] = useState(480);
-  const [turnSecs, setTurnSecs]   = useState(15);
+  const [matchSecs, setMatchSecs] = useState(MATCH_DURATION_SECS);
+  const [turnSecs, setTurnSecs]   = useState(TURN_TIMEOUT_SECS);
 
   const [floatingEmotes, setFloatingEmotes] = useState<
     Array<{ id: string; type: string; mine: boolean }>
@@ -473,8 +526,8 @@ export default function LudoGamePage() {
   // ── Refs ───────────────────────────────────────────────────────────────────
   const phaseRef           = useRef<GamePhase>("loading");
   const roomRef            = useRef<RoomState | null>(null);
-  const matchSecsRef       = useRef(480);
-  const turnSecsRef        = useRef(15);
+  const matchSecsRef       = useRef(MATCH_DURATION_SECS);
+  const turnSecsRef        = useRef(TURN_TIMEOUT_SECS);
   const prevTurnPlayer     = useRef<string | null>(null);
   const pollRef            = useRef<ReturnType<typeof setInterval> | null>(null);
   const matchTickRef       = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -681,23 +734,43 @@ export default function LudoGamePage() {
   useEffect(() => {
     if (phase !== "playing") return;
 
+    // Polls must never overlap: /state is a read-modify-write on the server
+    // (bot moves, timeouts), and two concurrent polls from the same client on a
+    // slow network made the bot appear to roll twice.
+    let pollBusy = false;
+
     const poll = async () => {
       // Never poll over an in-flight mutation — its own fetch is authoritative.
-      if (rollInFlightRef.current || moveInFlightRef.current) return;
-      const epoch = mutationEpochRef.current;
-      const state = await fetchRoom();
-      if (!state) return;
-      // A roll/move started while this poll was in flight — discard the result.
-      if (epoch !== mutationEpochRef.current) return;
-      applyRoomState(state);
-      if (state.status === "completed" || state.status === "forfeited") {
-        handleMatchEnd(state);
+      if (rollInFlightRef.current || moveInFlightRef.current || pollBusy) return;
+      pollBusy = true;
+      try {
+        const epoch = mutationEpochRef.current;
+        const state = await fetchRoom();
+        if (!state) return;
+        // A roll/move started while this poll was in flight — discard the result.
+        if (epoch !== mutationEpochRef.current) return;
+        applyRoomState(state);
+        if (state.status === "completed" || state.status === "forfeited") {
+          handleMatchEnd(state);
+        }
+      } finally {
+        pollBusy = false;
       }
     };
 
     poll();
     pollRef.current = setInterval(poll, 1200);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+
+    // Telegram throttles timers hard when the WebView is backgrounded; the
+    // moment the app comes back, resync immediately instead of waiting up to
+    // 1.2 s with a frozen board.
+    const onVisible = () => { if (document.visibilityState === "visible") poll(); };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [phase, fetchRoom, applyRoomState, handleMatchEnd]);
 
   // ── Match timer tick ──────────────────────────────────────────────────────
@@ -715,7 +788,7 @@ export default function LudoGamePage() {
     if (phase !== "playing") return;
     if (turnTickRef.current) clearInterval(turnTickRef.current);
 
-    const seed = roomRef.current?.turn_remaining_seconds ?? 15;
+    const seed = Math.min(TURN_TIMEOUT_SECS, roomRef.current?.turn_remaining_seconds ?? TURN_TIMEOUT_SECS);
     turnSecsRef.current = seed;
     setTurnSecs(seed);
 
@@ -794,7 +867,7 @@ export default function LudoGamePage() {
             movable_pieces: movablePcs,
             turn_player_id: nextTurn,
             // Reset turn timer display if turn auto-passed
-            turn_remaining_seconds: (autoPassd || tripleSix) ? 15 : prev.turn_remaining_seconds,
+            turn_remaining_seconds: (autoPassd || tripleSix) ? TURN_TIMEOUT_SECS : prev.turn_remaining_seconds,
           } : prev);
         }
 
@@ -808,8 +881,16 @@ export default function LudoGamePage() {
         // real server state is applied, so no stale poll can revert the roll.
         const fresh = await fetchRoom();
         if (fresh) applyRoomState(fresh);
+      } else if (res.status === 409) {
+        // Server rejected the roll as stale (turn already advanced, or a
+        // duplicate tap got there first). Re-sync instead of showing a scary
+        // error — the fresh state is the truth.
+        const fresh = await fetchRoom();
+        if (fresh) applyRoomState(fresh);
       } else {
         showToast(data.error ?? "Roll failed", "error");
+        const fresh = await fetchRoom();
+        if (fresh) applyRoomState(fresh);
       }
     } catch {
       showToast("Connection error. Try again.", "error");
@@ -860,8 +941,17 @@ export default function LudoGamePage() {
             handleMatchEnd(fresh);
           }
         }
+      } else if (res.status === 409) {
+        // Stale turn — the board moved on underneath us. Re-sync quietly.
+        const fresh = await fetchRoom();
+        if (fresh) {
+          applyRoomState(fresh);
+          if (fresh.status === "completed" || fresh.status === "forfeited") handleMatchEnd(fresh);
+        }
       } else {
         showToast(data.error ?? "Move failed", "error");
+        const fresh = await fetchRoom();
+        if (fresh) applyRoomState(fresh);
       }
     } catch {
       showToast("Connection error. Try again.", "error");
@@ -909,7 +999,10 @@ export default function LudoGamePage() {
     stopAllTimers();
     endedRef.current = true;  // prevent handleMatchEnd from firing again
 
-    if (forfeit && roomId && userId && roomRef.current?.status === "active") {
+    // Forfeit during 'countdown' too — the API accepts both, and skipping it
+    // here left the stake escrowed in a room nobody would ever open again.
+    const st = roomRef.current?.status;
+    if (forfeit && roomId && userId && (st === "active" || st === "countdown")) {
       // Fire-and-forget — don't await so redirect is instant
       fetch("/api/ludo/room/forfeit", {
         method:  "POST",
@@ -926,11 +1019,17 @@ export default function LudoGamePage() {
     router.replace("/games");
   }, [roomId, userId, stopAllTimers, refreshWallet, router]);
 
-  const handleForfeit = useCallback(async () => {
+  // Native confirm() is unreliable inside Telegram's WebView, so forfeiting goes
+  // through an in-app modal instead (see showForfeitConfirm below).
+  const handleForfeit = useCallback(() => {
     if (!roomId || !userId) return;
-    if (!confirm("Forfeit match? You will lose your stake.")) return;
+    setShowForfeitConfirm(true);
+  }, [roomId, userId]);
+
+  const confirmForfeit = useCallback(async () => {
+    setShowForfeitConfirm(false);
     await stopGame(true);
-  }, [roomId, userId, stopGame]);
+  }, [stopGame]);
 
   // handleExit: used from error/ended screens (no forfeit needed)
   // and from any place where the match is already over
@@ -1159,7 +1258,7 @@ export default function LudoGamePage() {
         <div className="h-0.5 bg-slate-800 rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-1000 ${turnSecs <= 5 ? "bg-red-500" : "bg-purple-500"}`}
-            style={{ width: `${Math.max(0, (turnSecs / 15) * 100)}%` }}
+            style={{ width: `${Math.max(0, Math.min(100, (turnSecs / TURN_TIMEOUT_SECS) * 100))}%` }}
           />
         </div>
       </div>
@@ -1275,7 +1374,7 @@ export default function LudoGamePage() {
               className="absolute top-[72px] right-3 z-40 bg-slate-950/98 border border-purple-500/30 rounded-2xl p-3 shadow-2xl"
             >
               <div className="text-[9px] text-purple-400 font-black uppercase tracking-widest mb-2 px-1">React</div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {EMOTES.map(type => (
                   <button
                     key={type}
@@ -1289,6 +1388,49 @@ export default function LudoGamePage() {
               </div>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {/* FORFEIT CONFIRMATION — replaces window.confirm(), which Telegram's
+          WebView blocks or renders natively (and on some builds returns false
+          immediately, so the Forfeit button appeared to do nothing). */}
+      <AnimatePresence>
+        {showForfeitConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
+            onClick={() => setShowForfeitConfirm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 24 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-[300px] rounded-2xl bg-slate-950 border border-red-500/25 p-6 text-center space-y-4"
+            >
+              <div className="text-3xl">🏳️</div>
+              <div>
+                <h3 className="text-base font-black text-white tracking-tight">Forfeit match?</h3>
+                <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                  You will lose your <span className="text-red-400 font-bold">{room.stake} coin</span> stake.
+                  Your opponent takes the pool. This cannot be undone.
+                </p>
+              </div>
+              <div className="flex gap-2.5">
+                <button
+                  onClick={() => setShowForfeitConfirm(false)}
+                  className="flex-1 h-11 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 text-[10px] font-black uppercase tracking-wider"
+                >
+                  Keep Playing
+                </button>
+                <button
+                  onClick={confirmForfeit}
+                  className="flex-1 h-11 rounded-xl bg-red-600 border border-red-500/40 text-white text-[10px] font-black uppercase tracking-wider"
+                >
+                  Forfeit
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 

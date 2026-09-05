@@ -79,6 +79,17 @@ export async function POST(req: NextRequest) {
     // ── Apply move ────────────────────────────────────────────────────────────
     const result = applyMove(myPieces, oppPieces, pieceIdx, roll, isPlayer1);
 
+    // applyMove now validates the rules itself (barrier crossing/landing,
+    // exact-finish, yard-needs-a-6). movable_pieces came from the DB and can be
+    // stale after a concurrent poll, so this is the authoritative check.
+    if (result.illegal) {
+      console.warn(`[LUDO MOVE] Illegal move rejected room=${room_id} piece=${pieceIdx}: ${result.reason}`);
+      return NextResponse.json(
+        { success: false, error: "Illegal move", detail: result.reason },
+        { status: 400 }
+      );
+    }
+
     boardState.pieces[myKey]  = result.myPieces;
     boardState.pieces[oppKey] = result.oppPieces;
 
@@ -97,10 +108,32 @@ export async function POST(req: NextRequest) {
 
       console.log(`[LUDO MOVE] WIN room=${room_id} winner=${userId} loser=${loserId} duration=${duration}s`);
 
-      await supabase
+      // CAS: only the request that still owns this exact turn may write the
+      // winning board. Two concurrent move requests (double-tap, two tabs) would
+      // otherwise both persist and both call settle_ludo_match.
+      const { data: won } = await supabase
         .from("ludo_rooms")
-        .update({ board_state: boardState, score_player_1: score1, score_player_2: score2, updated_at: new Date().toISOString() })
-        .eq("id", room_id);
+        .update({
+          board_state:    boardState,
+          score_player_1: score1,
+          score_player_2: score2,
+          dice_rolled:    false,
+          last_roll:      0,
+          movable_pieces: [],
+          updated_at:     new Date().toISOString(),
+        })
+        .eq("id", room_id)
+        .eq("turn_player_id", userId)
+        .eq("dice_rolled", true)
+        .select("id")
+        .maybeSingle();
+
+      if (!won) {
+        return NextResponse.json(
+          { success: false, error: "Turn already advanced" },
+          { status: 409 }
+        );
+      }
 
       const { error: settleErr } = await supabase.rpc("settle_ludo_match", {
         p_room_id:    room_id,
@@ -156,14 +189,29 @@ export async function POST(req: NextRequest) {
     // Only include consecutive_sixes if the column exists on this room row
     if ("consecutive_sixes" in room) updatePayload.consecutive_sixes = nextConsecutive;
 
-    const { error: saveErr } = await supabase
+    // CAS guard: the write only lands if this request still owns the turn and
+    // the dice for that turn are still up. Without it two concurrent move
+    // requests both passed the checks above and the player moved twice.
+    const { data: saved, error: saveErr } = await supabase
       .from("ludo_rooms")
       .update(updatePayload)
-      .eq("id", room_id);
+      .eq("id", room_id)
+      .eq("turn_player_id", userId)
+      .eq("dice_rolled", true)
+      .eq("last_roll", roll)
+      .select("id")
+      .maybeSingle();
 
     if (saveErr) {
       console.error(`[LUDO MOVE] Failed to save:`, saveErr.message);
       return NextResponse.json({ success: false, error: "Failed to save move" }, { status: 500 });
+    }
+    if (!saved) {
+      console.warn(`[LUDO MOVE] Stale move rejected room=${room_id} user=${userId}`);
+      return NextResponse.json(
+        { success: false, error: "Turn already advanced — please sync" },
+        { status: 409 }
+      );
     }
 
     return NextResponse.json({
