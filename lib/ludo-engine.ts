@@ -46,6 +46,15 @@
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
+/**
+ * Tokens per player in LUDZO 1v1: TWO. Both tokens must reach position 57 for
+ * the win (calcFinished / applyMove.isWin). The engine is length-generic — it
+ * loops over the pieces arrays it is given — so legacy rooms that were seeded
+ * with 4 tokens keep playing correctly, while every new room is seeded with
+ * 2 tokens by match_ludo_queue() (see sql/04_ludo_two_tokens_cleanup.sql).
+ */
+export const PIECES_PER_PLAYER = 2;
+
 export const SAFE_TRACK_INDICES = new Set([1, 9, 14, 22, 27, 35, 40, 48]);
 
 export const TURN_TIMEOUT_SECS    = 18;   // 15 s play + 3 s grace
@@ -149,7 +158,7 @@ export function calcMovablePieces(
 ): number[] {
   const blocked = getBlockedAbsCells(oppPieces, !amPlayer1);
   const movable: number[] = [];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < pieces.length; i++) {
     const pos = pieces[i];
     if (pos === 57) continue;
     if (pos === 0) {
@@ -207,6 +216,14 @@ export function applyMove(
   const currPos = mp[pieceIdx];
 
   // ── Rule guards ───────────────────────────────────────────────────────────
+  // Index guard: a stale/hand-crafted piece_index must never write undefined
+  // into the board. (Legacy rooms can still legitimately use indexes 0..3.)
+  if (
+    !Number.isInteger(pieceIdx) || pieceIdx < 0 || pieceIdx >= myPieces.length ||
+    !Number.isInteger(currPos)
+  ) {
+    return reject("invalid piece index for this board");
+  }
   if (currPos === 57) return reject("piece already finished");
   if (currPos === 0 && roll !== 6) return reject("a 6 is required to leave the yard");
 
@@ -240,7 +257,7 @@ export function applyMove(
   if (newPos >= 1 && newPos <= 51) {
     const myAbs = toAbsTrack(newPos, amPlayer1);
     if (myAbs !== null && !isSafeCell(myAbs)) {
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < op.length; i++) {
         const oPos = op[i];
         if (oPos < 1 || oPos > 51) continue;
         const oppAbs = toAbsTrack(oPos, !amPlayer1);

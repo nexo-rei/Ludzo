@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { applyMove, getsExtraTurn, calcScore } from "@/lib/ludo-engine";
+import { applyMove, getsExtraTurn, calcScore, PIECES_PER_PLAYER } from "@/lib/ludo-engine";
 
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
@@ -21,6 +21,8 @@ export async function POST(req: NextRequest) {
     }
 
     const pieceIdx = Number(piece_index);
+    // Upper bound is intentionally loose: legacy 4-token rooms use indexes 0..3.
+    // applyMove() rejects out-of-range indexes for the actual board.
     if (!Number.isInteger(pieceIdx) || pieceIdx < 0 || pieceIdx > 3) {
       return NextResponse.json({ success: false, error: "piece_index must be 0-3" }, { status: 400 });
     }
@@ -65,10 +67,10 @@ export async function POST(req: NextRequest) {
     const oppKey    = isPlayer1 ? "player_2" : "player_1";
 
     const boardState = JSON.parse(JSON.stringify(
-      room.board_state ?? { pieces: { player_1: [0,0,0,0], player_2: [0,0,0,0] } }
+      room.board_state ?? { pieces: { player_1: [0,0], player_2: [0,0] } }
     ));
-    const myPieces:  number[] = boardState.pieces[myKey]  ?? [0,0,0,0];
-    const oppPieces: number[] = boardState.pieces[oppKey] ?? [0,0,0,0];
+    const myPieces:  number[] = boardState.pieces[myKey]  ?? Array(PIECES_PER_PLAYER).fill(0);
+    const oppPieces: number[] = boardState.pieces[oppKey] ?? Array(PIECES_PER_PLAYER).fill(0);
     const roll = room.last_roll as number;
 
     console.log(

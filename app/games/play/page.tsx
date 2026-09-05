@@ -14,10 +14,10 @@ import {
 
 const FEATURED_GAME = {
   id: "ludo",
-  title: "Ludo",
-  description: "The classic board game reimagined for competitive play. Roll the dice, move your tokens, and be the first to reach home.",
-  players: "2-4 Players",
-  duration: "10-15 min",
+  title: "Ludo 1v1",
+  description: "Stake Coins, get matched in seconds and race your 2 tokens home against a real player or a bot. Bonus roll on a 6, three 6s forfeit the turn — winner takes the pool.",
+  players: "1 v 1",
+  duration: "~5-8 min",
   icon: LudoIcon,
   available: true,
 };
