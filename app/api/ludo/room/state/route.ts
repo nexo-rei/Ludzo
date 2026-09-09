@@ -433,7 +433,40 @@ export async function GET(req: NextRequest) {
         };
         if (hasConsecutiveCol) payload.consecutive_sixes = consecutiveSixes;
 
-        await supabase.from("ludo_rooms").update(payload).eq("id", roomId);
+                const { data: casWritten } = await supabase
+          .from("ludo_rooms")
+          .update(payload)
+          .eq("id", roomId)
+          .eq("turn_player_id", room.turn_player_id)   // turn must not have moved
+          .eq("dice_rolled",    room.dice_rolled)      // a roll must not have landed
+          .eq("turn_start_at",  room.turn_start_at)    // clock must not have been reset
+          .select("id")
+          .maybeSingle();
+
+        if (!casWritten) {
+          // A concurrent /roll or /move won. Re-read and report the REAL state.
+          console.log(`[LUDO STATE] CAS skipped (mutation won) room=${roomId}`);
+          const { data: cur } = await supabase
+            .from("ludo_rooms")
+            .select("*")
+            .eq("id", roomId)
+            .maybeSingle();
+          if (cur) {
+            const c = cur as unknown as Record<string, any>;
+            status        = c.status               ?? status;
+            turnPlayerId  = String(c.turn_player_id ?? turnPlayerId);
+            turnStartMs   = c.turn_start_at ? new Date(c.turn_start_at).getTime() : turnStartMs;
+            diceRolled    = c.dice_rolled          ?? diceRolled;
+            lastRoll      = c.last_roll            ?? lastRoll;
+            movablePieces = (c.movable_pieces ?? movablePieces) as number[];
+            hearts1       = c.hearts_player_1      ?? hearts1;
+            hearts2       = c.hearts_player_2      ?? hearts2;
+            score1        = c.score_player_1       ?? score1;
+            score2        = c.score_player_2       ?? score2;
+            boardState    = c.board_state          ?? boardState;
+            if (hasConsecutiveCol) consecutiveSixes = c.consecutive_sixes ?? consecutiveSixes;
+          }
+        }  
       }
     }
 
