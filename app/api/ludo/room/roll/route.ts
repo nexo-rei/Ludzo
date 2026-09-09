@@ -170,6 +170,8 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Normal roll — wait for player to choose a piece ───────────────────────
+        // ── Normal roll — wait for player to choose a piece ───────────────────────
+    // Refresh the turn clock so the player gets a full window to pick a token.
     const updatePayload: Record<string, unknown> = {
       last_roll:      roll,
       dice_rolled:    true,
