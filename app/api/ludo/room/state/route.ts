@@ -83,6 +83,7 @@ export async function GET(req: NextRequest) {
     const hasConsecutiveCol = "consecutive_sixes" in room;
     let consecutiveSixes    = hasConsecutiveCol ? (room.consecutive_sixes ?? 0) as number : 0;
     let stateModified       = false;
+    let rowUpdatedAt = (room.updated_at as string | null) ?? new Date(now).toISOString();
 
     // ── Match start time ──────────────────────────────────────────────────────
     // `let` because activating a countdown room (step 1) sets it for the first
@@ -137,6 +138,7 @@ export async function GET(req: NextRequest) {
           diceRolled    = false;
           lastRoll      = 0;
           movablePieces = [];
+          rowUpdatedAt  = startIso;
           console.log(`[LUDO STATE] Room ${roomId} activated via CAS fallback, first turn=${turnPlayerId}`);
         } else {
           // Somebody else (the RPC or a concurrent poll) already activated it.
@@ -232,6 +234,7 @@ export async function GET(req: NextRequest) {
           diceRolled       = false;
           lastRoll         = 0;
           movablePieces    = [];
+          rowUpdatedAt     = nowIso;
 
           if (!casRow) {
             // The turn was already advanced (RPC or a concurrent poll won the
@@ -418,6 +421,7 @@ export async function GET(req: NextRequest) {
           if (sr) { winnerId = sr.winner_id; loserId = sr.loser_id; winReason = sr.win_reason; status = sr.status; }
         }
       } else {
+        const writeIso = new Date().toISOString();
         const payload: Record<string, unknown> = {
           status,
           turn_player_id:   turnPlayerId,
@@ -430,7 +434,7 @@ export async function GET(req: NextRequest) {
           score_player_1:   score1,
           score_player_2:   score2,
           board_state:      boardState,
-          updated_at:       new Date().toISOString(),
+          updated_at:       writeIso,
         };
         if (hasConsecutiveCol) payload.consecutive_sixes = consecutiveSixes;
 
@@ -443,6 +447,7 @@ export async function GET(req: NextRequest) {
         }
 
         const { data: written } = await q.select("id").maybeSingle();
+        if (written) rowUpdatedAt = writeIso;
 
         if (!written && guardAgainstHumanRoll) {
           // A /roll landed first — its state is authoritative. Re-read so this
@@ -466,6 +471,7 @@ export async function GET(req: NextRequest) {
             score1        = c.score_player_1       ?? score1;
             score2        = c.score_player_2       ?? score2;
             boardState    = c.board_state          ?? boardState;
+            rowUpdatedAt  = (c.updated_at as string) ?? rowUpdatedAt;
             if (hasConsecutiveCol) consecutiveSixes = c.consecutive_sixes ?? consecutiveSixes;
           }
         }  
@@ -531,7 +537,7 @@ export async function GET(req: NextRequest) {
         consecutive_sixes:       consecutiveSixes,
         // Monotonic version stamp — the client uses this to reject stale/out-of
         // -order poll responses so they can never revert fresher local state.
-        updated_at:              new Date(now).toISOString(),
+        updated_at:              rowUpdatedAt,
       },
     });
 
