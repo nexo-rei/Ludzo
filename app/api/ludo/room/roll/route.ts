@@ -174,6 +174,7 @@ export async function POST(req: NextRequest) {
       last_roll:      roll,
       dice_rolled:    true,
       movable_pieces: movable,
+      turn_start_at:  new Date().toISOString(),
       updated_at:     new Date().toISOString(),
     };
     if ("consecutive_sixes" in room) updatePayload.consecutive_sixes = newConsecutive;
