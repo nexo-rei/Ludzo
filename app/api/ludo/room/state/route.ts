@@ -161,6 +161,7 @@ export async function GET(req: NextRequest) {
 
     // ── 2. Turn timeout (human players only) ──────────────────────────────────
     if (status === "active" && !turnPlayerId.startsWith("bot_") && !diceRolled) {
+      const turnElapsed = (now - turnStartMs) / 1000;
 
       if (turnElapsed >= TURN_TIMEOUT_SECS) {
         console.log(`[LUDO STATE] Timeout room=${roomId} player=${turnPlayerId} elapsed=${turnElapsed.toFixed(1)}s`);
