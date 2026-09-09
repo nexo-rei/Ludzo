@@ -434,19 +434,20 @@ export async function GET(req: NextRequest) {
         };
         if (hasConsecutiveCol) payload.consecutive_sixes = consecutiveSixes;
 
-                const { data: casWritten } = await supabase
-          .from("ludo_rooms")
-          .update(payload)
-          .eq("id", roomId)
-          .eq("turn_player_id", room.turn_player_id)   // turn must not have moved
-          .eq("dice_rolled",    room.dice_rolled)      // a roll must not have landed
-          .eq("turn_start_at",  room.turn_start_at)    // clock must not have been reset
-          .select("id")
-          .maybeSingle();
+                const guardAgainstHumanRoll =
+          !diceRolled && !turnPlayerId.startsWith("bot_");
 
-        if (!casWritten) {
-          // A concurrent /roll or /move won. Re-read and report the REAL state.
-          console.log(`[LUDO STATE] CAS skipped (mutation won) room=${roomId}`);
+        let q = supabase.from("ludo_rooms").update(payload).eq("id", roomId);
+        if (guardAgainstHumanRoll) {
+          q = q.eq("dice_rolled", false);
+        }
+
+        const { data: written } = await q.select("id").maybeSingle();
+
+        if (!written && guardAgainstHumanRoll) {
+          // A /roll landed first — its state is authoritative. Re-read so this
+          // response reports the player's actual roll instead of reverting it.
+          console.log(`[LUDO STATE] write skipped, /roll won room=${roomId}`);
           const { data: cur } = await supabase
             .from("ludo_rooms")
             .select("*")
