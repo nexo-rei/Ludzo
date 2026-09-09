@@ -160,7 +160,7 @@ export async function GET(req: NextRequest) {
     matchElapsedSecs = Math.floor((now - matchStartMs) / 1000);
 
     // ── 2. Turn timeout (human players only) ──────────────────────────────────
-    if (status === "active" && !turnPlayerId.startsWith("bot_")) {
+    if (status === "active" && !turnPlayerId.startsWith("bot_") && !diceRolled) {
       const turnElapsed = (now - turnStartMs) / 1000;
 
       if (turnElapsed >= TURN_TIMEOUT_SECS) {
