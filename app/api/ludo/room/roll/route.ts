@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
       // Only write consecutive_sixes if the column exists (safe guard)
       if ("consecutive_sixes" in room) updatePayload.consecutive_sixes = 0;
 
-      // CAS: only the request that still owns an un-rolled turn may write.
+      // CAS: only the request that still owns an un-rolled turn may write
       const { data: passed } = await supabase
         .from("ludo_rooms")
         .update(updatePayload)
