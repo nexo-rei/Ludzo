@@ -127,7 +127,7 @@ export async function GET(req: NextRequest) {
           })
           .eq("id", roomId)
           .eq("status", "countdown")          // ← CAS: only one poll can win
-          .select("status, turn_player_id")
+          .select("status, turn_player_id, updated_at")
           .maybeSingle();
 
         if (activated) {
@@ -138,7 +138,7 @@ export async function GET(req: NextRequest) {
           diceRolled    = false;
           lastRoll      = 0;
           movablePieces = [];
-          rowUpdatedAt  = startIso;
+          rowUpdatedAt  = (activated.updated_at as string) ?? startIso;
           console.log(`[LUDO STATE] Room ${roomId} activated via CAS fallback, first turn=${turnPlayerId}`);
         } else {
           // Somebody else (the RPC or a concurrent poll) already activated it.
@@ -223,7 +223,7 @@ export async function GET(req: NextRequest) {
             .eq("id", roomId)
             .eq("turn_player_id", turnPlayerId)
             .eq("turn_start_at", room.turn_start_at)
-            .select("turn_player_id, turn_start_at, hearts_player_1, hearts_player_2")
+            .select("turn_player_id, turn_start_at, hearts_player_1, hearts_player_2, updated_at")
             .maybeSingle();
 
           // Reflect the switch locally so THIS response already reports the new
@@ -234,7 +234,7 @@ export async function GET(req: NextRequest) {
           diceRolled       = false;
           lastRoll         = 0;
           movablePieces    = [];
-          rowUpdatedAt     = nowIso;
+          rowUpdatedAt     = (casRow?.updated_at as string) ?? nowIso;
 
           if (!casRow) {
             // The turn was already advanced (RPC or a concurrent poll won the
@@ -446,8 +446,8 @@ export async function GET(req: NextRequest) {
           q = q.eq("dice_rolled", false);
         }
 
-        const { data: written } = await q.select("id").maybeSingle();
-        if (written) rowUpdatedAt = writeIso;
+        const { data: written } = await q.select("id, updated_at").maybeSingle();
+        if (written) rowUpdatedAt = (written.updated_at as string) ?? writeIso;
 
         if (!written && guardAgainstHumanRoll) {
           // A /roll landed first — its state is authoritative. Re-read so this
