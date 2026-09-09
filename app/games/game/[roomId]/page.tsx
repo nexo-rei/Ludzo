@@ -869,7 +869,6 @@ export default function LudoGamePage() {
         // Immediately patch local room state so the board reflects the roll
         // result right now, without waiting for fetchRoom() to complete.
         // This makes home tokens (pos=0) light up the instant the API responds.
-        lastAppliedTsRef.current = Date.now();
         if (roomRef.current) {
           setRoom(prev => prev ? {
             ...prev,
@@ -938,7 +937,6 @@ export default function LudoGamePage() {
       });
       const data = await res.json();
       if (data.success) {
-        lastAppliedTsRef.current = Date.now();
         if (data.data?.has_capture) {
           playSound("kill");
           vibe([80, 40, 80]);
