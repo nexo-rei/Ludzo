@@ -448,7 +448,13 @@ export async function GET(req: NextRequest) {
           q = q.eq("dice_rolled", false);
         }
 
-        const { data: written } = await q.select("id, updated_at").maybeSingle();
+        const { data: written, error: writeErr } = await q.select("id, updated_at").maybeSingle();
+        if (writeErr) {
+          console.error(
+            `[LUDO STATE] WRITE FAILED room=${roomId} code=${writeErr.code} ${writeErr.message} ` +
+            `payload=${JSON.stringify({ turn: turnPlayerId, dice: diceRolled, roll: lastRoll, movable: movablePieces, consec: consecutiveSixes })}`
+          );
+        }
         if (written) rowUpdatedAt = (written.updated_at as string) ?? writeIso;
 
         if (!written && guardAgainstHumanRoll) {
