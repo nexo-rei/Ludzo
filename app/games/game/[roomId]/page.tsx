@@ -364,38 +364,22 @@ function LudoBoard({
   const canMove = (idx: number) =>
     isMyTurn && room.dice_rolled && (room.movable_pieces ?? []).includes(idx);
 
-    const oppPieces = amPlayer1
+      const myPieces  = amPlayer1
+    ? (room.board_state?.pieces?.player_1 ?? [0, 0])
+    : (room.board_state?.pieces?.player_2 ?? [0, 0]);
+  const oppPieces = amPlayer1
     ? (room.board_state?.pieces?.player_2 ?? [0, 0])
     : (room.board_state?.pieces?.player_1 ?? [0, 0]);
 
-  // YOU are always blue, OPPONENT always red — on every device.
+  // ↓↓↓ BLOCK YAHAN ↓↓↓
   const MY_COLOR  = "#3B82F6";
-  const MY_INNER  = "#1E3A8A";
-  const OPP_COLOR = "#EF4444";
-  const OPP_INNER = "#7F1D1D";
-
-  // Remember previous positions so tokens walk the track instead of teleporting.
-  const prevMineRef = useRef<number[] | null>(null);
-  const prevOppRef  = useRef<number[] | null>(null);
-  const prevMine = prevMineRef.current;
-  const prevOpp  = prevOppRef.current;
-  useEffect(() => { prevMineRef.current = [...myPieces]; }, [myPieces.join(",")]);
-  useEffect(() => { prevOppRef.current  = [...oppPieces]; }, [oppPieces.join(",")]);
-
-  const buildWaypoints = (isP1: boolean, from: number, to: number, idx: number) => {
-    const pts: [number, number][] = [];
-    if (from === to) pts.push(pieceXY(isP1, to, idx));
-    else if (from === 0) pts.push(pieceXY(isP1, 0, idx), pieceXY(isP1, to, idx));
-    else if (to === 0) pts.push(pieceXY(isP1, from, idx), pieceXY(isP1, 0, idx));
-    else if (to > from) { for (let p = from; p <= to; p++) pts.push(pieceXY(isP1, p, idx)); }
-    else pts.push(pieceXY(isP1, from, idx), pieceXY(isP1, to, idx));
-    return { xs: pts.map(pt => pt[0]), ys: pts.map(pt => pt[1]) };
-  };
-
+  ...
   const hopTiming = (steps: number) => ({
     duration: Math.min(0.14 * Math.max(steps, 1), 0.95),
     ease: "linear" as const,
   });
+  // ↑↑↑ BLOCK YAHAN TAK ↑↑↑
+  
 
   return (
     <svg className="absolute inset-0 w-full h-full rounded-2xl" viewBox="0 0 100 100" fill="none" preserveAspectRatio="xMidYMid meet">
