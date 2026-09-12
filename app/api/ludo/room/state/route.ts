@@ -436,7 +436,9 @@ export async function GET(req: NextRequest) {
           board_state:      boardState,
           updated_at:       writeIso,
         };
-        if (hasConsecutiveCol) payload.consecutive_sixes = consecutiveSixes;
+                if (hasConsecutiveCol) {
+          payload.consecutive_sixes = Math.min(MAX_CONSECUTIVE_SIXES, Math.max(0, consecutiveSixes));
+        }
 
                 const guardAgainstHumanRoll =
           !diceRolled && !turnPlayerId.startsWith("bot_");
