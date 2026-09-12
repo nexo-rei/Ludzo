@@ -27,8 +27,8 @@ const EMPTY_BOARD = {
 const COUNTDOWN_SECS = 10;
 
 /** Bot "thinking" delays, measured from turn_start_at. */
-const BOT_ROLL_DELAY_SECS = 2.5;
-const BOT_MOVE_DELAY_SECS = 2.0;
+const BOT_ROLL_DELAY_SECS = 1.2;
+const BOT_MOVE_DELAY_SECS = 0.8;
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth(req);
