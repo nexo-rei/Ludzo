@@ -364,12 +364,38 @@ function LudoBoard({
   const canMove = (idx: number) =>
     isMyTurn && room.dice_rolled && (room.movable_pieces ?? []).includes(idx);
 
-  const myPieces  = amPlayer1
-    ? (room.board_state?.pieces?.player_1 ?? [0, 0])
-    : (room.board_state?.pieces?.player_2 ?? [0, 0]);
-  const oppPieces = amPlayer1
+    const oppPieces = amPlayer1
     ? (room.board_state?.pieces?.player_2 ?? [0, 0])
     : (room.board_state?.pieces?.player_1 ?? [0, 0]);
+
+  // YOU are always blue, OPPONENT always red — on every device.
+  const MY_COLOR  = "#3B82F6";
+  const MY_INNER  = "#1E3A8A";
+  const OPP_COLOR = "#EF4444";
+  const OPP_INNER = "#7F1D1D";
+
+  // Remember previous positions so tokens walk the track instead of teleporting.
+  const prevMineRef = useRef<number[] | null>(null);
+  const prevOppRef  = useRef<number[] | null>(null);
+  const prevMine = prevMineRef.current;
+  const prevOpp  = prevOppRef.current;
+  useEffect(() => { prevMineRef.current = [...myPieces]; }, [myPieces.join(",")]);
+  useEffect(() => { prevOppRef.current  = [...oppPieces]; }, [oppPieces.join(",")]);
+
+  const buildWaypoints = (isP1: boolean, from: number, to: number, idx: number) => {
+    const pts: [number, number][] = [];
+    if (from === to) pts.push(pieceXY(isP1, to, idx));
+    else if (from === 0) pts.push(pieceXY(isP1, 0, idx), pieceXY(isP1, to, idx));
+    else if (to === 0) pts.push(pieceXY(isP1, from, idx), pieceXY(isP1, 0, idx));
+    else if (to > from) { for (let p = from; p <= to; p++) pts.push(pieceXY(isP1, p, idx)); }
+    else pts.push(pieceXY(isP1, from, idx), pieceXY(isP1, to, idx));
+    return { xs: pts.map(pt => pt[0]), ys: pts.map(pt => pt[1]) };
+  };
+
+  const hopTiming = (steps: number) => ({
+    duration: Math.min(0.14 * Math.max(steps, 1), 0.95),
+    ease: "linear" as const,
+  });
 
   return (
     <svg className="absolute inset-0 w-full h-full rounded-2xl" viewBox="0 0 100 100" fill="none" preserveAspectRatio="xMidYMid meet">
@@ -455,48 +481,59 @@ function LudoBoard({
         />
       ))}
 
-      {/* Opponent pieces */}
+            {/* Opponent pieces */}
       {oppPieces.map((pos: number, idx: number) => {
         const isP1Piece = !amPlayer1;
         const [baseCx, baseCy] = pieceXY(isP1Piece, pos, idx);
         const [dx, dy] = stackOffset(oppPieces, pos, idx);
-        const color = isP1Piece ? "#EF4444" : "#3B82F6";
-        const inner = isP1Piece ? "#7F1D1D" : "#1E3A8A";
+        const oppWp = buildWaypoints(isP1Piece, prevOpp?.[idx] ?? pos, pos, idx);
         return (
-          <g key={`opp-${idx}`}>
-            <circle cx={baseCx + dx} cy={baseCy + dy} r="2.6" fill={color} stroke="#FFFFFF" strokeWidth="0.5" />
-            <circle cx={baseCx + dx} cy={baseCy + dy} r="1.1" fill={inner} />
-          </g>
+          <motion.g
+            key={`opp-${idx}`}
+            initial={false}
+            animate={{
+              x: oppWp.xs.length > 1 ? oppWp.xs.map(v => v + dx) : baseCx + dx,
+              y: oppWp.ys.length > 1 ? oppWp.ys.map(v => v + dy) : baseCy + dy,
+            }}
+            transition={hopTiming(Math.max(oppWp.xs.length - 1, 1))}
+          >
+            <circle cx={0} cy={0} r="2.6" fill={OPP_COLOR} stroke="#FFFFFF" strokeWidth="0.5" />
+            <circle cx={0} cy={0} r="1.1" fill={OPP_INNER} />
+          </motion.g>
         );
       })}
 
-      {/* My pieces (interactive) */}
+            {/* My pieces (interactive) */}
       {myPieces.map((pos: number, idx: number) => {
         const [baseCx, baseCy] = pieceXY(amPlayer1, pos, idx);
         const [dx, dy] = stackOffset(myPieces, pos, idx);
-        const cx = baseCx + dx;
-        const cy = baseCy + dy;
         const canMoveThis = canMove(idx);
-        const color = amPlayer1 ? "#EF4444" : "#3B82F6";
-        const inner = amPlayer1 ? "#7F1D1D" : "#1E3A8A";
+        const myWp = buildWaypoints(amPlayer1, prevMine?.[idx] ?? pos, pos, idx);
         return (
-          <g
+          <motion.g
             key={`my-${idx}`}
+            initial={false}
+            animate={{
+              x: myWp.xs.length > 1 ? myWp.xs.map(v => v + dx) : baseCx + dx,
+              y: myWp.ys.length > 1 ? myWp.ys.map(v => v + dy) : baseCy + dy,
+            }}
+            transition={hopTiming(Math.max(myWp.xs.length - 1, 1))}
             onClick={() => canMoveThis && onMove(idx)}
             style={{ cursor: canMoveThis ? "pointer" : "default" }}
           >
             {canMoveThis && (
               <>
-                <circle cx={cx} cy={cy} r="4" fill={color} opacity="0.25">
+                <circle cx={0} cy={0} r="4" fill={MY_COLOR} opacity="0.25">
                   <animate attributeName="r" values="3;5;3" dur="1s" repeatCount="indefinite" />
                   <animate attributeName="opacity" values="0.25;0.05;0.25" dur="1s" repeatCount="indefinite" />
                 </circle>
-                <circle cx={cx} cy={cy} r="3.5" fill="none" stroke={color} strokeWidth="0.5" opacity="0.7" />
+                <circle cx={0} cy={0} r="3.5" fill="none" stroke={MY_COLOR} strokeWidth="0.5" opacity="0.7" />
               </>
             )}
-            <circle cx={cx} cy={cy} r="2.6" fill={color} stroke="#FFFFFF" strokeWidth="0.5" />
-            <circle cx={cx} cy={cy} r="1.1" fill={inner} />
-          </g>
+            <circle cx={0} cy={0} r="2.6" fill={MY_COLOR} stroke="#FFFFFF" strokeWidth="0.5" />
+            <circle cx={0} cy={0} r="1.1" fill={MY_INNER} />
+            {canMoveThis && <circle cx={0} cy={0} r="5.5" fill="transparent" />}
+          </motion.g>
         );
       })}
     </svg>
