@@ -94,6 +94,15 @@ const SAFE_SPOTS = new Set([1, 9, 14, 22, 27, 35, 40, 48]);
 const STAR_SPOTS = new Set([9, 22, 35, 48]);
 const CELL       = 100 / 15;
 
+// Viewer-perspective palette: the local player's tokens/UI are always BLUE and
+// the opponent's are always RED, regardless of which seat (player_1/player_2)
+// each one occupies. Board furniture (drawn at fixed seat positions) resolves
+// to these via P1_COLOR/P2_COLOR inside LudoBoard.
+const MY_COLOR  = "#3B82F6";
+const MY_INNER  = "#1E3A8A";
+const OPP_COLOR = "#EF4444";
+const OPP_INNER = "#7F1D1D";
+
 // MUST equal TURN_TIMEOUT_SECS in lib/ludo-engine.ts. The server sends
 // turn_remaining_seconds counting down from 18; the timer bar used to divide by
 // 15, so it rendered at 120% width for the first three seconds of every turn.
@@ -222,7 +231,7 @@ function DiceFace({ value, size = 40, rolling = false }: { value: number; size?:
   return (
     <motion.svg
       width={size} height={size} viewBox="0 0 100 100" fill="none"
-      animate={rolling ? { rotate: [0, -20, 20, -15, 15, 0] } : {}}
+      animate={rolling ? { rotate: [0, -20, 20, -15, 15, 0], scale: [1, 1.15, 0.94, 1.08, 1] } : { rotate: 0, scale: 1 }}
       transition={{ duration: 0.4, ease: "easeInOut" }}
     >
       <rect width="100" height="100" rx="20" fill="#1E293B" stroke="#A855F7" strokeWidth="4" />
@@ -371,10 +380,10 @@ function LudoBoard({
     ? (room.board_state?.pieces?.player_2 ?? [0, 0])
     : (room.board_state?.pieces?.player_1 ?? [0, 0]);
 
-  const MY_COLOR  = "#3B82F6";
-  const MY_INNER  = "#1E3A8A";
-  const OPP_COLOR = "#EF4444";
-  const OPP_INNER = "#7F1D1D";
+  // Board furniture (fixed at P1=top-left / P2=bottom-right) resolved to the
+  // viewer-perspective palette: I'm always blue, my opponent is always red.
+  const P1_COLOR = amPlayer1 ? MY_COLOR : OPP_COLOR;
+  const P2_COLOR = amPlayer1 ? OPP_COLOR : MY_COLOR;
 
   const prevMineRef = useRef<number[] | null>(null);
   const prevOppRef  = useRef<number[] | null>(null);
@@ -382,6 +391,17 @@ function LudoBoard({
   const prevOpp  = prevOppRef.current;
   useEffect(() => { prevMineRef.current = [...myPieces]; }, [myPieces.join(",")]);
   useEffect(() => { prevOppRef.current  = [...oppPieces]; }, [oppPieces.join(",")]);
+
+  // Presentation-only: fall back to instant positioning for motion-sensitive players.
+  const [reducedMotion, setReducedMotion] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   const buildWaypoints = (
     isP1: boolean, from: number, to: number, idx: number
@@ -401,28 +421,37 @@ function LudoBoard({
     return { xs: pts.map(pt => pt[0]), ys: pts.map(pt => pt[1]) };
   };
 
+  // Livelier hop: eased instead of linear, capped a touch longer so a
+  // multi-cell move reads as a sequence of hops rather than a blur.
   const hopTiming = (steps: number) => ({
-    duration: Math.min(0.14 * Math.max(steps, 1), 0.95),
-    ease: "linear" as const,
+    duration: reducedMotion ? 0 : Math.min(0.16 * Math.max(steps, 1), 1.1),
+    ease: "easeInOut" as const,
   });
-  
+
+  // Per-waypoint scale keyframes so each hop visibly bounces off the cell
+  // instead of gliding through it.
+  const hopScale = (n: number) =>
+    reducedMotion || n <= 1
+      ? 1
+      : Array.from({ length: n }, (_, i) =>
+          (i === 0 || i === n - 1 ? 1 : (i % 2 ? 1.28 : 1.06)));
 
   return (
     <svg className="absolute inset-0 w-full h-full rounded-2xl" viewBox="0 0 100 100" fill="none" preserveAspectRatio="xMidYMid meet">
       <rect width="100" height="100" rx="4" fill="#080D18" />
 
-      {/* Red yard (Player 1) */}
-      <rect x="0" y="0" width="40" height="40" rx="4" fill="#EF444412" stroke="#EF4444" strokeWidth="0.5" />
-      <rect x="6" y="6" width="28" height="28" rx="3" fill="#090E1C" stroke="#EF4444" strokeWidth="0.4" />
+      {/* Player 1 yard (fixed top-left; colored by ownership, not seat) */}
+      <rect x="0" y="0" width="40" height="40" rx="4" fill={`${P1_COLOR}12`} stroke={P1_COLOR} strokeWidth="0.5" />
+      <rect x="6" y="6" width="28" height="28" rx="3" fill="#090E1C" stroke={P1_COLOR} strokeWidth="0.4" />
       {p1Yard.map(([cx, cy], i) => (
-        <circle key={i} cx={cx} cy={cy} r={i < 2 ? 4.4 : 3.6} fill="#EF444425" stroke="#EF4444" strokeWidth={i < 2 ? 0.6 : 0.35} />
+        <circle key={i} cx={cx} cy={cy} r={i < 2 ? 4.4 : 3.6} fill={`${P1_COLOR}25`} stroke={P1_COLOR} strokeWidth={i < 2 ? 0.6 : 0.35} />
       ))}
 
-      {/* Blue yard (Player 2) */}
-      <rect x="60" y="60" width="40" height="40" rx="4" fill="#3B82F612" stroke="#3B82F6" strokeWidth="0.5" />
-      <rect x="66" y="66" width="28" height="28" rx="3" fill="#090E1C" stroke="#3B82F6" strokeWidth="0.4" />
+      {/* Player 2 yard (fixed bottom-right; colored by ownership, not seat) */}
+      <rect x="60" y="60" width="40" height="40" rx="4" fill={`${P2_COLOR}12`} stroke={P2_COLOR} strokeWidth="0.5" />
+      <rect x="66" y="66" width="28" height="28" rx="3" fill="#090E1C" stroke={P2_COLOR} strokeWidth="0.4" />
       {p2Yard.map(([cx, cy], i) => (
-        <circle key={i} cx={cx} cy={cy} r={i < 2 ? 4.4 : 3.6} fill="#3B82F625" stroke="#3B82F6" strokeWidth={i < 2 ? 0.6 : 0.35} />
+        <circle key={i} cx={cx} cy={cy} r={i < 2 ? 4.4 : 3.6} fill={`${P2_COLOR}25`} stroke={P2_COLOR} strokeWidth={i < 2 ? 0.6 : 0.35} />
       ))}
 
       {/* Unused yards */}
@@ -430,8 +459,8 @@ function LudoBoard({
       <rect x="0" y="60" width="40" height="40" rx="4" fill="#0F172A" stroke="#1E293B" strokeWidth="0.3" />
 
       {/* Centre */}
-      <polygon points="40,40 50,50 40,60" fill="#EF444418" stroke="#EF4444" strokeWidth="0.4" />
-      <polygon points="60,40 50,50 60,60" fill="#3B82F618" stroke="#3B82F6" strokeWidth="0.4" />
+      <polygon points="40,40 50,50 40,60" fill={`${P1_COLOR}18`} stroke={P1_COLOR} strokeWidth="0.4" />
+      <polygon points="60,40 50,50 60,60" fill={`${P2_COLOR}18`} stroke={P2_COLOR} strokeWidth="0.4" />
       <polygon points="40,40 50,50 60,40" fill="#0F172A" stroke="#1E293B" strokeWidth="0.2" />
       <polygon points="40,60 50,50 60,60" fill="#0F172A" stroke="#1E293B" strokeWidth="0.2" />
       <circle cx="50" cy="50" r="4" fill="#A855F718" stroke="#A855F7" strokeWidth="0.5" />
@@ -450,8 +479,8 @@ function LudoBoard({
         let fill   = "#0F172A30";
         let stroke = "#1E293B";
         let sw     = 0.15;
-        if (isLaunchRed)       { fill = "#EF444435"; stroke = "#EF4444"; sw = 0.4; }
-        else if (isLaunchBlue) { fill = "#3B82F635"; stroke = "#3B82F6"; sw = 0.4; }
+        if (isLaunchRed)       { fill = `${P1_COLOR}35`; stroke = P1_COLOR; sw = 0.4; }
+        else if (isLaunchBlue) { fill = `${P2_COLOR}35`; stroke = P2_COLOR; sw = 0.4; }
         else if (isStar)       { fill = "#A855F720"; stroke = "#A855F7"; sw = 0.35; }
         else if (isSafe)       { fill = "#A855F712"; stroke = "#A855F7"; sw = 0.25; }
         return (
@@ -476,7 +505,7 @@ function LudoBoard({
           x={col * CELL + 0.25} y={row * CELL + 0.25}
           width={CELL - 0.5} height={CELL - 0.5}
           rx="0.7"
-          fill="#EF444428" stroke="#EF4444" strokeWidth="0.3"
+          fill={`${P1_COLOR}28`} stroke={P1_COLOR} strokeWidth="0.3"
         />
       ))}
 
@@ -487,7 +516,7 @@ function LudoBoard({
           x={col * CELL + 0.25} y={row * CELL + 0.25}
           width={CELL - 0.5} height={CELL - 0.5}
           rx="0.7"
-          fill="#3B82F628" stroke="#3B82F6" strokeWidth="0.3"
+          fill={`${P2_COLOR}28`} stroke={P2_COLOR} strokeWidth="0.3"
         />
       ))}
 
@@ -496,7 +525,14 @@ function LudoBoard({
         const isP1Piece = !amPlayer1;
         const [baseCx, baseCy] = pieceXY(isP1Piece, pos, idx);
         const [dx, dy] = stackOffset(oppPieces, pos, idx);
-        const oppWp = buildWaypoints(isP1Piece, prevOpp?.[idx] ?? pos, pos, idx);
+        const fromPos = prevOpp?.[idx] ?? pos;
+        const oppWp = buildWaypoints(isP1Piece, fromPos, pos, idx);
+        const steps = Math.max(oppWp.xs.length - 1, 1);
+        const timing = hopTiming(steps);
+        // A piece jumping straight back to the yard from a non-yard cell was
+        // captured, not just moved — give it a distinct shake+fade instead of
+        // a plain hop.
+        const wasCaptured = fromPos !== 0 && pos === 0 && fromPos !== pos;
         return (
           <motion.g
             key={`opp-${idx}`}
@@ -504,11 +540,26 @@ function LudoBoard({
             animate={{
               x: oppWp.xs.length > 1 ? oppWp.xs.map(v => v + dx) : baseCx + dx,
               y: oppWp.ys.length > 1 ? oppWp.ys.map(v => v + dy) : baseCy + dy,
+              rotate: wasCaptured && !reducedMotion ? [0, -12, 10, -8, 0] : 0,
             }}
-            transition={hopTiming(Math.max(oppWp.xs.length - 1, 1))}
+            transition={timing}
           >
-            <circle cx={0} cy={0} r="2.6" fill={OPP_COLOR} stroke="#FFFFFF" strokeWidth="0.5" />
-            <circle cx={0} cy={0} r="1.1" fill={OPP_INNER} />
+            <motion.g
+              animate={{
+                scale: wasCaptured && !reducedMotion ? [1, 0.6, 0.85, 1] : hopScale(oppWp.xs.length),
+                opacity: wasCaptured && !reducedMotion ? [1, 0.35, 0.7, 1] : 1,
+              }}
+              transition={timing}
+            >
+              <circle cx={0} cy={0} r="2.6" fill={OPP_COLOR} stroke="#FFFFFF" strokeWidth="0.5" />
+              <circle cx={0} cy={0} r="1.1" fill={OPP_INNER} />
+            </motion.g>
+            {oppWp.xs.length > 1 && !wasCaptured && !reducedMotion && (
+              <circle key={`opp-pulse-${idx}-${pos}`} cx={0} cy={0} r="2.6" fill="none" stroke={OPP_COLOR} strokeWidth="0.6" opacity="0">
+                <animate attributeName="r" values="2.6;5.5" dur="0.4s" begin={`${timing.duration}s`} fill="freeze" />
+                <animate attributeName="opacity" values="0.8;0" dur="0.4s" begin={`${timing.duration}s`} fill="freeze" />
+              </circle>
+            )}
           </motion.g>
         );
       })}
@@ -518,7 +569,11 @@ function LudoBoard({
         const [baseCx, baseCy] = pieceXY(amPlayer1, pos, idx);
         const [dx, dy] = stackOffset(myPieces, pos, idx);
         const canMoveThis = canMove(idx);
-        const myWp = buildWaypoints(amPlayer1, prevMine?.[idx] ?? pos, pos, idx);
+        const fromPos = prevMine?.[idx] ?? pos;
+        const myWp = buildWaypoints(amPlayer1, fromPos, pos, idx);
+        const steps = Math.max(myWp.xs.length - 1, 1);
+        const timing = hopTiming(steps);
+        const wasCaptured = fromPos !== 0 && pos === 0 && fromPos !== pos;
         return (
           <motion.g
             key={`my-${idx}`}
@@ -526,8 +581,9 @@ function LudoBoard({
             animate={{
               x: myWp.xs.length > 1 ? myWp.xs.map(v => v + dx) : baseCx + dx,
               y: myWp.ys.length > 1 ? myWp.ys.map(v => v + dy) : baseCy + dy,
+              rotate: wasCaptured && !reducedMotion ? [0, -12, 10, -8, 0] : 0,
             }}
-            transition={hopTiming(Math.max(myWp.xs.length - 1, 1))}
+            transition={timing}
             onClick={() => canMoveThis && onMove(idx)}
             style={{ cursor: canMoveThis ? "pointer" : "default" }}
           >
@@ -540,8 +596,22 @@ function LudoBoard({
                 <circle cx={0} cy={0} r="3.5" fill="none" stroke={MY_COLOR} strokeWidth="0.5" opacity="0.7" />
               </>
             )}
-            <circle cx={0} cy={0} r="2.6" fill={MY_COLOR} stroke="#FFFFFF" strokeWidth="0.5" />
-            <circle cx={0} cy={0} r="1.1" fill={MY_INNER} />
+            <motion.g
+              animate={{
+                scale: wasCaptured && !reducedMotion ? [1, 0.6, 0.85, 1] : hopScale(myWp.xs.length),
+                opacity: wasCaptured && !reducedMotion ? [1, 0.35, 0.7, 1] : 1,
+              }}
+              transition={timing}
+            >
+              <circle cx={0} cy={0} r="2.6" fill={MY_COLOR} stroke="#FFFFFF" strokeWidth="0.5" />
+              <circle cx={0} cy={0} r="1.1" fill={MY_INNER} />
+            </motion.g>
+            {myWp.xs.length > 1 && !wasCaptured && !reducedMotion && (
+              <circle key={`my-pulse-${idx}-${pos}`} cx={0} cy={0} r="2.6" fill="none" stroke={MY_COLOR} strokeWidth="0.6" opacity="0">
+                <animate attributeName="r" values="2.6;5.5" dur="0.4s" begin={`${timing.duration}s`} fill="freeze" />
+                <animate attributeName="opacity" values="0.8;0" dur="0.4s" begin={`${timing.duration}s`} fill="freeze" />
+              </circle>
+            )}
             {canMoveThis && <circle cx={0} cy={0} r="5.5" fill="transparent" />}
           </motion.g>
         );
@@ -578,6 +648,13 @@ export default function LudoGamePage() {
   const [floatingEmotes, setFloatingEmotes] = useState<
     Array<{ id: string; type: string; mine: boolean }>
   >([]);
+
+  // Presentation-only: respected by the dice pop and the turn-handoff pulse below.
+  const [reducedMotion, setReducedMotion] = useState(false);
+  // Presentation-only: briefly true right after turn_player_id changes, so the
+  // active player's card can pulse — bot turns can be over in ~2.4s, so the
+  // handoff needs to be impossible to miss.
+  const [turnJustChanged, setTurnJustChanged] = useState(false);
 
   // ── Refs ───────────────────────────────────────────────────────────────────
   const phaseRef           = useRef<GamePhase>("loading");
@@ -633,6 +710,24 @@ export default function LudoGamePage() {
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
+
+  // ── Reduced-motion preference (presentation-only) ─────────────────────────
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  // ── Turn-handoff highlight (presentation-only) ────────────────────────────
+  useEffect(() => {
+    if (!room?.turn_player_id) return;
+    setTurnJustChanged(true);
+    const t = setTimeout(() => setTurnJustChanged(false), 700);
+    return () => clearTimeout(t);
+  }, [room?.turn_player_id]);
 
   // ── Fetch room state ──────────────────────────────────────────────────────
   const fetchRoom = useCallback(async (): Promise<RoomState | null> => {
@@ -1275,52 +1370,73 @@ export default function LudoGamePage() {
         </AnimatePresence>
       </div>
 
-      {/* OPPONENT HEADER */}
+      {/* OPPONENT HEADER — my card and the opponent's card are colored by
+          ownership (blue = me, red = opponent), never by seat. */}
       <div className="flex-none px-3 pt-safe pt-3 pb-2">
-        <div className="flex items-center justify-between bg-slate-900/80 border border-slate-800 rounded-2xl px-3 py-2.5">
+        <motion.div
+          animate={
+            !isMyTurn && turnJustChanged && !reducedMotion
+              ? { boxShadow: [`0 0 0 0px ${OPP_COLOR}00`, `0 0 0 3px ${OPP_COLOR}66`, `0 0 0 0px ${OPP_COLOR}00`] }
+              : { boxShadow: `0 0 0 0px ${OPP_COLOR}00` }
+          }
+          transition={{ duration: 0.7, ease: "easeOut" }}
+          className="flex items-center justify-between bg-gradient-to-br from-slate-900/90 to-slate-950/90 border border-slate-800/80 shadow-lg shadow-black/20 rounded-2xl px-3 py-2.5"
+        >
           <div className="flex items-center gap-2.5">
-            <div className="relative w-10 h-10 rounded-full border-2 border-blue-500 overflow-hidden bg-slate-950 flex-none">
+            <div className="relative w-10 h-10 rounded-full border-2 overflow-hidden bg-slate-950 flex-none" style={{ borderColor: OPP_COLOR }}>
               <img src={oppProfile?.avatar || "https://api.dicebear.com/7.x/adventurer/svg?seed=opp"} alt="Opp"
                 className="w-full h-full object-cover"
                 onError={e => { (e.target as HTMLImageElement).src = "https://api.dicebear.com/7.x/adventurer/svg?seed=opp"; }} />
               {!isMyTurn && (
-                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-blue-500 rounded-full border border-slate-950 animate-pulse" />
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border border-slate-950 animate-pulse" style={{ backgroundColor: OPP_COLOR }} />
               )}
             </div>
             <div className="min-w-0">
               <div className="text-[11px] font-bold text-slate-200 truncate max-w-[90px]">{oppProfile?.name ?? "Opponent"}</div>
-              <div className="text-[9px] text-slate-500 font-semibold">
+              <div className="text-[9px] text-slate-500 font-semibold flex items-center">
                 Score {oppScore}
                 {room.status === "active" && !isMyTurn && (
-                  <span className="ml-1 text-blue-400 animate-pulse">
-                    {room.dice_rolled ? "· moving…" : "· thinking…"}
+                  <span className="ml-1.5 inline-flex items-center gap-1 font-bold" style={{ color: OPP_COLOR }}>
+                    {room.dice_rolled ? "moving" : "thinking"}
+                    <span className="inline-flex gap-0.5">
+                      {[0, 1, 2].map(i => (
+                        <motion.span
+                          key={i}
+                          className="w-1 h-1 rounded-full"
+                          style={{ backgroundColor: OPP_COLOR }}
+                          animate={reducedMotion ? { opacity: 0.8 } : { opacity: [0.2, 1, 0.2] }}
+                          transition={{ duration: 1, repeat: Infinity, delay: i * 0.15 }}
+                        />
+                      ))}
+                    </span>
                   </span>
                 )}
               </div>
             </div>
           </div>
           <Hearts count={oppHearts} />
-          <div className="flex items-center gap-1.5 flex-none">
+          <div className="flex items-center gap-2 flex-none">
             <button
               onClick={() => setShowEmotes(v => !v)}
-              className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center"
+              className="w-11 h-11 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center"
               aria-label="Emotes"
             >
-              <EmoteSVG type="Clap" size={18} />
+              <EmoteSVG type="Clap" size={20} />
             </button>
             {/* Exit — always visible, opens the confirm modal (native confirm()
-                is blocked inside Telegram's WebView, so never use window.confirm). */}
+                is blocked inside Telegram's WebView, so never use window.confirm).
+                This is the SINGLE forfeit control in the playing UI. */}
             <button
               onClick={handleForfeit}
-              className="w-8 h-8 rounded-lg bg-red-950/60 border border-red-500/30 flex items-center justify-center"
+              className="w-11 h-11 rounded-lg bg-red-950/60 border border-red-500/30 flex items-center justify-center"
               aria-label="Exit match"
             >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <svg width="16" height="16" viewBox="0 0 14 14" fill="none">
                 <path d="M3 3 L11 11 M11 3 L3 11" stroke="#F87171" strokeWidth="2" strokeLinecap="round" />
               </svg>
             </button>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* Timer bar */}
@@ -1334,9 +1450,9 @@ export default function LudoGamePage() {
             Time: <span className={matchSecs <= 60 ? "text-red-400" : "text-slate-300"}>{formatTime(matchSecs)}</span>
           </span>
         </div>
-        <div className="h-0.5 bg-slate-800 rounded-full overflow-hidden">
+        <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all duration-1000 ${turnSecs <= 5 ? "bg-red-500" : "bg-purple-500"}`}
+            className={`h-full rounded-full transition-all duration-1000 ${turnSecs <= 5 ? "bg-red-500 animate-pulse" : "bg-purple-500"}`}
             style={{ width: `${Math.max(0, Math.min(100, (turnSecs / TURN_TIMEOUT_SECS) * 100))}%` }}
           />
         </div>
@@ -1358,14 +1474,22 @@ export default function LudoGamePage() {
 
       {/* MY PLAYER FOOTER */}
       <div className="flex-none px-3 pt-1 pb-safe pb-3">
-        <div className="flex items-center justify-between bg-slate-900/80 border border-slate-800 rounded-2xl px-3 py-2.5">
+        <motion.div
+          animate={
+            isMyTurn && turnJustChanged && !reducedMotion
+              ? { boxShadow: [`0 0 0 0px ${MY_COLOR}00`, `0 0 0 3px ${MY_COLOR}66`, `0 0 0 0px ${MY_COLOR}00`] }
+              : { boxShadow: `0 0 0 0px ${MY_COLOR}00` }
+          }
+          transition={{ duration: 0.7, ease: "easeOut" }}
+          className="flex items-center justify-between bg-gradient-to-br from-slate-900/90 to-slate-950/90 border border-slate-800/80 shadow-lg shadow-black/20 rounded-2xl px-3 py-2.5"
+        >
           <div className="flex items-center gap-2.5">
-            <div className="relative w-10 h-10 rounded-full border-2 border-purple-500 overflow-hidden bg-slate-950 flex-none">
+            <div className="relative w-10 h-10 rounded-full border-2 overflow-hidden bg-slate-950 flex-none" style={{ borderColor: MY_COLOR }}>
               <img src={myProfile?.avatar || "https://api.dicebear.com/7.x/adventurer/svg?seed=me"} alt="Me"
                 className="w-full h-full object-cover"
                 onError={e => { (e.target as HTMLImageElement).src = "https://api.dicebear.com/7.x/adventurer/svg?seed=me"; }} />
               {isMyTurn && (
-                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-purple-500 rounded-full border border-slate-950 animate-pulse" />
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border border-slate-950 animate-pulse" style={{ backgroundColor: MY_COLOR }} />
               )}
             </div>
             <div className="min-w-0">
@@ -1390,9 +1514,9 @@ export default function LudoGamePage() {
                 <div className="flex items-center gap-1.5 bg-purple-950/50 border border-purple-500/30 px-2.5 py-1.5 rounded-xl">
                   <motion.div
                     key={room.last_roll}
-                    initial={{ scale: 0.4, rotate: -180 }}
+                    initial={{ scale: 0.35, rotate: -200 }}
                     animate={{ scale: 1, rotate: 0 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 18 }}
+                    transition={{ type: "spring", stiffness: 320, damping: 13 }}
                   >
                     <DiceFace value={room.last_roll || diceDisplay} size={22} />
                   </motion.div>
@@ -1415,38 +1539,40 @@ export default function LudoGamePage() {
               </div>
             )}
           </div>
-        </div>
+        </motion.div>
 
-        {/* Action hint + forfeit */}
-        <div className="flex items-center justify-between mt-2 px-1">
-          <button
-            onClick={handleForfeit}
-            className="text-[9px] text-red-500/60 hover:text-red-500 font-bold uppercase tracking-wider py-1 px-2 rounded-lg border border-red-500/15 hover:border-red-500/30 transition-colors"
-          >
-            🏳 Forfeit
-          </button>
-          {isMyTurn && room.dice_rolled && (
-            <motion.div
-              animate={{ opacity: [1, 0.5, 1] }}
-              transition={{ duration: 1.2, repeat: Infinity }}
-              className="text-[9px] text-purple-400 font-black uppercase tracking-wider"
-            >
-              Tap a piece to move
-            </motion.div>
-          )}
-          {/* 6-streak dots: 2 sixes = bonus roll earned; a 3rd six forfeits. */}
-          {isMyTurn && (room.consecutive_sixes ?? 0) > 0 && (
-            <div className="flex items-center gap-1">
-              {[1, 2].map(n => (
-                <span
-                  key={n}
-                  className={`w-1.5 h-1.5 rounded-full ${n <= (room.consecutive_sixes ?? 0) ? "bg-amber-400" : "bg-slate-700"}`}
-                />
-              ))}
-              <span className="text-[8px] text-amber-400/80 font-black uppercase">6-streak</span>
-            </div>
-          )}
-          <div className="text-[9px] text-slate-600 font-mono">{room.stake}c</div>
+        {/* Action row — the single forfeit control lives in the header ✕
+            button now, so this row is just status info, evenly split into
+            three equal columns so it never leaves a lopsided gap. */}
+        <div className="flex items-center mt-2 px-1">
+          <div className="flex-1 flex justify-start">
+            {isMyTurn && room.dice_rolled && (
+              <motion.div
+                animate={{ opacity: [1, 0.5, 1] }}
+                transition={{ duration: 1.2, repeat: Infinity }}
+                className="text-[9px] text-purple-400 font-black uppercase tracking-wider"
+              >
+                Tap a piece to move
+              </motion.div>
+            )}
+          </div>
+          <div className="flex-1 flex justify-center">
+            {/* 6-streak dots: 2 sixes = bonus roll earned; a 3rd six forfeits. */}
+            {isMyTurn && (room.consecutive_sixes ?? 0) > 0 && (
+              <div className="flex items-center gap-1">
+                {[1, 2].map(n => (
+                  <span
+                    key={n}
+                    className={`w-1.5 h-1.5 rounded-full ${n <= (room.consecutive_sixes ?? 0) ? "bg-amber-400" : "bg-slate-700"}`}
+                  />
+                ))}
+                <span className="text-[8px] text-amber-400/80 font-black uppercase">6-streak</span>
+              </div>
+            )}
+          </div>
+          <div className="flex-1 flex justify-end">
+            <div className="text-[9px] text-slate-600 font-mono">{room.stake}c</div>
+          </div>
         </div>
       </div>
 
