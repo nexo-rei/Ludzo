@@ -61,6 +61,15 @@ export const TURN_TIMEOUT_SECS    = 18;   // 15 s play + 3 s grace
 export const MATCH_DURATION_SECS  = 480;  // 8 minutes
 export const MAX_CONSECUTIVE_SIXES = 3;   // 3 sixes in a row → forfeit turn
 
+
+/** Rolls that release a token from the yard. Applies to bot and human alike. */
+export const YARD_RELEASE_ROLLS: ReadonlySet<number> = new Set([1, 6]);
+
+/** True if `roll` may bring a token out of the yard. */
+export function canLeaveYard(roll: number): boolean {
+  return YARD_RELEASE_ROLLS.has(roll);
+}
+
 // ── Position helpers ──────────────────────────────────────────────────────────
 
 export function toAbsTrack(relPos: number, isPlayer1: boolean): number | null {
@@ -162,8 +171,8 @@ export function calcMovablePieces(
     const pos = pieces[i];
     if (pos === 57) continue;
     if (pos === 0) {
-      // Leaving the yard requires a 6 AND the start cell must not be blocked.
-      if (roll === 6 && !pathCrossesBlock(0, 1, amPlayer1, blocked)) movable.push(i);
+            // Leaving the yard requires a release roll (1 or 6).
+      if (canLeaveYard(roll) && !pathCrossesBlock(0, 1, amPlayer1, blocked)) movable.push(i);
       continue;
     }
     if (canAdvance(pos, roll)) {
@@ -225,7 +234,7 @@ export function applyMove(
     return reject("invalid piece index for this board");
   }
   if (currPos === 57) return reject("piece already finished");
-  if (currPos === 0 && roll !== 6) return reject("a 6 is required to leave the yard");
+  if (currPos === 0 && !canLeaveYard(roll)) return reject("a 1 or a 6 is required to leave the yard");
 
   const newPos = currPos === 0 ? 1 : currPos + roll;
 
