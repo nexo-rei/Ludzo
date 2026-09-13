@@ -48,7 +48,21 @@ export default function AdminSettingsPage() {
       const res = await fetch("/api/admin/settings", { headers: { Authorization: `Bearer ${getToken()}` } });
       if (res.status === 401) { router.replace("/admin"); return; }
       const data = await res.json();
-      if (data.success) setSettings({ ...DEFAULT_SETTINGS, ...data.data });
+            if (data.success) {
+        // The settings table stores every value as TEXT, so booleans arrive as
+        // "true"/"false". Spreading them raw left maintenance_mode holding the
+        // string "false", and !"false" is false — the toggle could never turn
+        // the app off. Coerce back to the types DEFAULT_SETTINGS declares.
+        const raw = (data.data ?? {}) as Record<string, string>;
+        const coerced: Record<string, string | number | boolean> = {};
+        for (const [key, value] of Object.entries(raw)) {
+          const def = DEFAULT_SETTINGS[key as keyof AppSettings];
+          if (typeof def === "boolean")      coerced[key] = String(value) === "true";
+          else if (typeof def === "number")  coerced[key] = Number(value) || 0;
+          else                               coerced[key] = value;
+        }
+        setSettings({ ...DEFAULT_SETTINGS, ...coerced } as AppSettings);
+      }
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, [router]);
