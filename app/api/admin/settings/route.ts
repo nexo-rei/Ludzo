@@ -32,10 +32,7 @@ export async function POST(req: NextRequest) {
     const upserts = Object.entries(settings).map(([key, value]) => ({
       key,
       value: String(value),
-      updated_at: new Date().toISOString(),
-      updated_by: auth.adminId,
     }));
-
         const { error: upsertErr } = await supabase
       .from("settings")
       .upsert(upserts, { onConflict: "key" });
