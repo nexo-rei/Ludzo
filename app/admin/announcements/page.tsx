@@ -143,7 +143,6 @@ export default function AdminAnnouncementsPage() {
                     <p className="text-[10px] text-gray-600 mt-1">{formatDateTime(item.created_at)}</p>
                   </div>
                   <div className="flex gap-1.5">
-                                      <div className="flex gap-1.5">
                     <button
                       onClick={() => handleBroadcast(item)}
                       disabled={sending === item.id}
