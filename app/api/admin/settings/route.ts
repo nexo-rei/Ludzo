@@ -36,7 +36,28 @@ export async function POST(req: NextRequest) {
       updated_by: auth.adminId,
     }));
 
-    await supabase.from("settings").upsert(upserts, { onConflict: "key" });
+        const { error: upsertErr } = await supabase
+      .from("settings")
+      .upsert(upserts, { onConflict: "key" });
+
+    if (upsertErr) {
+      console.error(
+        `[ADMIN SETTINGS] UPSERT FAILED code=${upsertErr.code} ${upsertErr.message} ` +
+        `details=${upsertErr.details ?? "-"} hint=${upsertErr.hint ?? "-"} ` +
+        `keys=${JSON.stringify(upserts.map(u => u.key))}`
+      );
+      return NextResponse.json(
+        { success: false, error: `Save failed: ${upsertErr.message}` },
+        { status: 500 }
+      );
+    }
+
+    const { data: verify } = await supabase
+      .from("settings")
+      .select("key, value")
+      .eq("key", "maintenance_mode")
+      .maybeSingle();
+    console.log(`[ADMIN SETTINGS] saved. maintenance_mode now = ${JSON.stringify(verify?.value)}`);
 
     await supabase.from("admin_logs").insert({
       admin_id: auth.adminId,
