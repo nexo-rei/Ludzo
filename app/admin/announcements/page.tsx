@@ -85,6 +85,35 @@ export default function AdminAnnouncementsPage() {
     } catch { showToast("Failed to delete", "error"); }
   };
 
+  
+  const [sending, setSending] = useState<string | null>(null);
+
+  const handleBroadcast = async (item: { id: string; title: string; description: string }) => {
+    if (!confirm(`Send "${item.title}" to ALL users on Telegram?`)) return;
+    setSending(item.id);
+    try {
+      const res = await fetch("/api/admin/broadcast", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({
+          title: item.title,
+          description: item.description,
+          url: "https://t.me/LudzoBot?startapp",
+        }),
+      });
+      const data = await res.json();
+      if (data.success) showToast(`Sent to ${data.data.sent} of ${data.data.total} users`, "success");
+      else showToast(data.error ?? "Broadcast failed", "error");
+    } catch {
+      showToast("Broadcast failed", "error");
+    } finally {
+      setSending(null);
+    }
+  };
+
   return (
     <AdminShell title="Announcements">
       <div className="p-4 md:p-6 space-y-4">
@@ -114,6 +143,15 @@ export default function AdminAnnouncementsPage() {
                     <p className="text-[10px] text-gray-600 mt-1">{formatDateTime(item.created_at)}</p>
                   </div>
                   <div className="flex gap-1.5">
+                                      <div className="flex gap-1.5">
+                    <button
+                      onClick={() => handleBroadcast(item)}
+                      disabled={sending === item.id}
+                      title="Send to all users on Telegram"
+                      className="p-2 rounded-lg bg-[#222] text-gray-400 hover:text-blue-400 hover:bg-[#333] transition-colors disabled:opacity-40"
+                    >
+                      {sending === item.id ? "…" : "📢"}
+                    </button>
                     <button onClick={() => openEdit(item)} className="p-2 rounded-lg bg-[#222] text-gray-400 hover:text-[#A855F7] hover:bg-[#333] transition-colors">
                       <Pencil size={13} />
                     </button>
