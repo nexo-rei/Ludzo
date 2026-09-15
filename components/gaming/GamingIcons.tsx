@@ -664,3 +664,187 @@ export function ArrowRightIcon({ size = 16, className }: IconProps) {
     </svg>
   );
 }
+
+// ─── Arena Tab Icons (custom hand-built SVG set for the 3-tab game nav) ───
+
+/** Home tab — arena house with a dice porthole. */
+export function ArenaHomeIcon({ size = 24, className, active }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      className={baseClass(className)}
+    >
+      <path
+        d="M3.1 10.7 12 3.3l8.9 7.4"
+        stroke="currentColor"
+        strokeWidth={active ? 2.2 : 1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M5.5 9.7V19a1.9 1.9 0 0 0 1.9 1.9h9.2A1.9 1.9 0 0 0 18.5 19V9.7"
+        stroke="currentColor"
+        strokeWidth={active ? 2.2 : 1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill={active ? "currentColor" : "none"}
+        fillOpacity={active ? 0.12 : 0}
+      />
+      <rect
+        x="9.1"
+        y="11.9"
+        width="5.8"
+        height="5.8"
+        rx="1.7"
+        stroke="currentColor"
+        strokeWidth={active ? 1.9 : 1.6}
+      />
+      <circle cx="10.9" cy="13.7" r="0.75" fill="currentColor" />
+      <circle cx="13.1" cy="15.9" r="0.75" fill="currentColor" />
+      <circle cx="13.1" cy="13.7" r="0.6" fill="currentColor" fillOpacity="0.65" />
+    </svg>
+  );
+}
+
+/** Play tab — Ludo dice with pips. */
+export function ArenaLudoIcon({ size = 24, className, active }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      className={baseClass(className)}
+    >
+      <rect
+        x="3.2"
+        y="3.2"
+        width="17.6"
+        height="17.6"
+        rx="5"
+        stroke="currentColor"
+        strokeWidth={active ? 2.2 : 1.8}
+        fill={active ? "currentColor" : "none"}
+        fillOpacity={active ? 0.12 : 0}
+      />
+      <circle cx="8.6" cy="8.6" r="1.45" fill="currentColor" />
+      <circle cx="15.4" cy="8.6" r="1.45" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.7" fill="currentColor" />
+      <circle cx="8.6" cy="15.4" r="1.45" fill="currentColor" />
+      <circle cx="15.4" cy="15.4" r="1.45" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Profile tab — player head with a rank star. */
+export function ArenaProfileIcon({ size = 24, className, active }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      className={baseClass(className)}
+    >
+      <circle
+        cx="11.2"
+        cy="8.2"
+        r="3.9"
+        stroke="currentColor"
+        strokeWidth={active ? 2.2 : 1.8}
+        fill={active ? "currentColor" : "none"}
+        fillOpacity={active ? 0.16 : 0}
+      />
+      <path
+        d="M3.9 20.4c.8-3.9 3.8-6.1 7.3-6.1 1.3 0 2.5.3 3.55.85"
+        stroke="currentColor"
+        strokeWidth={active ? 2.2 : 1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="m18.6 11.2 1.05 2.1 2.3.33-1.67 1.62.4 2.3-2.08-1.1-2.08 1.1.4-2.3-1.67-1.62 2.3-.33z"
+        fill="currentColor"
+        stroke="currentColor"
+        strokeWidth="0.6"
+        strokeLinejoin="round"
+        opacity={active ? 1 : 0.75}
+      />
+    </svg>
+  );
+}
+
+/** Battle-log / match history icon. */
+export function BattleLogIcon({ size = 24, className, active }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      className={baseClass(className)}
+    >
+      <rect
+        x="3.2"
+        y="3.6"
+        width="17.6"
+        height="16.8"
+        rx="3.4"
+        stroke="currentColor"
+        strokeWidth={active ? 2.2 : 1.8}
+        fill={active ? "currentColor" : "none"}
+        fillOpacity={active ? 0.12 : 0}
+      />
+      <path
+        d="M8 9.2l3 3-3 3"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M13.4 15.2h3.4" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" />
+      <path d="M13.4 8.8h3.4" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Single dice (stake chips / roll hints). */
+export function DiceIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={baseClass(className)}>
+      <rect x="3.2" y="3.2" width="17.6" height="17.6" rx="5" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="8.6" cy="8.6" r="1.4" fill="currentColor" />
+      <circle cx="15.4" cy="15.4" r="1.4" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.4" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Pawn / token piece used for stake rows. */
+export function TokenIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={baseClass(className)}>
+      <path
+        d="M12 3.2a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9.4 9.4h5.2l1.1 3.1a4 4 0 0 1-1.2 1.4h-5a4 4 0 0 1-1.2-1.4l1.1-3.1Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6.4 20.8c0-2.3 1.9-3.6 5.6-3.6s5.6 1.3 5.6 3.6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}

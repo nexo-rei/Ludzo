@@ -255,7 +255,7 @@ export interface HomePageSettings {
 
 export interface HomePageData {
   user: HomePageUser;
-  wallet: { coin_balance: number; usdt_balance: number };
+  wallet: { coin_balance: number; usdt_balance: number; won_coins_balance?: number };
   ads: HomePageAds;
   streak: HomePageStreak;
   announcements: Announcement[];

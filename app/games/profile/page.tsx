@@ -1,190 +1,453 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+/**
+ * LUDZO — Gaming Hub Profile (/games/profile)
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Tab 3 of the 3-tab game section. It is the hub for EVERYTHING that is not
+ * Home or Play — most importantly the Matches / battle-history entry that used
+ * to be its own nav tab.
+ *
+ * Data sources (no local guessing anywhere):
+ *   • wallets    → coin_balance, won_coins_balance, usdt_balance  (/api/wallet)
+ *   • ludo_stats → wins, losses, win_rate, streaks, total_won_coins
+ *                  (/api/ludo/stats — written by settle_ludo_match())
+ *
+ * That is why "matches won" and "coins won" now actually appear here: the old
+ * screen rendered localStorage demo stats that real matches never touched.
+ */
+
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
+import {
+  Trophy,
+  Crown,
+  ReceiptText,
+  Settings as SettingsIcon,
+  BookOpen,
+  LifeBuoy,
+  LogOut,
+  RotateCw,
+  ChevronRight,
+} from "lucide-react";
 import { useApp } from "@/hooks/useApp";
-import { TrophyIcon, CoinIcon } from "@/components/ui/Icons";
+import { CoinIcon } from "@/components/ui/Icons";
+import { showToast } from "@/components/ui/Toast";
+import { BattleLogIcon, DiceIcon, TokenIcon, LudoIcon } from "@/components/gaming/GamingIcons";
 
-export default function ProfilePage() {
-  const { wallet, userId, user } = useApp();
-  const [stats, setStats] = useState<any>({
-    wins: 0,
-    losses: 0,
-    total_matches: 0,
-    win_rate: "0%",
-    current_streak: 0,
-    best_streak: 0,
-    total_won_coins: 0
-  });
+interface Stats {
+  wins: number;
+  losses: number;
+  total_matches: number;
+  win_rate: string;
+  current_streak: number;
+  best_streak: number;
+  total_won_coins: number;
+}
+
+const EMPTY_STATS: Stats = {
+  wins: 0, losses: 0, total_matches: 0, win_rate: "0%",
+  current_streak: 0, best_streak: 0, total_won_coins: 0,
+};
+
+const RULES = [
+  { icon: "🎲", text: "Roll a 6 to release a token from your yard." },
+  { icon: "🎯", text: "Both of your tokens must reach home to win the pool." },
+  { icon: "🔁", text: "A 6, a capture or a finished token grants a bonus roll." },
+  { icon: "⚠️", text: "Three 6s in a row — the third roll is forfeited." },
+  { icon: "🛡️", text: "★ cells are safe; nobody can capture you there." },
+  { icon: "⏱️", text: "18 seconds per turn, 8 minute cap, 3 hearts." },
+];
+
+interface MenuItem {
+  label: string;
+  hint: string;
+  href?: string;
+  action?: "rules" | "support" | "exit";
+  tint: string;
+  Icon: React.ComponentType<{ size?: number; className?: string; active?: boolean }>;
+}
+
+const MENU: MenuItem[] = [
+  { label: "Battle History",  hint: "Every match & Coin result", href: "/games/matches", tint: "#A855F7", Icon: BattleLogIcon },
+  { label: "Leaderboard",     hint: "Top earners this season",   href: "/leaderboard",   tint: "#F59E0B", Icon: Trophy },
+  { label: "How to Play",     hint: "Rules in 20 seconds",       action: "rules",        tint: "#3B82F6", Icon: BookOpen },
+  { label: "Transactions",    hint: "Deposits, wins & payouts",  href: "/history",       tint: "#10B981", Icon: ReceiptText },
+  { label: "Settings",        hint: "Theme, language & sound",   href: "/settings",      tint: "#94A3B8", Icon: SettingsIcon },
+  { label: "Gaming Support",  hint: "Talk to the arena team",    action: "support",      tint: "#22D3EE", Icon: LifeBuoy },
+  { label: "Exit Gaming Hub", hint: "Back to the main app",      action: "exit",         tint: "#F97316", Icon: LogOut },
+];
+
+export default function GamingProfilePage() {
+  const router = useRouter();
+  const { user, userId, wallet, refreshWallet } = useApp();
+
+  const [stats, setStats] = useState<Stats>(EMPTY_STATS);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
 
-  useEffect(() => {
-    const loadStats = async () => {
-      if (!userId) return;
-      try {
-        const res = await fetch("/api/ludo/stats", {
-          headers: { "Authorization": `Bearer ${userId}`, "x-user-id": userId || "" }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && data.data) {
-            setStats(data.data.stats);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load profile stats:", err);
-      } finally {
-        setLoading(false);
+  const load = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const res = await fetch("/api/ludo/stats", {
+        headers: { "Authorization": `Bearer ${userId}`, "x-user-id": userId },
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) setStats({ ...EMPTY_STATS, ...(json.data.stats ?? {}) });
       }
-    };
-
-    loadStats();
+    } catch { /* silent */ }
+    finally { setLoading(false); setRefreshing(false); }
   }, [userId]);
 
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (userId) refreshWallet(); }, [userId, refreshWallet]);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    refreshWallet();
+    load();
+  };
+
+  const handleMenuAction = (item: MenuItem) => {
+    if (item.action === "rules") { setRulesOpen(true); return; }
+    if (item.action === "support") {
+      showToast("Opening Ludzo support…", "info");
+      window.open("https://t.me/ludzo_support", "_blank");
+      return;
+    }
+    if (item.action === "exit") { router.push("/home"); return; }
+  };
+
+  const coins     = wallet?.coin_balance ?? 0;
+  const wonCoins  = wallet?.won_coins_balance ?? 0;
+  const usdt      = wallet?.usdt_balance ?? 0;
+  const hasPlayed = stats.total_matches > 0;
+
   return (
-    <div className="min-h-screen w-full bg-slate-950 text-white pb-24">
-      <div className="mx-auto max-w-[480px] px-4 pt-5 pb-6 space-y-6">
-        {/* Page Header */}
+    <div className="relative min-h-screen w-full overflow-x-hidden text-white">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <motion.div
-          initial={{ opacity: 0, y: -6 }}
+          className="absolute -top-16 left-1/4 h-56 w-56 rounded-full bg-purple-600/20 blur-3xl"
+          animate={{ opacity: [0.35, 0.7, 0.35] }}
+          transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+        />
+      </div>
+
+      <div className="relative z-10 mx-auto w-full max-w-app px-4 pt-4 space-y-4 hub-pad-bottom-lg select-none">
+
+        {/* ── Header ───────────────────────────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="flex items-center gap-3"
+          className="flex items-start justify-between gap-3"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gaming-primary/10 text-gaming-primary">
-            <TrophyIcon size={22} className="text-purple-400" />
-          </div>
           <div>
-            <h1 className="text-lg font-bold text-gaming-foreground">My Profile</h1>
-            <p className="text-xs text-gaming-muted text-purple-400/80">Ludo statistics & standings</p>
+            <h1 className="text-xl font-black tracking-tight text-slate-50">Gamer Profile</h1>
+            <p className="mt-0.5 text-[10px] font-black uppercase tracking-widest text-purple-400">
+              Pro Identity
+            </p>
           </div>
+
+          <motion.button
+            whileTap={{ scale: 0.92, rotate: -25 }}
+            onClick={handleRefresh}
+            aria-label="Refresh profile"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-purple-500/35 bg-slate-900/70 text-purple-300"
+          >
+            <RotateCw size={15} className={refreshing ? "animate-spin" : ""} />
+          </motion.button>
         </motion.div>
 
-        {/* User Card — live data from the main account */}
+        {/* ── Identity card ────────────────────────────────────────────────── */}
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative rounded-2xl border border-purple-500/20 bg-slate-900/40 p-5 flex items-center gap-4"
+          transition={{ delay: 0.05 }}
+          className="surface-glass relative overflow-hidden rounded-3xl p-5"
         >
-          <div className="w-16 h-16 rounded-full border-2 border-purple-500 overflow-hidden bg-slate-950 shadow-lg flex-none">
-            <img
-              src={user?.photo_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${userId ?? "me"}`}
-              alt="Avatar"
-              className="w-full h-full object-cover"
-              onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${userId ?? "me"}`; }}
-            />
+          <div className="pointer-events-none absolute -right-6 -top-8 opacity-[0.12]">
+            <LudoIcon size={130} className="text-purple-300" />
           </div>
-          <div className="min-w-0">
-            <h2 className="text-base font-black text-slate-100 truncate">{user?.first_name ?? "Player"}</h2>
-            {user?.username && (
-              <span className="text-[10px] text-slate-400 font-bold block truncate">@{user.username}</span>
-            )}
-            <span className="text-[10px] text-purple-400 font-extrabold uppercase tracking-wider block mt-1">Ludo Pro Division</span>
+
+          <div className="relative z-10 flex items-center gap-4">
+            <div className="relative h-16 w-16 flex-none overflow-hidden rounded-2xl border-2 border-purple-500/60 bg-slate-900 shadow-[0_0_20px_rgba(168,85,247,0.4)]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={user?.photo_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${userId ?? "me"}`}
+                alt="Avatar"
+                className="h-full w-full object-cover"
+                onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${userId ?? "me"}`; }}
+              />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <h2 className="flex items-center gap-2 text-base font-black tracking-tight text-white">
+                <span className="truncate">{user?.first_name ?? "Player"}</span>
+                <span className="flex-none rounded border border-purple-500/30 bg-purple-600/25 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-purple-300">
+                  Pro
+                </span>
+              </h2>
+              {user?.username && (
+                <p className="mt-0.5 truncate text-[11px] font-bold text-purple-300">@{user.username}</p>
+              )}
+              <p className="mt-1 flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-amber-400">
+                <Crown size={11} /> {stats.best_streak} best streak
+              </p>
+            </div>
           </div>
         </motion.div>
 
-        {/* Wallet mini-cards */}
-        <div className="grid grid-cols-2 gap-2.5">
-          <div className="rounded-xl border border-amber-500/15 bg-amber-500/5 p-3">
-            <span className="text-[9px] text-amber-400/80 font-black uppercase tracking-wider block">Coin Balance</span>
-            <span className="text-base font-black text-amber-400 mt-0.5 block tabular-nums">{wallet?.coin_balance ?? 0}</span>
+        {/* ── Wallet ───────────────────────────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="grid grid-cols-2 gap-2.5"
+        >
+          <div className="surface-glass rounded-2xl px-4 py-3">
+            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Playable Coins</span>
+            <div className="mt-1 flex items-center gap-1.5">
+              <CoinIcon size={16} className="text-amber-400" />
+              <span className="text-lg font-black tabular-nums text-white">{coins.toLocaleString()}</span>
+            </div>
           </div>
-          <div className="rounded-xl border border-emerald-500/15 bg-emerald-500/5 p-3">
-            <span className="text-[9px] text-emerald-400/80 font-black uppercase tracking-wider block">Won Coins</span>
-            <span className="text-base font-black text-emerald-400 mt-0.5 block tabular-nums">{wallet?.won_coins_balance ?? 0}</span>
+
+          <div className="surface-glass rounded-2xl px-4 py-3">
+            <span className="text-[9px] font-black uppercase tracking-widest text-purple-300">Won Coins</span>
+            <div className="mt-1 flex items-center gap-1.5">
+              <TokenIcon size={16} className="text-purple-300" />
+              <span className="text-lg font-black tabular-nums text-purple-300">{wonCoins.toLocaleString()}</span>
+            </div>
           </div>
-        </div>
 
-        {/* Pro Stats Cards Grid */}
-        <div className="space-y-3.5">
-          <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 px-0.5">Gaming statistics</h3>
+          <div className="surface-glass col-span-2 flex items-center justify-between gap-3 rounded-2xl px-4 py-3">
+            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+              Cash · 100 Won Coins = $1
+            </span>
+            <span className="font-mono text-sm font-black text-emerald-400">${usdt.toFixed(2)}</span>
+          </div>
+        </motion.div>
 
-          {loading ? (
-            <div className="grid grid-cols-2 gap-3.5">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="h-20 rounded-xl bg-slate-900/50 animate-pulse border border-slate-900" />
-              ))}
+        {/* ── Statistics ───────────────────────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="space-y-2.5"
+        >
+          <div className="flex items-end justify-between px-0.5">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-purple-300">
+              Gaming Statistics
+            </h3>
+            {loading && <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Syncing…</span>}
+          </div>
+
+          {!hasPlayed && !loading ? (
+            <div className="surface-glass flex flex-col items-center gap-3 rounded-3xl px-5 py-8 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-purple-500/20 bg-purple-500/10 text-purple-300">
+                <DiceIcon size={26} />
+              </div>
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wide text-slate-200">No matches yet</h4>
+                <p className="mx-auto mt-1 max-w-[230px] text-[10px] font-medium leading-relaxed text-slate-500">
+                  Finish your first Ludo match and your wins, streaks and Won Coins will appear here.
+                </p>
+              </div>
+              <motion.button
+                whileTap={{ scale: 0.96 }}
+                onClick={() => router.push("/games")}
+                className="h-9 rounded-xl border border-purple-400/40 bg-gradient-to-r from-purple-600 to-indigo-600 px-4 text-[10px] font-black uppercase tracking-widest text-white"
+              >
+                Play first match
+              </motion.button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3.5">
-              {/* Total Matches */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="p-4 rounded-xl border border-slate-900 bg-slate-900/30 flex flex-col justify-between h-20"
-              >
-                <span className="text-[9px] text-slate-500 font-extrabold uppercase tracking-wide">Total Matches</span>
-                <span className="text-lg font-black text-slate-100 mt-1">{stats.total_matches}</span>
-              </motion.div>
-
-              {/* Win Rate */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="p-4 rounded-xl border border-slate-900 bg-slate-900/30 flex flex-col justify-between h-20"
-              >
-                <span className="text-[9px] text-slate-500 font-extrabold uppercase tracking-wide">Win Rate</span>
-                <span className="text-lg font-black text-amber-400 mt-1">{stats.win_rate}</span>
-              </motion.div>
-
-              {/* Wins */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="p-4 rounded-xl border border-slate-900 bg-slate-900/30 flex flex-col justify-between h-20"
-              >
-                <span className="text-[9px] text-slate-500 font-extrabold uppercase tracking-wide">Wins</span>
-                <span className="text-lg font-black text-emerald-400 mt-1">{stats.wins}</span>
-              </motion.div>
-
-              {/* Losses */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="p-4 rounded-xl border border-slate-900 bg-slate-900/30 flex flex-col justify-between h-20"
-              >
-                <span className="text-[9px] text-slate-500 font-extrabold uppercase tracking-wide">Losses</span>
-                <span className="text-lg font-black text-red-500 mt-1">{stats.losses}</span>
-              </motion.div>
-
-              {/* Current Streak */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="p-4 rounded-xl border border-slate-900 bg-slate-900/30 flex flex-col justify-between h-20"
-              >
-                <span className="text-[9px] text-slate-500 font-extrabold uppercase tracking-wide">Current Streak</span>
-                <span className="text-lg font-black text-emerald-400 mt-1">🔥 {stats.current_streak}</span>
-              </motion.div>
-
-              {/* Best Streak */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="p-4 rounded-xl border border-slate-900 bg-slate-900/30 flex flex-col justify-between h-20"
-              >
-                <span className="text-[9px] text-slate-500 font-extrabold uppercase tracking-wide">Best Streak</span>
-                <span className="text-lg font-black text-amber-400 mt-1">👑 {stats.best_streak}</span>
-              </motion.div>
-            </div>
-          )}
-
-          {/* Total Earnings */}
-          {!loading && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="p-5 rounded-xl border border-purple-500/20 bg-gradient-to-r from-purple-950/20 to-slate-950 flex items-center justify-between"
-            >
-              <div>
-                <span className="text-[9px] text-purple-400 font-black uppercase tracking-wider block">Total Won Coins Earned</span>
-                <span className="text-xl font-black text-amber-400 mt-1 block">{stats.total_won_coins} Coins</span>
+            <>
+              <div className="grid grid-cols-3 gap-2.5">
+                {[
+                  { label: "Battles", value: stats.total_matches, tone: "text-slate-100" },
+                  { label: "Wins", value: stats.wins, tone: "text-emerald-400" },
+                  { label: "Losses", value: stats.losses, tone: "text-red-400" },
+                ].map((cell, i) => (
+                  <motion.div
+                    key={cell.label}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.18 + i * 0.04 }}
+                    className="surface-glass rounded-2xl px-3 py-3.5 text-center"
+                  >
+                    <span className={`block text-base font-black tabular-nums ${cell.tone}`}>{cell.value}</span>
+                    <span className="mt-0.5 block text-[9px] font-black uppercase tracking-wider text-slate-500">
+                      {cell.label}
+                    </span>
+                  </motion.div>
+                ))}
               </div>
-              <CoinIcon size={28} className="text-amber-400" />
-            </motion.div>
+
+              <div className="grid grid-cols-3 gap-2.5">
+                {[
+                  { label: "Win Rate", value: stats.win_rate, tone: "text-purple-300" },
+                  { label: "Streak", value: `🔥 ${stats.current_streak}`, tone: "text-amber-400" },
+                  { label: "Best", value: `👑 ${stats.best_streak}`, tone: "text-amber-400" },
+                ].map((cell, i) => (
+                  <motion.div
+                    key={cell.label}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.3 + i * 0.04 }}
+                    className="surface-glass rounded-2xl px-3 py-3.5 text-center"
+                  >
+                    <span className={`block text-sm font-black tabular-nums ${cell.tone}`}>{cell.value}</span>
+                    <span className="mt-0.5 block text-[9px] font-black uppercase tracking-wider text-slate-500">
+                      {cell.label}
+                    </span>
+                  </motion.div>
+                ))}
+              </div>
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.4 }}
+                className="relative overflow-hidden rounded-2xl border border-amber-500/25 bg-gradient-to-r from-amber-500/10 to-purple-500/5 p-4"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <span className="block text-[9px] font-black uppercase tracking-widest text-amber-300/90">
+                      Total Won Coins earned
+                    </span>
+                    <motion.span
+                      key={stats.total_won_coins}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-1 block text-xl font-black tabular-nums text-amber-400"
+                    >
+                      {stats.total_won_coins.toLocaleString()}
+                    </motion.span>
+                  </div>
+                  <TokenIcon size={30} className="text-amber-400/90" />
+                </div>
+              </motion.div>
+            </>
           )}
-        </div>
+        </motion.div>
+
+        {/* ── Menu (Matches + everything else) ─────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="space-y-2.5"
+        >
+          <h3 className="px-0.5 text-[10px] font-black uppercase tracking-widest text-purple-300">
+            Arena Options
+          </h3>
+
+          <div className="surface-glass divide-y divide-slate-800/70 overflow-hidden rounded-3xl">
+            {MENU.map((item, i) => {
+              const Icon = item.Icon;
+              const inner = (
+                <div className="flex items-center gap-3.5 px-4 py-3.5">
+                  <span
+                    className="flex h-9 w-9 flex-none items-center justify-center rounded-xl"
+                    style={{ background: `${item.tint}1F`, border: `1px solid ${item.tint}33`, color: item.tint }}
+                  >
+                    <Icon size={17} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-xs font-extrabold text-slate-100">{item.label}</span>
+                    <span className="mt-0.5 block truncate text-[10px] font-semibold text-slate-500">{item.hint}</span>
+                  </span>
+                  <ChevronRight size={16} className="flex-none text-slate-500" />
+                </div>
+              );
+
+              return (
+                <motion.div
+                  key={item.label}
+                  initial={{ opacity: 0, x: -6 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.24 + i * 0.04 }}
+                >
+                  {item.href ? (
+                    <Link href={item.href} className="block transition-colors hover:bg-white/5 active:bg-white/10">
+                      {inner}
+                    </Link>
+                  ) : (
+                    <button
+                      onClick={() => handleMenuAction(item)}
+                      className="block w-full text-left transition-colors hover:bg-white/5 active:bg-white/10"
+                    >
+                      {inner}
+                    </button>
+                  )}
+                </motion.div>
+              );
+            })}
+          </div>
+        </motion.div>
+
+        <p className="px-1 pt-1 text-center text-[9px] font-bold uppercase tracking-widest text-slate-600">
+          LUDZO Arena · Pro Division
+        </p>
       </div>
+
+      {/* ── RULES SHEET ────────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {rulesOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setRulesOpen(false)}
+            className="fixed inset-0 z-[100] flex items-end justify-center bg-black/80 p-4 backdrop-blur-sm sm:items-center"
+            style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+          >
+            <motion.div
+              initial={{ y: 60, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+              transition={{ type: "spring", damping: 26, stiffness: 320 }}
+              onClick={(e) => e.stopPropagation()}
+              className="surface-glass w-full max-w-sm rounded-3xl p-5"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-black uppercase tracking-widest text-white">How to Play</h3>
+                <button onClick={() => setRulesOpen(false)} className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Close
+                </button>
+              </div>
+
+              <div className="mt-4 space-y-2">
+                {RULES.map((rule, i) => (
+                  <motion.div
+                    key={rule.text}
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="flex items-start gap-2.5 rounded-xl border border-slate-800/70 bg-slate-950/50 px-3 py-2.5"
+                  >
+                    <span className="mt-0.5 flex-none text-sm leading-none">{rule.icon}</span>
+                    <span className="text-[11px] font-semibold leading-snug text-slate-300">{rule.text}</span>
+                  </motion.div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => { setRulesOpen(false); router.push("/games"); }}
+                className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-purple-400/40 bg-gradient-to-r from-purple-600 to-indigo-600 text-[11px] font-black uppercase tracking-widest text-white"
+              >
+                <DiceIcon size={16} />
+                Enter the arena
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
