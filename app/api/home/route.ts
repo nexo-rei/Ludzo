@@ -51,7 +51,7 @@ console.log("HOME USER ERROR:", JSON.stringify(userError));
       recentActivityRes,
       leaderboardRes,
     ] = await Promise.all([
-      supabase.from("wallets").select("coin_balance, usdt_balance").eq("user_id", user.id).maybeSingle(),
+      supabase.from("wallets").select("coin_balance, usdt_balance, won_coins_balance").eq("user_id", user.id).maybeSingle(),
       supabase.from("ad_logs").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("ad_type", "normal").gte("created_at", todayStart),
       supabase.from("daily_streaks").select("*").eq("user_id", user.id).maybeSingle(),
       supabase.from("announcements").select("id, title, description, priority, created_at").eq("is_active", true).order("priority", { ascending: false }).limit(3),
@@ -72,7 +72,7 @@ console.log("HOME USER ERROR:", JSON.stringify(userError));
       success: true,
       data: {
         user: { id: user.id, first_name: user.first_name, photo_url: user.photo_url },
-        wallet: walletRes.data ?? { coin_balance: 0, usdt_balance: 0 },
+        wallet: walletRes.data ?? { coin_balance: 0, usdt_balance: 0, won_coins_balance: 0 },
         ads: {
           watched_today: adCountRes.count ?? 0,
           daily_limit: settings.daily_ad_limit,

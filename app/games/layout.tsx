@@ -3,30 +3,47 @@
 import { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import GamingBottomNav from "@/components/gaming/GamingBottomNav";
+import { ToastContainer } from "@/components/ui/Toast";
 
 interface GamingLayoutProps {
   children: ReactNode;
 }
 
+/**
+ * Gaming Hub shell — applies to every /games/* route.
+ *
+ * • /games/game/[roomId] takes over the whole viewport (no chrome at all).
+ * • Everything else gets the arena background + the 3-tab hub nav.
+ * • The main app BottomNav renders nothing on /games/* so there is never a
+ *   doubled / overlapping navigation bar again.
+ */
 export default function GamingLayout({ children }: GamingLayoutProps) {
   const pathname = usePathname();
   const isGameRoute = pathname.startsWith("/games/game/");
 
-  // Game screen takes over the full viewport — no layout chrome at all
+  // The live board ships its own full-screen chrome — but it still fires
+  // toasts (forfeit, errors), so the container has to stay mounted.
   if (isGameRoute) {
-    return <>{children}</>;
+    return (
+      <>
+        <ToastContainer />
+        {children}
+      </>
+    );
   }
 
   return (
-    <div className="relative min-h-screen w-full bg-gaming-background text-gaming-foreground overflow-x-hidden">
-      {/* Ambient background */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-0 left-1/4 w-72 h-72 bg-gaming-accent/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-gaming-primary/5 rounded-full blur-3xl" />
+    <div className="relative min-h-screen w-full overflow-x-hidden gaming-gradient-bg text-slate-100">
+      {/* Ambient background glows */}
+      <div className="pointer-events-none fixed inset-0 z-0">
+        <div className="absolute left-1/4 top-0 h-72 w-72 rounded-full bg-purple-500/10 blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/4 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl" />
       </div>
 
-      {/* Page content — NO AnimatePresence wrapper (caused blank frame on game route transition) */}
-      <main className="relative z-10 pb-24">
+      {/* Page content — each page owns its own bottom padding (.hub-pad-bottom-lg) */}
+      <ToastContainer />
+
+      <main className="relative z-10">
         {children}
       </main>
 

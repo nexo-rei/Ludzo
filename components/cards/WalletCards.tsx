@@ -9,6 +9,8 @@ interface WalletCardsProps {
   coinBalance: number;
   usdtBalance: number;
   coinRate?: number;
+  /** Won Coins (convertible) — straight from wallets.won_coins_balance */
+  wonCoins?: number;
 }
 
 function LudzoCoinIcon({ size = 22 }: { size?: number }) {
@@ -33,11 +35,17 @@ function LudzoCoinIcon({ size = 22 }: { size?: number }) {
   );
 }
 
-export default function WalletCards({ coinBalance, usdtBalance, coinRate = 100 }: WalletCardsProps) {
+export default function WalletCards({
+  coinBalance,
+  usdtBalance,
+  coinRate = 100,
+  wonCoins = 0,
+}: WalletCardsProps) {
   const coinValue = (coinBalance / coinRate).toFixed(2);
 
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
       {/* Coin Balance Card */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -115,6 +123,50 @@ export default function WalletCards({ coinBalance, usdtBalance, coinRate = 100 }
             style={{ background: "var(--bg-elevated)", color: "var(--text-muted)", border: "1px solid var(--border)" }}>
             <ArrowUpRight size={10} /> Out
           </Link>
+        </div>
+      </motion.div>
+      </div>
+
+      {/* Won Coins (convertible) — DB value, never a local guess */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2, duration: 0.4 }}
+        className="relative overflow-hidden rounded-2xl p-3.5"
+        style={{
+          background: "linear-gradient(135deg, rgba(168,85,247,0.16) 0%, rgba(124,58,237,0.06) 100%)",
+          border: "1px solid rgba(168,85,247,0.28)",
+        }}
+      >
+        <div className="absolute top-0 right-0 w-20 h-20 rounded-full opacity-25 pointer-events-none"
+          style={{ background: "radial-gradient(circle, #A855F7 0%, transparent 70%)", transform: "translate(30%, -30%)" }} />
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "#94A3B8" }}>
+              Won Coins
+            </span>
+            <motion.div
+              key={wonCoins}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35 }}
+              className="font-numeric text-lg font-black"
+              style={{ color: "#C084FC" }}
+            >
+              {formatCoins(wonCoins)}
+            </motion.div>
+          </div>
+          <div className="text-right">
+            <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: "#64748B" }}>
+              Convertible
+            </span>
+            <div className="font-numeric text-sm font-black" style={{ color: "#10B981" }}>
+              ${formatUSDT(wonCoins / coinRate)}
+            </div>
+          </div>
+        </div>
+        <div className="mt-1 text-[10px]" style={{ color: "#64748B" }}>
+          Ludo prize coins · 100 Won Coins = $1
         </div>
       </motion.div>
     </div>

@@ -68,31 +68,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
 
   const setIsInGamingHub = useCallback((value: boolean) => {
+    // The gaming hub is now a self-contained route group (/games/*), so this
+    // flag only exists for backwards compatibility with old saved state.
+    // Never let a stale "true" from a previous session turn the main app's
+    // Home/Profile into the gamer dashboard.
     setIsInGamingHubState(value);
     localStorage.setItem("ludzo_in_gaming_hub", value ? "true" : "false");
   }, []);
 
   useEffect(() => {
-    const stored = localStorage.getItem("ludzo_in_gaming_hub");
-    if (stored === "true") {
-      setIsInGamingHubState(true);
-    }
+    // Clear legacy hub mode saved by older builds — the /games/* routes own
+    // the game experience now, not the shared Home/Profile screens.
+    localStorage.removeItem("ludzo_in_gaming_hub");
+    setIsInGamingHubState(false);
   }, []);
 
   const userId = user?.id ?? null;
 
-  // Sync won coins balance and stats on mount/changes
+  // Sync legacy local stats on mount. Won Coins are NOT read from localStorage
+  // anymore — they are always the DB value (wallets.won_coins_balance), because
+  // every match is settled server-side by settle_ludo_match().
   useEffect(() => {
-    const storedWon = localStorage.getItem("ludzo_won_coins_balance");
     const storedStats = localStorage.getItem("ludzo_gaming_stats");
-
-    if (storedWon) {
-      setWonCoinsBalanceState(Number(storedWon));
-    } else {
-      // Default to 0, wait for Supabase DB values to load
-      setWonCoinsBalanceState(0);
-    }
-
     if (storedStats) {
       try {
         setGamingStatsState(JSON.parse(storedStats));
@@ -102,21 +99,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const fetchWallet = useCallback(async (id: string) => {
     try {
-      const res = await fetch("/api/wallet", { headers: { "x-user-id": id } });
+      const res = await fetch("/api/wallet", { headers: { "x-user-id": id }, cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
-          // If we have stored wallet overrides, merge them to preserve demo consistency
-          const storedCoinsOverride = localStorage.getItem("ludzo_wallet_coins_override");
-          const storedUsdtOverride = localStorage.getItem("ludzo_wallet_usdt_override");
-          const finalWallet = { ...data.data };
-          if (storedCoinsOverride !== null) {
-            finalWallet.coin_balance = Number(storedCoinsOverride);
-          }
-          if (storedUsdtOverride !== null) {
-            finalWallet.usdt_balance = Number(storedUsdtOverride);
-          }
-          setWallet(finalWallet);
+          // The database is the single source of truth for balances. The old
+          // localStorage "override" values used to shadow DB writes, which is
+          // why Won Coins / Coins never appeared to change after a match.
+          const dbWallet = data.data;
+          setWallet(dbWallet);
+          setWonCoinsBalanceState(Number(dbWallet?.won_coins_balance ?? 0));
         }
       }
     } catch { /* silent */ }
@@ -174,17 +166,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (p) localStorage.setItem("ludzo_prefs", JSON.stringify(p));
   }, []);
 
-  // Update wallet coin and usdt balances locally
+  // Update wallet coin and usdt balances locally (optimistic, DB wins on next refresh)
   const updateWalletBalances = useCallback((coinsChange: number, usdtChange: number, wonCoinsChange: number) => {
     setWallet((prev) => {
       if (!prev) return null;
       const nextCoins = Math.max(0, prev.coin_balance + coinsChange);
       const nextUsdt = Math.max(0, prev.usdt_balance + usdtChange);
       const nextWon = Math.max(0, (prev.won_coins_balance || 0) + wonCoinsChange);
-
-      localStorage.setItem("ludzo_wallet_coins_override", String(nextCoins));
-      localStorage.setItem("ludzo_wallet_usdt_override", String(nextUsdt));
-      localStorage.setItem("ludzo_won_coins_balance", String(nextWon));
 
       return {
         ...prev,
@@ -194,11 +182,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
     });
 
-    setWonCoinsBalanceState((prev) => {
-      const nextWon = Math.max(0, prev + wonCoinsChange);
-      localStorage.setItem("ludzo_won_coins_balance", String(nextWon));
-      return nextWon;
-    });
+    setWonCoinsBalanceState((prev) => Math.max(0, prev + wonCoinsChange));
   }, []);
 
   // Record simulated match result
@@ -252,13 +236,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [updateWalletBalances]);
 
-  // Clear all game logs, override balances, and statistics
+  // Clear all legacy game logs / demo overrides and statistics
   const clearGamingData = useCallback(() => {
     localStorage.removeItem("ludzo_won_coins_balance");
     localStorage.removeItem("ludzo_gaming_stats");
     localStorage.removeItem("ludzo_match_history");
     localStorage.removeItem("ludzo_wallet_coins_override");
     localStorage.removeItem("ludzo_wallet_usdt_override");
+    localStorage.removeItem("ludzo_in_gaming_hub");
 
     setWonCoinsBalanceState(0);
     setGamingStatsState({
@@ -273,7 +258,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (user?.id) {
       fetchWallet(user.id);
     }
-    showToast("Gaming statistics and wallet overrides reset.", "info");
+    showToast("Local cache cleared — balances reloaded from the server.", "info");
   }, [user, fetchWallet]);
 
   return (
