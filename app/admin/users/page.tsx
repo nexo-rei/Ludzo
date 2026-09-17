@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, SearchIcon } from "@/components/ui/DuotoneIcons";
 import AdminShell from "@/components/admin/AdminShell";
 import Badge from "@/components/ui/Badge";
 import { showToast } from "@/components/ui/Toast";
@@ -80,7 +80,7 @@ export default function AdminUsersPage() {
         {/* Filters */}
         <div className="flex flex-col md:flex-row gap-3">
           <div className="relative flex-1">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+            <SearchIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
             <input
               type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               placeholder="Search by name, username, or Telegram ID…"
@@ -144,11 +144,11 @@ export default function AdminUsersPage() {
           <span>Total: {total} users</span>
           <div className="flex gap-2">
             <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="p-2 rounded-lg bg-[#111] border border-[#333] disabled:opacity-40 hover:border-[#555]">
-              <ChevronLeft size={14} />
+              <ChevronLeftIcon size={14} />
             </button>
             <span className="px-3 py-2 rounded-lg bg-[#111] border border-[#333] text-white">{page}/{totalPages || 1}</span>
             <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="p-2 rounded-lg bg-[#111] border border-[#333] disabled:opacity-40 hover:border-[#555]">
-              <ChevronRight size={14} />
+              <ChevronRightIcon size={14} />
             </button>
           </div>
         </div>

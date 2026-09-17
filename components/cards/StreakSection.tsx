@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play } from "lucide-react";
+import { PlayIcon } from "@/components/ui/DuotoneIcons";
 import Button from "@/components/ui/Button";
 import { showToast } from "@/components/ui/Toast";
 import { useApp } from "@/hooks/useApp";
@@ -214,7 +214,7 @@ export default function StreakSection({ streak, todayReward, onClaimed }: Streak
                 onClick={handleWatchBonusAd}
                 className="flex-1 gap-1"
               >
-                <Play size={12} /> Bonus Ad
+                <PlayIcon size={12} /> Bonus Ad
               </Button>
               <Button
                 size="sm"

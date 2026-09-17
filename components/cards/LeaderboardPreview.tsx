@@ -2,7 +2,7 @@
 
 import { type ReactElement } from "react";
 import { motion } from "framer-motion";
-import { ChevronRight } from "lucide-react";
+import { ChevronRightIcon } from "@/components/ui/DuotoneIcons";
 import Link from "next/link";
 import Image from "next/image";
 import Badge from "@/components/ui/Badge";
@@ -47,7 +47,7 @@ export default function LeaderboardPreview({ entries }: LeaderboardPreviewProps)
         <Link href="/leaderboard"
           className="flex items-center gap-0.5 text-xs font-semibold hover:opacity-80 transition-opacity"
           style={{ color: "#63D9B4" }}>
-          View All <ChevronRight size={12} />
+          View All <ChevronRightIcon size={12} />
         </Link>
       </div>
 

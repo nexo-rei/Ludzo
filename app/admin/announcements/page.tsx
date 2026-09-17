@@ -3,7 +3,7 @@ import SymbolIcon from "@/components/ui/SymbolIcon";
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { PencilIcon, PlusIcon, TrashIcon } from "@/components/ui/DuotoneIcons";
 import AdminShell from "@/components/admin/AdminShell";
 import Badge from "@/components/ui/Badge";
 import { showToast } from "@/components/ui/Toast";
@@ -123,7 +123,7 @@ export default function AdminAnnouncementsPage() {
             onClick={openCreate}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#23856C] text-white text-sm font-bold hover:bg-[#196A55] transition-colors"
           >
-            <Plus size={15} /> New Announcement
+            <PlusIcon size={15} /> New Announcement
           </button>
         </div>
 
@@ -153,10 +153,10 @@ export default function AdminAnnouncementsPage() {
                       {sending === item.id ? "…" : <SymbolIcon name="announcement" size={16} />}
                     </button>
                     <button onClick={() => openEdit(item)} className="p-2 rounded-lg bg-[#222] text-gray-400 hover:text-[#63D9B4] hover:bg-[#333] transition-colors">
-                      <Pencil size={13} />
+                      <PencilIcon size={13} />
                     </button>
                     <button onClick={() => handleDelete(item.id)} className="p-2 rounded-lg bg-[#222] text-gray-400 hover:text-red-400 hover:bg-[#333] transition-colors">
-                      <Trash2 size={13} />
+                      <TrashIcon size={13} />
                     </button>
                   </div>
                 </div>

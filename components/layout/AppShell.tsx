@@ -15,7 +15,7 @@ interface AppShellProps {
 
 export default function AppShell({ children, hideNav = false, className }: AppShellProps) {
   return (
-    <div className="app-workspace min-h-screen bg-[var(--bg)] flex justify-center">
+    <div className={cn("app-workspace min-h-screen bg-[var(--bg)] flex justify-center", hideNav && "app-workspace-standalone")}>
       {!hideNav && <WorkspaceNav />}
       <div className={cn("workspace-content relative w-full flex flex-col min-h-screen", hideNav && "workspace-standalone", className)}>
         <ToastContainer />

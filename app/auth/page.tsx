@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { CircleCheck, ShieldAlert } from "lucide-react";
+import { CheckCircleIcon, ShieldAlertIcon } from "@/components/ui/DuotoneIcons";
 import OnboardingLayout from "@/components/layout/OnboardingLayout";
 import LudzoLogo from "@/components/layout/LudzoLogo";
 import { useTelegram } from "@/hooks/useTelegram";
@@ -104,7 +104,7 @@ function AuthContent() {
 
         {status === "success" && (
           <div className="text-center">
-            <CircleCheck size={44} className="mx-auto text-[var(--accent)]" />
+            <CheckCircleIcon size={44} className="mx-auto text-[var(--accent)]" />
             <h2 className="text-xl font-bold text-[var(--text-primary)] mt-3">
               Welcome to LUDZO!
             </h2>
@@ -116,7 +116,7 @@ function AuthContent() {
 
         {status === "error" && (
           <div className="text-center">
-            <ShieldAlert size={44} className="mx-auto text-[var(--accent)]" />
+            <ShieldAlertIcon size={44} className="mx-auto text-[var(--accent)]" />
             <h2 className="text-xl font-bold text-[var(--text-primary)] mt-3">
               Let’s get you connected
             </h2>

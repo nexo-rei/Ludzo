@@ -18,20 +18,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  HomeIcon,
-  TaskIcon,
-  GamesIcon,
-  ReferralIcon,
-  ProfileIcon,
-} from "@/components/ui/Icons";
+  HomeNavIcon,
+  TasksNavIcon,
+  GamesNavIcon,
+  UsersIcon,
+  ProfileNavIcon,
+} from "@/components/ui/DuotoneIcons";
 import { motion } from "framer-motion";
 
 const NAV_ITEMS = [
-  { href: "/home",      label: "Home",    Icon: HomeIcon },
-  { href: "/tasks",     label: "Tasks",   Icon: TaskIcon },
-  { href: "/games/home", label: "Games",  Icon: GamesIcon },
-  { href: "/refer",     label: "Refer",   Icon: ReferralIcon },
-  { href: "/profile",   label: "Profile", Icon: ProfileIcon },
+  { href: "/home",      label: "Home",    Icon: HomeNavIcon },
+  { href: "/tasks",     label: "Tasks",   Icon: TasksNavIcon },
+  { href: "/games/home", label: "Games",  Icon: GamesNavIcon },
+  { href: "/refer",     label: "Refer",   Icon: UsersIcon },
+  { href: "/profile",   label: "Profile", Icon: ProfileNavIcon },
 ];
 
 export default function BottomNav() {
@@ -49,7 +49,7 @@ export default function BottomNav() {
         const active = isActive(item.href);
         return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={cn("mobile-nav-link", active && "is-active")}>
           {active && <motion.span layoutId="nav-active-pill" className="mobile-nav-indicator" transition={{ type: "spring", stiffness: 400, damping: 32 }} />}
-          <item.Icon size={21} strokeWidth={active ? 2 : 1.6} />
+          <item.Icon size={21} />
           <span>{item.label}</span>
         </Link>;
       })}

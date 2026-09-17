@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, type ReactElement } from "react";
 import { motion } from "framer-motion";
-import { RefreshCw, ExternalLink } from "lucide-react";
+import { ExternalLinkIcon, RefreshIcon } from "@/components/ui/DuotoneIcons";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
 import Badge from "@/components/ui/Badge";
@@ -122,7 +122,7 @@ export default function TasksPage() {
         title="Tasks"
         right={
           <button onClick={loadTasks} className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
-            <RefreshCw size={15} />
+            <RefreshIcon size={15} />
           </button>
         }
       />
@@ -176,13 +176,13 @@ export default function TasksPage() {
                       <div className="flex gap-2 mt-3">
                         {!task.user_task || task.user_task.status !== "in_progress" ? (
                           <Button variant="primary" size="sm" className="flex-1 gap-1.5" loading={starting === task.id} onClick={() => handleStart(task)}>
-                            <ExternalLink size={12} /> Start Task
+                            <ExternalLinkIcon size={12} /> Start Task
                           </Button>
                         ) : (
                           <>
                             {task.target_link && (
                               <Button variant="secondary" size="sm" className="flex-1 gap-1.5" onClick={() => window.open(task.target_link!, "_blank")}>
-                                <ExternalLink size={12} /> Open
+                                <ExternalLinkIcon size={12} /> Open
                               </Button>
                             )}
                             <Button

@@ -22,16 +22,16 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
-  Trophy,
-  Crown,
-  ReceiptText,
-  Settings as SettingsIcon,
-  BookOpen,
-  LifeBuoy,
-  LogOut,
-  RotateCw,
-  ChevronRight,
-} from "lucide-react";
+  BookIcon,
+  CrownIcon,
+  ChevronRightIcon,
+  LifeBuoyIcon,
+  LogOutIcon,
+  ReceiptIcon,
+  RotateIcon,
+  SettingsNavIcon,
+  TrophyDuotoneIcon,
+} from "@/components/ui/DuotoneIcons";
 import { useApp } from "@/hooks/useApp";
 import { CoinIcon } from "@/components/ui/Icons";
 import { showToast } from "@/components/ui/Toast";
@@ -72,12 +72,12 @@ interface MenuItem {
 
 const MENU: MenuItem[] = [
   { label: "Battle History",  hint: "Every match & Coin result", href: "/games/matches", tint: "#63D9B4", Icon: BattleLogIcon },
-  { label: "Leaderboard",     hint: "Top earners this season",   href: "/leaderboard",   tint: "#F59E0B", Icon: Trophy },
-  { label: "How to Play",     hint: "Rules in 20 seconds",       action: "rules",        tint: "#3B82F6", Icon: BookOpen },
-  { label: "Transactions",    hint: "Deposits, wins & payouts",  href: "/history",       tint: "#10B981", Icon: ReceiptText },
-  { label: "Settings",        hint: "Theme, language & sound",   href: "/settings",      tint: "#94A3B8", Icon: SettingsIcon },
-  { label: "Gaming Support",  hint: "Talk to the arena team",    action: "support",      tint: "#22D3EE", Icon: LifeBuoy },
-  { label: "Exit Gaming Hub", hint: "Back to the main app",      action: "exit",         tint: "#F97316", Icon: LogOut },
+  { label: "Leaderboard",     hint: "Top earners this season",   href: "/leaderboard",   tint: "#F59E0B", Icon: TrophyDuotoneIcon },
+  { label: "How to Play",     hint: "Rules in 20 seconds",       action: "rules",        tint: "#3B82F6", Icon: BookIcon },
+  { label: "Transactions",    hint: "Deposits, wins & payouts",  href: "/history",       tint: "#10B981", Icon: ReceiptIcon },
+  { label: "Settings",        hint: "Theme, language & sound",   href: "/settings",      tint: "#94A3B8", Icon: SettingsNavIcon },
+  { label: "Gaming Support",  hint: "Talk to the arena team",    action: "support",      tint: "#22D3EE", Icon: LifeBuoyIcon },
+  { label: "Exit Gaming Hub", hint: "Back to the main app",      action: "exit",         tint: "#F97316", Icon: LogOutIcon },
 ];
 
 export default function GamingProfilePage() {
@@ -159,7 +159,7 @@ export default function GamingProfilePage() {
             aria-label="Refresh profile"
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-purple-500/35 bg-slate-900/70 text-purple-300"
           >
-            <RotateCw size={15} className={refreshing ? "animate-spin" : ""} />
+            <RotateIcon size={15} className={refreshing ? "animate-spin" : ""} />
           </motion.button>
         </motion.div>
 
@@ -196,7 +196,7 @@ export default function GamingProfilePage() {
                 <p className="mt-0.5 truncate text-[11px] font-bold text-purple-300">@{user.username}</p>
               )}
               <p className="mt-1 flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-amber-400">
-                <Crown size={11} /> {stats.best_streak} best streak
+                <CrownIcon size={11} /> {stats.best_streak} best streak
               </p>
             </div>
           </div>
@@ -363,7 +363,7 @@ export default function GamingProfilePage() {
                     <span className="block text-xs font-extrabold text-slate-100">{item.label}</span>
                     <span className="mt-0.5 block truncate text-[10px] font-semibold text-slate-500">{item.hint}</span>
                   </span>
-                  <ChevronRight size={16} className="flex-none text-slate-500" />
+                  <ChevronRightIcon size={16} className="flex-none text-slate-500" />
                 </div>
               );
 

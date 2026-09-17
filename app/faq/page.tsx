@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown } from "lucide-react";
+import { ChevronDownIcon } from "@/components/ui/DuotoneIcons";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
 
@@ -80,7 +80,7 @@ function FaqItem({ q, a }: { q: string; a: string }) {
       >
         <span className="text-sm font-medium text-[var(--text-primary)] leading-snug">{q}</span>
         <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }} className="flex-shrink-0">
-          <ChevronDown size={15} className="text-[var(--text-muted)]" />
+          <ChevronDownIcon size={15} className="text-[var(--text-muted)]" />
         </motion.span>
       </button>
       <AnimatePresence>

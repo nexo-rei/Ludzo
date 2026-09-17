@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ChevronRight } from "lucide-react";
+import { ChevronRightIcon } from "@/components/ui/DuotoneIcons";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
 import {
@@ -136,7 +136,7 @@ export default function LegalCenterPage() {
                 <p className="text-sm font-medium text-[var(--text-primary)]">{label}</p>
                 <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate">{description}</p>
               </div>
-              <ChevronRight size={13} className="text-[#475569] shrink-0" />
+              <ChevronRightIcon size={13} className="text-[#475569] shrink-0" />
             </button>
           ))}
         </motion.div>

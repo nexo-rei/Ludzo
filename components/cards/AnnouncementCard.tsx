@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDownIcon, ChevronUpIcon } from "@/components/ui/DuotoneIcons";
 import Badge from "@/components/ui/Badge";
 import type { Announcement } from "@/types";
 import { timeAgo } from "@/lib/utils";
@@ -58,7 +58,7 @@ export default function AnnouncementCard({ announcement, index = 0 }: Announceme
           </span>
         </div>
         <div className="flex-shrink-0 text-[var(--text-muted)] mt-0.5">
-          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          {expanded ? <ChevronUpIcon size={14} /> : <ChevronDownIcon size={14} />}
         </div>
       </button>
     </motion.div>

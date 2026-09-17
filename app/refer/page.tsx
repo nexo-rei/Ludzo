@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Copy, Share2 } from "lucide-react";
+import { CopyIcon, ShareIcon } from "@/components/ui/DuotoneIcons";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
 import Badge from "@/components/ui/Badge";
@@ -140,10 +140,10 @@ export default function ReferPage() {
               </div>
               <div className="flex gap-2">
                 <Button variant="primary" size="sm" className="flex-1 gap-1.5" onClick={handleCopy}>
-                  <Copy size={13} /> Copy Link
+                  <CopyIcon size={13} /> Copy Link
                 </Button>
                 <Button variant="secondary" size="sm" className="flex-1 gap-1.5" onClick={handleShare}>
-                  <Share2 size={13} /> Share
+                  <ShareIcon size={13} /> Share
                 </Button>
               </div>
             </motion.div>
