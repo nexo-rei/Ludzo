@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logAdminAction } from "@/lib/admin-log";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdminAuth(req);
@@ -50,11 +51,11 @@ export async function POST(req: NextRequest) {
   throw error;
     }
 
-    await supabase.from("admin_logs").insert({
-      admin_id: auth.adminId,
+    await logAdminAction(supabase, {
+      adminId: auth.adminId,
       action: "announcement_create",
-      target_type: "announcement",
-      target_id: data.id,
+      targetType: "announcement",
+      targetId: data.id,
     });
 
     return NextResponse.json({ success: true, data });
@@ -72,8 +73,8 @@ export async function PATCH(req: NextRequest) {
     const { id, ...fields } = body;
     const supabase = createAdminClient();
     await supabase.from("announcements").update({ ...fields, updated_at: new Date().toISOString() }).eq("id", id);
-    await supabase.from("admin_logs").insert({
-      admin_id: auth.adminId, action: "announcement_update", target_type: "announcement", target_id: id,
+    await logAdminAction(supabase, {
+      adminId: auth.adminId, action: "announcement_update", targetType: "announcement", targetId: id,
     });
     return NextResponse.json({ success: true });
   } catch (err) {
@@ -92,8 +93,8 @@ export async function DELETE(req: NextRequest) {
 
     const supabase = createAdminClient();
     await supabase.from("announcements").delete().eq("id", id);
-    await supabase.from("admin_logs").insert({
-      admin_id: auth.adminId, action: "announcement_delete", target_type: "announcement", target_id: id,
+    await logAdminAction(supabase, {
+      adminId: auth.adminId, action: "announcement_delete", targetType: "announcement", targetId: id,
     });
     return NextResponse.json({ success: true });
   } catch (err) {

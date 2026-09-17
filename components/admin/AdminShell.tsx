@@ -10,6 +10,7 @@ import {
   ArrowUpCircleIcon,
   CheckSquareIcon,
   CloseIcon,
+  LifeBuoyIcon,
   LogOutIcon,
   MegaphoneIcon,
   MenuIcon,
@@ -27,12 +28,13 @@ interface AdminShellProps {
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/admin/dashboard", icon: OverviewIcon },
-  { label: "UsersIcon", href: "/admin/users", icon: UsersIcon },
+  { label: "Users", href: "/admin/users", icon: UsersIcon },
   { label: "Tasks", href: "/admin/tasks", icon: CheckSquareIcon },
+  { label: "Support", href: "/admin/support", icon: LifeBuoyIcon },
   { label: "Deposits", href: "/admin/deposits", icon: ArrowDownCircleIcon },
   { label: "Withdrawals", href: "/admin/withdrawals", icon: ArrowUpCircleIcon },
   { label: "Announcements", href: "/admin/announcements", icon: MegaphoneIcon },
-  { label: "SettingsNavIcon", href: "/admin/settings", icon: SettingsNavIcon },
+  { label: "Settings", href: "/admin/settings", icon: SettingsNavIcon },
   { label: "Logs", href: "/admin/logs", icon: ScrollIcon },
 ];
 

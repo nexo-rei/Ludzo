@@ -79,8 +79,19 @@ const SECTIONS = [
   },
 ];
 
+const SUPPORT_USERNAME = process.env.NEXT_PUBLIC_SUPPORT_USERNAME ?? "LudzoSupport";
+
 export default function SupportDisputesPage() {
   const router = useRouter();
+
+  const openTelegramSupport = () => {
+    const url = `https://t.me/${SUPPORT_USERNAME}`;
+    const tg = typeof window !== "undefined"
+      ? (window as Window & { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram?.WebApp
+      : undefined;
+    if (tg?.openTelegramLink) tg.openTelegramLink(url);
+    else if (typeof window !== "undefined") window.open(url, "_blank");
+  };
 
   return (
     <LegalPageLayout
@@ -91,14 +102,23 @@ export default function SupportDisputesPage() {
       footerNote={
         <div className="text-center">
           <p className="text-xs text-[var(--text-muted)] leading-relaxed mb-3">
-            Need help right now? Open a support ticket or chat with our team.
+            Need help right now? Open a support ticket — you&apos;ll find <strong>Support</strong> in
+            your Profile menu too, under &ldquo;Support&rdquo;.
           </p>
-          <button
-            onClick={() => router.push("/support")}
-            className="px-5 py-2.5 rounded-xl bg-[#23856C] text-white text-sm font-bold hover:bg-[#196A55] transition-colors"
-          >
-            Go to Support
-          </button>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+            <button
+              onClick={() => router.push("/support")}
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#23856C] text-white text-sm font-bold hover:bg-[#196A55] transition-colors"
+            >
+              Go to Support
+            </button>
+            <button
+              onClick={openTelegramSupport}
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#229ED9] text-white text-sm font-bold hover:bg-[#1a8abf] transition-colors"
+            >
+              Chat on Telegram
+            </button>
+          </div>
         </div>
       }
     />

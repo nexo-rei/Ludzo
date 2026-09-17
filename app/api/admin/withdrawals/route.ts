@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logAdminAction } from "@/lib/admin-log";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdminAuth(req);
@@ -79,11 +80,11 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: false, error: `Cannot ${action} withdrawal with status ${withdrawal.status}` }, { status: 400 });
     }
 
-    await supabase.from("admin_logs").insert({
-      admin_id: auth.adminId,
+    await logAdminAction(supabase, {
+      adminId: auth.adminId,
       action: `withdrawal_${action}`,
-      target_type: "withdrawal",
-      target_id: withdrawal_id,
+      targetType: "withdrawal",
+      targetId: withdrawal_id,
       details: { note },
     });
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { resolveTaskChatRef } from "@/lib/telegram-chat";
 
 // Start a task (sets status to in_progress)
 export async function POST(req: NextRequest) {
@@ -86,9 +87,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Link na ho to @username se bana do (task me target_id ho to)
+    const chatRef = resolveTaskChatRef(task);
+    const targetLink =
+      task.target_link ||
+      (chatRef && chatRef.startsWith("@") ? `https://t.me/${chatRef.slice(1)}` : null);
+
     return NextResponse.json({
       success: true,
-      data: { task_id: taskId, target_link: task.target_link },
+      data: {
+        task_id: taskId,
+        target_link: targetLink,
+        type: task.type,
+        // join tasks ke liye reward sirf Bot-API membership check ke baad milega
+        requires_verification: task.type === "channel_join" || task.type === "group_join",
+      },
     });
   } catch (err) {
     console.error("[tasks/claim]", err);

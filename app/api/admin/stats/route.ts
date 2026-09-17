@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
       totalCoinsRes,
       weeklyUsersRes,
       monthlyRevenueRes,
+      supportTicketsRes,
     ] = await Promise.all([
       supabase.from("users").select("id", { count: "exact", head: true }),
       supabase.from("ad_logs").select("user_id").gte("created_at", todayStart),
@@ -37,6 +38,8 @@ export async function GET(req: NextRequest) {
       supabase.from("transactions").select("amount").eq("type", "ad_reward"),
       supabase.from("users").select("id, created_at").gte("created_at", weekAgo).order("created_at"),
       supabase.from("deposits").select("amount, created_at").eq("status", "completed").gte("created_at", monthAgo),
+      // support_tickets table na ho to error aata hai — niche count 0 rakhte hain
+      supabase.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["open", "in_progress"]),
     ]);
 
     const uniqueActiveUsers = new Set((activeUsersRes.data ?? []).map((r: { user_id: string }) => r.user_id)).size;
@@ -57,6 +60,7 @@ export async function GET(req: NextRequest) {
         total_deposited: totalDeposited,
         total_withdrawn: totalWithdrawn,
         total_coins_distributed: totalCoins,
+        open_support_tickets: supportTicketsRes.count ?? 0,
         weekly_signups: weeklyUsersRes.data ?? [],
         monthly_revenue: monthlyRevenueRes.data ?? [],
       },

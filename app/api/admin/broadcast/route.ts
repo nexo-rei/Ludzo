@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logAdminAction } from "@/lib/admin-log";
 
 export const dynamic = "force-dynamic";
 
@@ -83,11 +84,11 @@ export async function POST(req: NextRequest) {
       if (i + BATCH_SIZE < ids.length) await sleep(BATCH_PAUSE);
     }
 
-    await supabase.from("admin_logs").insert({
-      admin_id:    auth.adminId,
-      action:      "announcement_broadcast",
-      target_type: "broadcast",
-      target_id:   null,
+    await logAdminAction(supabase, {
+      adminId: auth.adminId,
+      action: "announcement_broadcast",
+      targetType: "broadcast",
+      details: { total: ids.length, sent, failed },
     });
 
     console.log(`[BROADCAST] total=${ids.length} sent=${sent} failed=${failed}`);

@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import LudzoCoin from "@/components/ui/LudzoCoin";
 
 interface IconProps {
   size?: number;
@@ -276,18 +277,7 @@ export function TrophyIcon({ size = 24, className }: IconProps) {
 }
 
 export function CoinIcon({ size = 20, className }: IconProps) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      className={baseClass(className)}
-    >
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" fill="currentColor" fillOpacity="0.12" />
-      <path d="M12 7v10M9.5 9h5M9.5 15h5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+  return <LudzoCoin size={size} className={baseClass(className)} />;
 }
 
 export function CashIcon({ size = 20, className }: IconProps) {

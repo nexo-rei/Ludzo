@@ -7,6 +7,7 @@ import { ChevronRightIcon } from "@/components/ui/DuotoneIcons";
 import Image from "next/image";
 import Link from "next/link";
 import AppShell from "@/components/layout/AppShell";
+import LudzoCoin from "@/components/ui/LudzoCoin";
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import { useApp } from "@/hooks/useApp";
 
@@ -22,6 +23,8 @@ const MENU_ITEMS = [
   { label: "Leaderboard",         href: "/leaderboard", color: "#F59E0B", bg: "rgba(245,158,11,0.12)",  icon: <><rect x="18" y="3" width="4" height="18" rx="1" /><rect x="10" y="8" width="4" height="13" rx="1" /><rect x="2" y="13" width="4" height="8" rx="1" /></> },
   { label: "Refer & Earn",        href: "/refer",       color: "#3B82F6", bg: "rgba(59,130,246,0.12)",  icon: <><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" /></> },
   { label: "FAQ",                 href: "/faq",         color: "#63D9B4", bg: "rgba(99,217,180,0.12)",  icon: <><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01" /></> },
+  { label: "Support",             href: "/support",     color: "#06B6D4", bg: "rgba(6,182,212,0.12)",   icon: <><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" /><path d="M4.9 4.9l4.3 4.3M14.8 14.8l4.3 4.3M19.1 4.9l-4.3 4.3M9.2 14.8l-4.3 4.3" /></> },
+  { label: "Support & Disputes",  href: "/support-disputes", color: "#EF4444", bg: "rgba(239,68,68,0.12)", icon: <><path d="M12 22s8-3.4 8-10V5.6L12 3 4 5.6V12c0 6.6 8 10 8 10z" /><path d="M9.5 12h5M12 9.5v5" /></> },
   { label: "Settings",            href: "/settings",    color: "#64748B", bg: "rgba(100,116,139,0.12)", icon: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" /></> },
   { label: "Legal Center",        href: "/legal",       color: "#23856C", bg: "rgba(35,133,108,0.12)", icon: <><path d="M12 2v20" /><path d="M5 22h14" /><path d="M5 6h14" /><path d="M5 6L2 12a3 3 0 006 0L5 6z" /><path d="M19 6l-3 6a3 3 0 006 0l-3-6z" /></> },
 ];
@@ -109,7 +112,9 @@ export default function ProfilePage() {
             animate={{ opacity: 1, y: 0 }}
             className="p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] space-y-1"
           >
-            <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block">Coins Wallet</span>
+            <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1.5">
+              Coins Wallet <LudzoCoin size={13} />
+            </span>
             <span className="text-xl font-black font-numeric text-[var(--text-primary)] block">
               {profile?.wallet.coin_balance.toLocaleString()}
             </span>
@@ -140,8 +145,8 @@ export default function ProfilePage() {
         >
           <div className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-25 pointer-events-none"
             style={{ background: "radial-gradient(circle, #63D9B4 0%, transparent 70%)", transform: "translate(30%, -30%)" }} />
-          <span className="text-[10px] font-bold uppercase tracking-wider block" style={{ color: "#94A3B8" }}>
-            Won Coins (Ludo prizes)
+          <span className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: "#94A3B8" }}>
+            Won Coins (Ludo prizes) <LudzoCoin size={13} />
           </span>
           <div className="flex items-end justify-between">
             <motion.span

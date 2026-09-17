@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateAdminToken } from "@/lib/auth";
+import { logAdminAction } from "@/lib/admin-log";
 
 export async function POST(req: NextRequest) {
   try {
@@ -43,8 +44,9 @@ console.log("ADMIN_ERROR:", JSON.stringify(error));
     const token = await generateAdminToken({ adminId: admin.id, username: admin.username, role: admin.role });
 
     // Log login
-    await supabase.from("admin_logs").insert({
-      admin_id: admin.id,
+    await logAdminAction(supabase, {
+      adminId: admin.id,
+      adminUsername: username,
       action: "admin_login",
       details: { username },
     });

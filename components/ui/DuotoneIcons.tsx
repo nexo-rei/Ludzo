@@ -14,6 +14,7 @@
  */
 
 import { useId, type SVGProps } from "react";
+import LudzoCoin from "@/components/ui/LudzoCoin";
 
 export type DuotoneIconProps = SVGProps<SVGSVGElement> & { size?: number };
 
@@ -166,18 +167,12 @@ export function OverviewIcon({ size = 20, ...props }: DuotoneIconProps) {
 
 /* ═══════════════════════════ WALLET ═══════════════════════════ */
 
-export function CoinsDuotoneIcon({ size = 20, ...props }: DuotoneIconProps) {
-  return (
-    <svg {...dt(size, props)}>
-      <circle cx="8.2" cy="8.2" r="5.7" fill="currentColor" opacity={0.16} stroke="none" />
-      <Line>
-        <circle cx="8.2" cy="8.2" r="5.7" />
-        <path d="M17.6 10.6a6.2 6.2 0 1 1-7 7.6" />
-        <path d="M7 6.2h.9v4" />
-        <path d="m16.4 14 .8.8-2.6 2.6" />
-      </Line>
-    </svg>
-  );
+/**
+ * Coins — resolves to the single branded Ludzo coin mark so the same coin
+ * shows up in balances, rewards, admin tables and anywhere `coins` is used.
+ */
+export function CoinsDuotoneIcon({ size = 20, className }: DuotoneIconProps) {
+  return <LudzoCoin size={size} className={className} />;
 }
 
 export function WalletDuotoneIcon({ size = 20, ...props }: DuotoneIconProps) {

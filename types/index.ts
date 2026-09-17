@@ -218,15 +218,33 @@ export interface AdminLog {
 
 // ─── Support ─────────────────────────────────────────────────────────────────
 
+export type SupportTicketStatus = "open" | "in_progress" | "resolved" | "closed";
+export type SupportTicketPriority = "low" | "normal" | "high" | "urgent";
+
+export interface SupportTicketMessage {
+  id: string;
+  ticket_id?: string;
+  sender_type: "user" | "admin" | "system";
+  sender_id?: string | null;
+  sender_name?: string | null;
+  body: string;
+  created_at: string;
+}
+
 export interface SupportTicket {
   id: string;
   user_id: string;
   subject: string;
   message: string;
-  status: "open" | "in_progress" | "resolved" | "closed";
-  admin_reply?: string;
+  category: string;
+  priority: SupportTicketPriority;
+  status: SupportTicketStatus;
+  admin_reply?: string | null;
+  replied_by?: string | null;
+  replied_at?: string | null;
   created_at: string;
   updated_at: string;
+  messages?: SupportTicketMessage[];
 }
 
 // ─── Home Page Data ───────────────────────────────────────────────────────────

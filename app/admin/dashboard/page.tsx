@@ -16,6 +16,7 @@ interface DashboardStats {
   pending_withdrawals: number;
   pending_withdrawal_amount: number;
   pending_deposits: number;
+  open_support_tickets?: number;
   total_deposited: number;
   total_withdrawn: number;
   total_coins_distributed: number;
@@ -30,8 +31,15 @@ const STAT_CARDS = (s: DashboardStats) => [
   { label: "Total Deposited", value: `$${formatUSDT(s.total_deposited)}`, icon: "deposit", color: "#F59E0B" },
   { label: "Total Withdrawn", value: `$${formatUSDT(s.total_withdrawn)}`, icon: "withdraw", color: "#EF4444" },
   { label: "Coins Distributed", value: formatCoins(s.total_coins_distributed), icon: "coins", color: "#F59E0B" },
-  { label: "Pending Withdrawals", value: s.pending_withdrawals.toString(), icon: "⏳", color: "#F59E0B", alert: s.pending_withdrawals > 0 },
+  { label: "Pending Withdrawals", value: s.pending_withdrawals.toString(), icon: "clock", color: "#F59E0B", alert: s.pending_withdrawals > 0 },
   { label: "Pending Deposits", value: s.pending_deposits.toString(), icon: "deposit", color: "#23856C" },
+  {
+    label: "Support Tickets",
+    value: (s.open_support_tickets ?? 0).toString(),
+    icon: "help",
+    color: "#06B6D4",
+    alert: (s.open_support_tickets ?? 0) > 0,
+  },
 ];
 
 export default function AdminDashboardPage() {
@@ -100,6 +108,7 @@ export default function AdminDashboardPage() {
               {[
                 { label: "Review Withdrawals", href: "/admin/withdrawals", urgent: stats.pending_withdrawals > 0 },
                 { label: "Manage Tasks", href: "/admin/tasks", urgent: false },
+                { label: "Support Inbox", href: "/admin/support", urgent: (stats.open_support_tickets ?? 0) > 0 },
                 { label: "New Announcement", href: "/admin/announcements", urgent: false },
                 { label: "View Logs", href: "/admin/logs", urgent: false },
               ].map((action) => (
