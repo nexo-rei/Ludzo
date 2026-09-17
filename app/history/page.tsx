@@ -60,14 +60,14 @@ const TYPE_ICON_MAP: Record<string, IconConfig> = {
     </>,
   },
   withdrawal: {
-    color: "#A855F7", bg: "rgba(168,85,247,0.1)",
+    color: "#63D9B4", bg: "rgba(99,217,180,0.1)",
     paths: <>
       <path d="M12 2v10M8 8l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
       <path d="M4 14v4a2 2 0 002 2h12a2 2 0 002-2v-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
     </>,
   },
   referral_commission: {
-    color: "#7C3AED", bg: "rgba(124,58,237,0.1)",
+    color: "#23856C", bg: "rgba(35,133,108,0.1)",
     paths: <>
       <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
       <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.5" fill="none"/>
@@ -145,7 +145,7 @@ export default function HistoryPage() {
                 onClick={() => setFilter(f.value)}
                 className="px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all"
                 style={filter === f.value
-                  ? { background: "#7C3AED", color: "white", boxShadow: "0 2px 8px rgba(124,58,237,0.3)" }
+                  ? { background: "#23856C", color: "white", boxShadow: "0 2px 8px rgba(35,133,108,0.3)" }
                   : { background: "var(--card-bg)", color: "var(--text-muted)", border: "1px solid var(--border)" }}
               >
                 {f.label}

@@ -1,4 +1,5 @@
 "use client";
+import SymbolIcon from "@/components/ui/SymbolIcon";
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -92,7 +93,7 @@ export default function AdminTasksPage() {
         <div className="flex justify-end">
           <button
             onClick={openCreate}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#7C3AED] text-white text-sm font-bold hover:bg-[#5B21B6] transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#23856C] text-white text-sm font-bold hover:bg-[#196A55] transition-colors"
           >
             <Plus size={15} /> New Task
           </button>
@@ -112,9 +113,9 @@ export default function AdminTasksPage() {
                   </div>
                   {task.description && <p className="text-xs text-gray-500 mt-0.5">{task.description}</p>}
                 </div>
-                <div className="text-sm font-bold text-yellow-400 font-numeric">+{task.reward_coins} 🪙</div>
+                <div className="text-sm font-bold text-yellow-400 font-numeric">+{task.reward_coins} <SymbolIcon name="coins" size={14} /></div>
                 <div className="flex gap-2">
-                  <button onClick={() => openEdit(task)} className="p-2 rounded-lg bg-[#222] text-gray-400 hover:text-[#A855F7] hover:bg-[#333] transition-colors">
+                  <button onClick={() => openEdit(task)} className="p-2 rounded-lg bg-[#222] text-gray-400 hover:text-[#63D9B4] hover:bg-[#333] transition-colors">
                     <Pencil size={13} />
                   </button>
                   <button
@@ -151,7 +152,7 @@ export default function AdminTasksPage() {
                   type={type} value={(form as Record<string, unknown>)[key] as string}
                   onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                   placeholder={placeholder}
-                  className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#7C3AED]"
+                  className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#23856C]"
                 />
               </div>
             ))}
@@ -159,7 +160,7 @@ export default function AdminTasksPage() {
               <label className="text-xs text-gray-400 font-medium">Type</label>
               <select
                 value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-                className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#7C3AED]"
+                className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#23856C]"
               >
                 {["channel_join", "group_join", "ad_task", "custom"].map((t) => (
                   <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
@@ -171,21 +172,21 @@ export default function AdminTasksPage() {
               <input
                 type="number" min={1} value={form.reward_coins}
                 onChange={(e) => setForm((f) => ({ ...f, reward_coins: Number(e.target.value) }))}
-                className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#7C3AED]"
+                className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#23856C]"
               />
             </div>
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox" checked={form.is_active}
                 onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))}
-                className="w-4 h-4 accent-[#7C3AED]"
+                className="w-4 h-4 accent-[#23856C]"
               />
               <span className="text-sm text-gray-300">Active (visible to users)</span>
             </label>
             <button
               onClick={handleSave}
               disabled={saving}
-              className="w-full py-3 rounded-xl bg-[#7C3AED] text-white font-bold text-sm disabled:opacity-60 hover:bg-[#5B21B6] transition-colors"
+              className="w-full py-3 rounded-xl bg-[#23856C] text-white font-bold text-sm disabled:opacity-60 hover:bg-[#196A55] transition-colors"
             >
               {saving ? "Saving…" : editing ? "Update Task" : "Create Task"}
             </button>

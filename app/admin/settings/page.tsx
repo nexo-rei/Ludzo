@@ -94,7 +94,7 @@ export default function AdminSettingsPage() {
         type="number"
         value={settings[field] as number}
         onChange={(e) => set(field, Number(e.target.value))}
-        className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#7C3AED]"
+        className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#23856C]"
       />
     </div>
   );
@@ -107,7 +107,7 @@ export default function AdminSettingsPage() {
         <div className="p-4 md:p-6 space-y-8 pb-10">
           {/* Economy */}
           <section>
-            <h2 className="text-sm font-bold text-[#7C3AED] uppercase tracking-wide mb-4">Economy</h2>
+            <h2 className="text-sm font-bold text-[#23856C] uppercase tracking-wide mb-4">Economy</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <NumberInput label="Coin Display Rate (X coins = $1)" field="coin_rate" />
               <NumberInput label="Coins Per Ad" field="ad_reward_coins" />
@@ -122,7 +122,7 @@ export default function AdminSettingsPage() {
 
           {/* Daily streak */}
           <section>
-            <h2 className="text-sm font-bold text-[#7C3AED] uppercase tracking-wide mb-4">Daily Streak Rewards (Coins)</h2>
+            <h2 className="text-sm font-bold text-[#23856C] uppercase tracking-wide mb-4">Daily Streak Rewards (Coins)</h2>
             <div className="grid grid-cols-4 md:grid-cols-7 gap-3">
               {([1, 2, 3, 4, 5, 6, 7] as const).map((day) => (
                 <div key={day} className="text-center">
@@ -131,7 +131,7 @@ export default function AdminSettingsPage() {
                     type="number"
                     value={settings[`streak_day_${day}` as keyof AppSettings] as number}
                     onChange={(e) => set(`streak_day_${day}` as keyof AppSettings, Number(e.target.value))}
-                    className="w-full mt-1 px-2 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm text-center outline-none focus:border-[#7C3AED]"
+                    className="w-full mt-1 px-2 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm text-center outline-none focus:border-[#23856C]"
                   />
                 </div>
               ))}
@@ -140,20 +140,20 @@ export default function AdminSettingsPage() {
 
           {/* Platform */}
           <section>
-            <h2 className="text-sm font-bold text-[#7C3AED] uppercase tracking-wide mb-4">Platform</h2>
+            <h2 className="text-sm font-bold text-[#23856C] uppercase tracking-wide mb-4">Platform</h2>
             <div className="space-y-3">
               <div>
                 <label className="text-xs text-gray-400 font-medium">Site Name</label>
                 <input
                   type="text" value={settings.site_name} onChange={(e) => set("site_name", e.target.value)}
-                  className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#7C3AED]"
+                  className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#23856C]"
                 />
               </div>
               <div>
                 <label className="text-xs text-gray-400 font-medium">Support Telegram Username</label>
                 <input
                   type="text" value={settings.support_username} onChange={(e) => set("support_username", e.target.value)}
-                  className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#7C3AED]"
+                  className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#23856C]"
                 />
               </div>
               <div>
@@ -161,7 +161,7 @@ export default function AdminSettingsPage() {
                 <textarea
                   value={settings.maintenance_message} onChange={(e) => set("maintenance_message", e.target.value)}
                   rows={3}
-                  className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#7C3AED] resize-none"
+                  className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#23856C] resize-none"
                 />
               </div>
 
@@ -172,7 +172,7 @@ export default function AdminSettingsPage() {
                 <div>
                   <div className="text-sm font-bold text-white">Maintenance Mode</div>
                   <div className="text-xs text-gray-500 mt-0.5">
-                    {settings.maintenance_mode ? "🔴 App is OFFLINE for users" : "🟢 App is LIVE for users"}
+                    {settings.maintenance_mode ? "App is OFFLINE for users" : "App is LIVE for users"}
                   </div>
                 </div>
                 <button
@@ -192,7 +192,7 @@ export default function AdminSettingsPage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="w-full py-4 rounded-xl bg-[#7C3AED] text-white font-bold text-base hover:bg-[#5B21B6] transition-colors disabled:opacity-60"
+            className="w-full py-4 rounded-xl bg-[#23856C] text-white font-bold text-base hover:bg-[#196A55] transition-colors disabled:opacity-60"
           >
             {saving ? "Saving…" : "Save All Settings"}
           </button>

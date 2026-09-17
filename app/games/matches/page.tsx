@@ -1,4 +1,5 @@
 "use client";
+import SymbolIcon from "@/components/ui/SymbolIcon";
 
 /**
  * LUDZO — Battle History (/games/matches)
@@ -161,11 +162,11 @@ export default function MatchesPage() {
           className="grid grid-cols-3 gap-2.5"
         >
           <div className="surface-glass rounded-2xl px-3 py-3 text-center">
-            <span className="block text-sm font-black text-emerald-400">🔥 {stats.current_streak}</span>
+            <span className="block text-sm font-black text-emerald-400"><SymbolIcon name="streak" size={14} /> {stats.current_streak}</span>
             <span className="mt-0.5 block text-[9px] font-black uppercase tracking-wider text-slate-500">Streak</span>
           </div>
           <div className="surface-glass rounded-2xl px-3 py-3 text-center">
-            <span className="block text-sm font-black text-amber-400">👑 {stats.best_streak}</span>
+            <span className="block text-sm font-black text-amber-400"><SymbolIcon name="award" size={14} /> {stats.best_streak}</span>
             <span className="mt-0.5 block text-[9px] font-black uppercase tracking-wider text-slate-500">Best</span>
           </div>
           <div className="surface-glass rounded-2xl px-3 py-3 text-center">

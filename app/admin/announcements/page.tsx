@@ -1,4 +1,5 @@
 "use client";
+import SymbolIcon from "@/components/ui/SymbolIcon";
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -120,7 +121,7 @@ export default function AdminAnnouncementsPage() {
         <div className="flex justify-end">
           <button
             onClick={openCreate}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#7C3AED] text-white text-sm font-bold hover:bg-[#5B21B6] transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#23856C] text-white text-sm font-bold hover:bg-[#196A55] transition-colors"
           >
             <Plus size={15} /> New Announcement
           </button>
@@ -149,9 +150,9 @@ export default function AdminAnnouncementsPage() {
                       title="Send to all users on Telegram"
                       className="p-2 rounded-lg bg-[#222] text-gray-400 hover:text-blue-400 hover:bg-[#333] transition-colors disabled:opacity-40"
                     >
-                      {sending === item.id ? "…" : "📢"}
+                      {sending === item.id ? "…" : <SymbolIcon name="announcement" size={16} />}
                     </button>
-                    <button onClick={() => openEdit(item)} className="p-2 rounded-lg bg-[#222] text-gray-400 hover:text-[#A855F7] hover:bg-[#333] transition-colors">
+                    <button onClick={() => openEdit(item)} className="p-2 rounded-lg bg-[#222] text-gray-400 hover:text-[#63D9B4] hover:bg-[#333] transition-colors">
                       <Pencil size={13} />
                     </button>
                     <button onClick={() => handleDelete(item.id)} className="p-2 rounded-lg bg-[#222] text-gray-400 hover:text-red-400 hover:bg-[#333] transition-colors">
@@ -178,7 +179,7 @@ export default function AdminAnnouncementsPage() {
               <input
                 type="text" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                 placeholder="Announcement title"
-                className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#7C3AED]"
+                className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#23856C]"
               />
             </div>
             <div>
@@ -186,14 +187,14 @@ export default function AdminAnnouncementsPage() {
               <textarea
                 value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 placeholder="Announcement description…" rows={4}
-                className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#7C3AED] resize-none"
+                className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#23856C] resize-none"
               />
             </div>
             <div>
               <label className="text-xs text-gray-400 font-medium">Priority</label>
               <select
                 value={form.priority} onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}
-                className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#7C3AED]"
+                className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#23856C]"
               >
                 <option value="high">High (Pinned)</option>
                 <option value="medium">Medium</option>
@@ -204,13 +205,13 @@ export default function AdminAnnouncementsPage() {
               <input
                 type="checkbox" checked={form.is_active}
                 onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))}
-                className="w-4 h-4 accent-[#7C3AED]"
+                className="w-4 h-4 accent-[#23856C]"
               />
               <span className="text-sm text-gray-300">Visible to users</span>
             </label>
             <button
               onClick={handleSave} disabled={saving}
-              className="w-full py-3 rounded-xl bg-[#7C3AED] text-white font-bold text-sm disabled:opacity-60 hover:bg-[#5B21B6]"
+              className="w-full py-3 rounded-xl bg-[#23856C] text-white font-bold text-sm disabled:opacity-60 hover:bg-[#196A55]"
             >
               {saving ? "Saving…" : editing ? "Update" : "Publish"}
             </button>

@@ -29,7 +29,7 @@ const COLORS = {
   success: "bg-[#10B981]/15 border-[#10B981]/40 text-[#10B981]",
   error: "bg-[#EF4444]/15 border-[#EF4444]/40 text-[#EF4444]",
   warning: "bg-[#F59E0B]/15 border-[#F59E0B]/40 text-[#F59E0B]",
-  info: "bg-[#7C3AED]/15 border-[#7C3AED]/40 text-[#A855F7]",
+  info: "bg-[#23856C]/15 border-[#23856C]/40 text-[#63D9B4]",
 };
 
 export function ToastContainer() {

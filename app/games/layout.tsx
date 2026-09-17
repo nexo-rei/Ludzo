@@ -2,6 +2,7 @@
 
 import { ReactNode } from "react";
 import { usePathname } from "next/navigation";
+import WorkspaceNav from "@/components/layout/WorkspaceNav";
 import GamingBottomNav from "@/components/gaming/GamingBottomNav";
 import { ToastContainer } from "@/components/ui/Toast";
 
@@ -33,17 +34,12 @@ export default function GamingLayout({ children }: GamingLayoutProps) {
   }
 
   return (
-    <div className="relative min-h-screen w-full overflow-x-hidden gaming-gradient-bg text-slate-100">
-      {/* Ambient background glows */}
-      <div className="pointer-events-none fixed inset-0 z-0">
-        <div className="absolute left-1/4 top-0 h-72 w-72 rounded-full bg-purple-500/10 blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl" />
-      </div>
-
+    <div className="relative min-h-screen w-full overflow-x-hidden gaming-workspace gaming-gradient-bg text-slate-100">
+      <WorkspaceNav />
       {/* Page content — each page owns its own bottom padding (.hub-pad-bottom-lg) */}
       <ToastContainer />
 
-      <main className="relative z-10">
+      <main className="gaming-content relative z-10">
         {children}
       </main>
 

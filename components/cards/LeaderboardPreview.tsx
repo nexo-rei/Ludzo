@@ -46,7 +46,7 @@ export default function LeaderboardPreview({ entries }: LeaderboardPreviewProps)
         </div>
         <Link href="/leaderboard"
           className="flex items-center gap-0.5 text-xs font-semibold hover:opacity-80 transition-opacity"
-          style={{ color: "#A855F7" }}>
+          style={{ color: "#63D9B4" }}>
           View All <ChevronRight size={12} />
         </Link>
       </div>

@@ -25,9 +25,9 @@ export default function Button({
 
   const variants: Record<string, string> = {
     primary:
-      "text-white shadow-purple-sm",
+      "text-white shadow-sm",
     secondary:
-      "bg-[var(--card-bg)] text-[var(--text-primary)] border border-[var(--border)] hover:border-[#7C3AED]/40 hover:bg-[var(--bg-elevated)]",
+      "bg-[var(--card-bg)] text-[var(--text-primary)] border border-[var(--border)] hover:border-[#23856C]/40 hover:bg-[var(--bg-elevated)]",
     ghost:
       "bg-transparent text-[var(--text-secondary)] hover:bg-[var(--border)]/60 hover:text-[var(--text-primary)]",
     danger:
@@ -37,12 +37,12 @@ export default function Button({
     gold:
       "text-[#0F172A] font-bold",
     outline:
-      "bg-transparent border border-[#7C3AED]/50 text-[#A855F7] hover:bg-[#7C3AED]/10",
+      "bg-transparent border border-[#23856C]/50 text-[#63D9B4] hover:bg-[#23856C]/10",
   };
 
   const gradients: Record<string, string> = {
-    primary: "linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)",
-    success: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
+    primary: "#23856C",
+    success: "#147D64",
     gold: "linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%)",
   };
 

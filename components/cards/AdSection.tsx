@@ -62,11 +62,11 @@ export default function AdSection({ adsWatchedToday, dailyLimit, adReward, onAdW
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.2 }}
-      className="rounded-2xl p-4"
+      className="rounded-xl p-5"
       style={{
         background: "var(--card-bg)",
-        border: "1px solid rgba(59,130,246,0.15)",
-        boxShadow: "0 2px 16px rgba(0,0,0,0.06)",
+        border: "1px solid var(--border)",
+        boxShadow: "none",
       }}
     >
       <div className="flex items-center justify-between mb-3">

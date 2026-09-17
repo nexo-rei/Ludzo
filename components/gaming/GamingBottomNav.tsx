@@ -49,7 +49,7 @@ export default function GamingBottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40"
+      className="gaming-mobile-nav fixed bottom-0 left-0 right-0 z-40"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="mx-auto w-full max-w-app px-3 pb-2.5">

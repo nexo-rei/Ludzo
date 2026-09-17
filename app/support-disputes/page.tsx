@@ -95,7 +95,7 @@ export default function SupportDisputesPage() {
           </p>
           <button
             onClick={() => router.push("/support")}
-            className="px-5 py-2.5 rounded-xl bg-[#7C3AED] text-white text-sm font-bold hover:bg-[#5B21B6] transition-colors"
+            className="px-5 py-2.5 rounded-xl bg-[#23856C] text-white text-sm font-bold hover:bg-[#196A55] transition-colors"
           >
             Go to Support
           </button>

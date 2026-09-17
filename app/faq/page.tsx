@@ -108,7 +108,7 @@ export default function FaqPage() {
             key={cat.category}
             initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
           >
-            <h2 className="text-xs font-bold text-[#7C3AED] uppercase tracking-wide mb-2">{cat.category}</h2>
+            <h2 className="text-xs font-bold text-[#23856C] uppercase tracking-wide mb-2">{cat.category}</h2>
             <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl overflow-hidden">
               {cat.items.map((item) => (
                 <FaqItem key={item.q} q={item.q} a={item.a} />

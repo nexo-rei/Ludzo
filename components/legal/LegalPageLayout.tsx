@@ -43,7 +43,7 @@ function SectionBlock({ section, index }: { section: LegalSection; index: number
             <li key={i} className="flex items-start gap-2.5 text-sm text-[var(--text-secondary)] leading-relaxed">
               <span
                 className="mt-[7px] w-1.5 h-1.5 rounded-full shrink-0"
-                style={{ background: "#7C3AED" }}
+                style={{ background: "#23856C" }}
               />
               <span>{b}</span>
             </li>
@@ -78,12 +78,12 @@ export default function LegalPageLayout({
           <div
             className="rounded-2xl p-4"
             style={{
-              background: `${highlight.color ?? "#7C3AED"}14`,
-              border: `1px solid ${highlight.color ?? "#7C3AED"}40`,
+              background: `${highlight.color ?? "#23856C"}14`,
+              border: `1px solid ${highlight.color ?? "#23856C"}40`,
             }}
           >
             {highlight.title && (
-              <p className="text-xs font-bold mb-1" style={{ color: highlight.color ?? "#A855F7" }}>
+              <p className="text-xs font-bold mb-1" style={{ color: highlight.color ?? "#63D9B4" }}>
                 {highlight.title}
               </p>
             )}

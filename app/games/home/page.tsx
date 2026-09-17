@@ -109,7 +109,7 @@ export default function GamingHomePage() {
           className="flex items-center justify-between gap-3"
         >
           <div className="flex min-w-0 items-center gap-3">
-            <div className="relative h-12 w-12 flex-none overflow-hidden rounded-2xl border border-purple-500/50 bg-slate-900 shadow-[0_0_18px_rgba(168,85,247,0.35)]">
+            <div className="relative h-12 w-12 flex-none overflow-hidden rounded-2xl border border-purple-500/50 bg-slate-900 shadow-[0_0_18px_rgba(99,217,180,0.35)]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={user?.photo_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${userId ?? "me"}`}
@@ -183,7 +183,7 @@ export default function GamingHomePage() {
 
           <div className="mt-4 flex items-center justify-between border-t border-purple-500/10 pt-3">
             <span className="text-[10px] font-bold tracking-wide text-purple-300/90">
-              ⚡ 100 Won Coins = $1.00 USDT
+              100 Won Coins = $1.00 USDT
             </span>
             <span className="rounded-md border border-slate-800 bg-slate-900/70 px-2 py-1 font-mono text-[9px] font-bold text-emerald-400">
               Cash ${usdt.toFixed(2)}
@@ -227,7 +227,7 @@ export default function GamingHomePage() {
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          className="arena-glow relative overflow-hidden rounded-3xl border border-purple-500/40 bg-gradient-to-b from-purple-950 to-slate-950 shadow-[0_18px_50px_-24px_rgba(124,58,237,0.9)]"
+          className="arena-glow relative overflow-hidden rounded-3xl border border-purple-500/40 bg-gradient-to-b from-purple-950 to-slate-950 shadow-[0_18px_50px_-24px_rgba(35,133,108,0.9)]"
         >
           <div className="pointer-events-none absolute -right-8 -top-6 opacity-20">
             <LudoIcon size={150} className="text-purple-300" />
@@ -251,7 +251,7 @@ export default function GamingHomePage() {
             <motion.button
               whileTap={{ scale: 0.975 }}
               onClick={() => router.push("/games")}
-              className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-purple-400/40 bg-gradient-to-r from-purple-600 to-indigo-600 text-xs font-black uppercase tracking-widest text-white shadow-[0_10px_30px_-12px_rgba(168,85,247,0.9)]"
+              className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-purple-400/40 bg-gradient-to-r from-purple-600 to-indigo-600 text-xs font-black uppercase tracking-widest text-white shadow-[0_10px_30px_-12px_rgba(99,217,180,0.9)]"
             >
               <DiceIcon size={16} />
               Play Ludo Now

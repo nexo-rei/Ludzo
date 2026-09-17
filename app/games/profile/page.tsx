@@ -1,4 +1,5 @@
 "use client";
+import SymbolIcon from "@/components/ui/SymbolIcon";
 
 /**
  * LUDZO — Gaming Hub Profile (/games/profile)
@@ -52,11 +53,11 @@ const EMPTY_STATS: Stats = {
 };
 
 const RULES = [
-  { icon: "🎲", text: "Roll a 6 to release a token from your yard." },
-  { icon: "🎯", text: "Both of your tokens must reach home to win the pool." },
-  { icon: "🔁", text: "A 6, a capture or a finished token grants a bonus roll." },
-  { icon: "⚠️", text: "Three 6s in a row — the third roll is forfeited." },
-  { icon: "🛡️", text: "★ cells are safe; nobody can capture you there." },
+  { icon: "dice", text: "Roll a 6 to release a token from your yard." },
+  { icon: "target", text: "Both of your tokens must reach home to win the pool." },
+  { icon: "repeat", text: "A 6, a capture or a finished token grants a bonus roll." },
+  { icon: "warning", text: "Three 6s in a row — the third roll is forfeited." },
+  { icon: "shield", text: "★ cells are safe; nobody can capture you there." },
   { icon: "⏱️", text: "18 seconds per turn, 8 minute cap, 3 hearts." },
 ];
 
@@ -70,7 +71,7 @@ interface MenuItem {
 }
 
 const MENU: MenuItem[] = [
-  { label: "Battle History",  hint: "Every match & Coin result", href: "/games/matches", tint: "#A855F7", Icon: BattleLogIcon },
+  { label: "Battle History",  hint: "Every match & Coin result", href: "/games/matches", tint: "#63D9B4", Icon: BattleLogIcon },
   { label: "Leaderboard",     hint: "Top earners this season",   href: "/leaderboard",   tint: "#F59E0B", Icon: Trophy },
   { label: "How to Play",     hint: "Rules in 20 seconds",       action: "rules",        tint: "#3B82F6", Icon: BookOpen },
   { label: "Transactions",    hint: "Deposits, wins & payouts",  href: "/history",       tint: "#10B981", Icon: ReceiptText },
@@ -174,7 +175,7 @@ export default function GamingProfilePage() {
           </div>
 
           <div className="relative z-10 flex items-center gap-4">
-            <div className="relative h-16 w-16 flex-none overflow-hidden rounded-2xl border-2 border-purple-500/60 bg-slate-900 shadow-[0_0_20px_rgba(168,85,247,0.4)]">
+            <div className="relative h-16 w-16 flex-none overflow-hidden rounded-2xl border-2 border-purple-500/60 bg-slate-900 shadow-[0_0_20px_rgba(99,217,180,0.4)]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={user?.photo_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${userId ?? "me"}`}
@@ -291,8 +292,8 @@ export default function GamingProfilePage() {
               <div className="grid grid-cols-3 gap-2.5">
                 {[
                   { label: "Win Rate", value: stats.win_rate, tone: "text-purple-300" },
-                  { label: "Streak", value: `🔥 ${stats.current_streak}`, tone: "text-amber-400" },
-                  { label: "Best", value: `👑 ${stats.best_streak}`, tone: "text-amber-400" },
+                  { label: "Streak", value: `${stats.current_streak}`, tone: "text-amber-400" },
+                  { label: "Best", value: `${stats.best_streak}`, tone: "text-amber-400" },
                 ].map((cell, i) => (
                   <motion.div
                     key={cell.label}
@@ -431,7 +432,7 @@ export default function GamingProfilePage() {
                     transition={{ delay: i * 0.05 }}
                     className="flex items-start gap-2.5 rounded-xl border border-slate-800/70 bg-slate-950/50 px-3 py-2.5"
                   >
-                    <span className="mt-0.5 flex-none text-sm leading-none">{rule.icon}</span>
+                    <span className="mt-0.5 flex-none text-sm leading-none"><SymbolIcon name={rule.icon} size={17} /></span>
                     <span className="text-[11px] font-semibold leading-snug text-slate-300">{rule.text}</span>
                   </motion.div>
                 ))}

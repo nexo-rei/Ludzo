@@ -83,7 +83,7 @@ export default function AdminWithdrawalsPage() {
               key={s}
               onClick={() => { setStatus(s); setPage(1); }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all capitalize ${
-                status === s ? "bg-[#7C3AED] text-white" : "bg-[#111] border border-[#333] text-gray-400 hover:border-[#555]"
+                status === s ? "bg-[#23856C] text-white" : "bg-[#111] border border-[#333] text-gray-400 hover:border-[#555]"
               }`}
             >
               {s}
@@ -123,7 +123,7 @@ export default function AdminWithdrawalsPage() {
                   <td className="px-4 py-3">
                     <button
                       onClick={() => setSelected(w)}
-                      className="px-3 py-1 rounded-lg bg-[#7C3AED]/20 text-[#A855F7] text-xs font-semibold hover:bg-[#7C3AED]/30"
+                      className="px-3 py-1 rounded-lg bg-[#23856C]/20 text-[#63D9B4] text-xs font-semibold hover:bg-[#23856C]/30"
                     >
                       Review
                     </button>
@@ -195,7 +195,7 @@ export default function AdminWithdrawalsPage() {
               <button
                 onClick={() => handleAction(selected.id, "mark_paid")}
                 disabled={processing === selected.id}
-                className="w-full py-2.5 rounded-xl bg-[#7C3AED] text-white text-sm font-bold hover:bg-[#5B21B6] disabled:opacity-40"
+                className="w-full py-2.5 rounded-xl bg-[#23856C] text-white text-sm font-bold hover:bg-[#196A55] disabled:opacity-40"
               >
                 ✓ Mark as Paid
               </button>

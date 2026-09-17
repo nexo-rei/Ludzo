@@ -1,4 +1,5 @@
 "use client";
+import SymbolIcon from "@/components/ui/SymbolIcon";
 
 /**
  * LUDZO — Ludo Lobby (the "Play" tab)
@@ -38,11 +39,11 @@ const QUEUE_POLL_MS = 1500;
 const payoutFor = (stake: number) => Math.floor(stake * 2 * (1 - PLATFORM_FEE));
 
 const HOW_TO_PLAY = [
-  { icon: "🎲", text: "Roll a 6 to bring a token out of the yard" },
-  { icon: "🎯", text: "Both tokens must reach home to win the pool" },
-  { icon: "🔁", text: "A 6, a capture or a finished token grants a bonus roll" },
-  { icon: "⚠️", text: "Three 6s in a row — the third one is forfeited" },
-  { icon: "🛡️", text: "★ cells are safe — nobody can capture you there" },
+  { icon: "dice", text: "Roll a 6 to bring a token out of the yard" },
+  { icon: "target", text: "Both tokens must reach home to win the pool" },
+  { icon: "repeat", text: "A 6, a capture or a finished token grants a bonus roll" },
+  { icon: "warning", text: "Three 6s in a row — the third one is forfeited" },
+  { icon: "shield", text: "★ cells are safe — nobody can capture you there" },
   { icon: "⏱️", text: "18s per turn, 8 min per match, 3 hearts" },
 ];
 
@@ -282,7 +283,7 @@ export default function LudoLobby() {
           className="flex items-center justify-between gap-3"
         >
           <div className="flex items-center gap-3 min-w-0">
-            <div className="relative h-11 w-11 flex-none overflow-hidden rounded-2xl border border-purple-500/50 bg-slate-900 shadow-[0_0_16px_rgba(168,85,247,0.4)]">
+            <div className="relative h-11 w-11 flex-none overflow-hidden rounded-2xl border border-purple-500/50 bg-slate-900 shadow-[0_0_16px_rgba(99,217,180,0.4)]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={user?.photo_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${userId ?? "me"}`}
@@ -342,7 +343,7 @@ export default function LudoLobby() {
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.4 }}
-          className="arena-glow relative overflow-hidden rounded-3xl border border-purple-500/40 bg-gradient-to-b from-purple-950/80 via-slate-950 to-slate-950 shadow-[0_18px_50px_-24px_rgba(168,85,247,0.8)]"
+          className="arena-glow relative overflow-hidden rounded-3xl border border-purple-500/40 bg-gradient-to-b from-purple-950/80 via-slate-950 to-slate-950 shadow-[0_18px_50px_-24px_rgba(99,217,180,0.8)]"
         >
           {/* board watermark */}
           <div className="pointer-events-none absolute -right-6 -top-4 opacity-[0.16]">
@@ -364,7 +365,7 @@ export default function LudoLobby() {
             </p>
 
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {["2 Players", "8 min cap", "18s / turn", "3 ❤ lives"].map((chip) => (
+              {["2 Players", "8 min cap", "18s / turn", "3 lives"].map((chip) => (
                 <span
                   key={chip}
                   className="rounded-lg border border-slate-700/70 bg-slate-900/70 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-slate-400"
@@ -378,7 +379,7 @@ export default function LudoLobby() {
               whileTap={{ scale: 0.975 }}
               whileHover={{ scale: 1.01 }}
               onClick={handlePlayTap}
-              className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-purple-400/40 bg-gradient-to-r from-purple-600 to-indigo-600 text-xs font-black uppercase tracking-widest text-white shadow-[0_10px_30px_-10px_rgba(168,85,247,0.9)]"
+              className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-purple-400/40 bg-gradient-to-r from-purple-600 to-indigo-600 text-xs font-black uppercase tracking-widest text-white shadow-[0_10px_30px_-10px_rgba(99,217,180,0.9)]"
             >
               <DiceIcon size={17} />
               {selectedStake ? `Play for ${selectedStake} Coins` : "Play Ludo Now"}
@@ -500,7 +501,7 @@ export default function LudoLobby() {
                 transition={{ delay: 0.3 + i * 0.04 }}
                 className="flex items-start gap-2 rounded-xl border border-slate-800/70 bg-slate-950/50 px-2.5 py-2"
               >
-                <span className="mt-0.5 flex-none text-sm leading-none">{rule.icon}</span>
+                <span className="mt-0.5 flex-none text-sm leading-none"><SymbolIcon name={rule.icon} size={17} /></span>
                 <span className="text-[10px] font-semibold leading-snug text-slate-300">{rule.text}</span>
               </motion.div>
             ))}

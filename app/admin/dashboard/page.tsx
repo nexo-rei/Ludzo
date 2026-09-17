@@ -1,4 +1,5 @@
 "use client";
+import SymbolIcon from "@/components/ui/SymbolIcon";
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -23,14 +24,14 @@ interface DashboardStats {
 }
 
 const STAT_CARDS = (s: DashboardStats) => [
-  { label: "Total Users", value: s.total_users.toLocaleString(), icon: "👥", color: "#7C3AED" },
-  { label: "Active Today", value: s.active_users_today.toLocaleString(), icon: "🟢", color: "#10B981" },
-  { label: "New Today", value: s.new_users_today.toLocaleString(), icon: "✨", color: "#A855F7" },
-  { label: "Total Deposited", value: `$${formatUSDT(s.total_deposited)}`, icon: "💰", color: "#F59E0B" },
-  { label: "Total Withdrawn", value: `$${formatUSDT(s.total_withdrawn)}`, icon: "💸", color: "#EF4444" },
-  { label: "Coins Distributed", value: formatCoins(s.total_coins_distributed), icon: "🪙", color: "#F59E0B" },
+  { label: "Total Users", value: s.total_users.toLocaleString(), icon: "users", color: "#23856C" },
+  { label: "Active Today", value: s.active_users_today.toLocaleString(), icon: "activity", color: "#10B981" },
+  { label: "New Today", value: s.new_users_today.toLocaleString(), icon: "star", color: "#63D9B4" },
+  { label: "Total Deposited", value: `$${formatUSDT(s.total_deposited)}`, icon: "deposit", color: "#F59E0B" },
+  { label: "Total Withdrawn", value: `$${formatUSDT(s.total_withdrawn)}`, icon: "withdraw", color: "#EF4444" },
+  { label: "Coins Distributed", value: formatCoins(s.total_coins_distributed), icon: "coins", color: "#F59E0B" },
   { label: "Pending Withdrawals", value: s.pending_withdrawals.toString(), icon: "⏳", color: "#F59E0B", alert: s.pending_withdrawals > 0 },
-  { label: "Pending Deposits", value: s.pending_deposits.toString(), icon: "📥", color: "#7C3AED" },
+  { label: "Pending Deposits", value: s.pending_deposits.toString(), icon: "deposit", color: "#23856C" },
 ];
 
 export default function AdminDashboardPage() {
@@ -83,7 +84,7 @@ export default function AdminDashboardPage() {
                 className={`bg-[#111] border rounded-2xl p-4 ${card.alert ? "border-yellow-500/50" : "border-[#222]"}`}
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xl">{card.icon}</span>
+                  <span className="text-xl"><SymbolIcon name={card.icon} /></span>
                   {card.alert && <span className="text-[10px] px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 rounded-full font-bold">Action</span>}
                 </div>
                 <div className="text-xl font-black text-white font-numeric">{card.value}</div>
@@ -129,9 +130,9 @@ export default function AdminDashboardPage() {
                   <Tooltip
                     contentStyle={{ background: "#1a1a1a", border: "1px solid #333", borderRadius: 8, fontSize: 12 }}
                     labelStyle={{ color: "#aaa" }}
-                    itemStyle={{ color: "#A855F7" }}
+                    itemStyle={{ color: "#63D9B4" }}
                   />
-                  <Bar dataKey="count" fill="#7C3AED" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="count" fill="#23856C" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

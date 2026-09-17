@@ -92,7 +92,7 @@ export default function AdminDepositsPage() {
               onClick={() => { setStatus(s); setPage(1); }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all capitalize ${
                 status === s
-                  ? "bg-[#7C3AED] text-white"
+                  ? "bg-[#23856C] text-white"
                   : "bg-[#111] border border-[#333] text-gray-400 hover:border-[#555]"
               }`}
             >
@@ -129,7 +129,7 @@ export default function AdminDepositsPage() {
                       {d.user?.username && <div className="text-xs text-gray-500">@{d.user.username}</div>}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-[#A855F7] font-bold">{coins.toLocaleString()}</span>
+                      <span className="text-[#63D9B4] font-bold">{coins.toLocaleString()}</span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className="text-green-400 font-bold font-numeric">${usdtAmt.toFixed(2)}</span>

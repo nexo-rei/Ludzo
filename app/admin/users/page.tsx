@@ -84,12 +84,12 @@ export default function AdminUsersPage() {
             <input
               type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               placeholder="Search by name, username, or Telegram ID…"
-              className="w-full pl-9 pr-4 py-2.5 bg-[#111] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#7C3AED]"
+              className="w-full pl-9 pr-4 py-2.5 bg-[#111] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#23856C]"
             />
           </div>
           <select
             value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-            className="px-3 py-2.5 bg-[#111] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#7C3AED]"
+            className="px-3 py-2.5 bg-[#111] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#23856C]"
           >
             <option value="all">All Status</option>
             <option value="active">Active</option>
@@ -128,7 +128,7 @@ export default function AdminUsersPage() {
                   <td className="px-4 py-3">
                     <button
                       onClick={() => setSelected(user)}
-                      className="px-3 py-1 rounded-lg bg-[#7C3AED]/20 text-[#A855F7] text-xs font-semibold hover:bg-[#7C3AED]/30 transition-colors"
+                      className="px-3 py-1 rounded-lg bg-[#23856C]/20 text-[#63D9B4] text-xs font-semibold hover:bg-[#23856C]/30 transition-colors"
                     >
                       Manage
                     </button>
@@ -173,7 +173,7 @@ export default function AdminUsersPage() {
               <select
                 value={adjustment.type}
                 onChange={(e) => setAdjustment((a) => ({ ...a, type: e.target.value }))}
-                className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#7C3AED]"
+                className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#23856C]"
               >
                 <option value="add_coins">Add Coins</option>
                 <option value="remove_coins">Remove Coins</option>
@@ -184,18 +184,18 @@ export default function AdminUsersPage() {
                 type="number" min={0} value={adjustment.amount}
                 onChange={(e) => setAdjustment((a) => ({ ...a, amount: e.target.value }))}
                 placeholder="Amount"
-                className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#7C3AED]"
+                className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#23856C]"
               />
               <input
                 type="text" value={adjustment.reason}
                 onChange={(e) => setAdjustment((a) => ({ ...a, reason: e.target.value }))}
                 placeholder="Reason (optional)"
-                className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#7C3AED]"
+                className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#23856C]"
               />
               <button
                 onClick={() => handleAction(adjustment.type)}
                 disabled={!adjustment.amount || actionLoading}
-                className="w-full py-2.5 rounded-xl bg-[#7C3AED] text-white text-sm font-bold disabled:opacity-60 hover:bg-[#5B21B6] transition-colors"
+                className="w-full py-2.5 rounded-xl bg-[#23856C] text-white text-sm font-bold disabled:opacity-60 hover:bg-[#196A55] transition-colors"
               >
                 {actionLoading ? "Processing…" : "Apply Adjustment"}
               </button>

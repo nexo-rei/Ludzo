@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
+import "./workspace.css";
+import MotionPreferences from "@/components/layout/MotionPreferences";
 import { AppProvider } from "@/hooks/useApp";
 
 export const metadata: Metadata = {
@@ -21,11 +23,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   strategy="afterInteractive"
 />
         
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-        <meta name="theme-color" content="#000000" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <meta name="theme-color" content="#111715" />
       </head>
       <body>
-        <AppProvider>{children}</AppProvider>
+        <MotionPreferences><AppProvider>{children}</AppProvider></MotionPreferences>
       </body>
     </html>
   );

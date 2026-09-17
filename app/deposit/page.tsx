@@ -1,4 +1,5 @@
 "use client";
+import SymbolIcon from "@/components/ui/SymbolIcon";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -51,19 +52,19 @@ const PRESET_COINS = [300, 500, 1000, 2000, 5000, 10000];
 const NETWORKS: { id: Network; label: string; desc: string; emoji: string; badge: string; badgeColor: string; color: string; bg: string; border: string }[] = [
   {
     id: "TON", label: "USDT TON", desc: "TON Blockchain",
-    emoji: "⭐", badge: "Lowest Fee",
+    emoji: "star", badge: "Lowest Fee",
     badgeColor: "text-emerald-400 bg-emerald-400/10 border-emerald-400/30",
     color: "#0098EA", bg: "rgba(0,152,234,0.08)", border: "rgba(0,152,234,0.35)",
   },
   {
     id: "TRC20", label: "USDT TRC20", desc: "Tron Network",
-    emoji: "⚡", badge: "Fast",
+    emoji: "fast", badge: "Fast",
     badgeColor: "text-red-400 bg-red-400/10 border-red-400/30",
     color: "#E50914", bg: "rgba(229,9,20,0.08)", border: "rgba(229,9,20,0.35)",
   },
   {
     id: "BEP20", label: "USDT BEP20", desc: "BNB Smart Chain",
-    emoji: "🔥", badge: "Recommended",
+    emoji: "streak", badge: "Recommended",
     badgeColor: "text-yellow-400 bg-yellow-400/10 border-yellow-400/30",
     color: "#F3BA2F", bg: "rgba(243,186,47,0.08)", border: "rgba(243,186,47,0.35)",
   },
@@ -150,15 +151,15 @@ function StepBar({ step }: { step: Step }) {
             <div className="flex flex-col items-center gap-1">
               <motion.div
                 animate={{
-                  background: done ? "#10B981" : active ? "#7C3AED" : "rgba(255,255,255,0.08)",
-                  borderColor: done ? "#10B981" : active ? "#7C3AED" : "rgba(255,255,255,0.15)",
+                  background: done ? "#10B981" : active ? "#23856C" : "rgba(255,255,255,0.08)",
+                  borderColor: done ? "#10B981" : active ? "#23856C" : "rgba(255,255,255,0.15)",
                 }}
                 className="w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold"
                 style={{ color: done || active ? "#fff" : "rgba(255,255,255,0.3)" }}
               >
                 {done ? <CheckCircle size={14} /> : num}
               </motion.div>
-              <span className={`text-[10px] font-semibold whitespace-nowrap ${active ? "text-[#7C3AED]" : done ? "text-emerald-400" : "text-[var(--text-muted)]"}`}>
+              <span className={`text-[10px] font-semibold whitespace-nowrap ${active ? "text-[#23856C]" : done ? "text-emerald-400" : "text-[var(--text-muted)]"}`}>
                 {label}
               </span>
             </div>
@@ -227,7 +228,7 @@ function WarningBanner() {
     <div className="flex items-start gap-3 px-4 py-3 rounded-xl border border-yellow-500/30 bg-yellow-500/8">
       <AlertTriangle size={15} className="text-yellow-400 shrink-0 mt-0.5" />
       <p className="text-xs text-yellow-300/90 leading-relaxed">
-        <span className="font-bold">⚠️ Ensure the exact amount is received.</span>
+        <span className="font-bold">Ensure the exact amount is received.</span>
         {" "}Deposits with insufficient received amount may not be credited automatically.
       </p>
     </div>
@@ -382,7 +383,7 @@ export default function DepositPage() {
       {/* Balance */}
       <div className="glass rounded-2xl p-5 text-center">
         <p className="text-xs text-[var(--text-muted)] mb-1">Current Balance</p>
-        <p className="text-3xl font-black text-[#7C3AED]">
+        <p className="text-3xl font-black text-[#23856C]">
           {fmtCoins(coinBalance)}{" "}
           <span className="text-base text-[var(--text-muted)] font-semibold">Coins</span>
         </p>
@@ -405,8 +406,8 @@ export default function DepositPage() {
               onClick={() => { setUseCustom(false); setCoinAmount(v); setError(""); }}
               className={`py-3 rounded-xl text-sm font-semibold border transition-all ${
                 !useCustom && coinAmount === v
-                  ? "border-[#7C3AED] bg-[#7C3AED]/12 text-[#A855F7]"
-                  : "border-[var(--border)] text-[var(--text-muted)] hover:border-[#7C3AED]/40 hover:text-[var(--text-primary)]"
+                  ? "border-[#23856C] bg-[#23856C]/12 text-[#63D9B4]"
+                  : "border-[var(--border)] text-[var(--text-muted)] hover:border-[#23856C]/40 hover:text-[var(--text-primary)]"
               }`}
             >
               <span className="block font-bold">{fmtCoins(v)}</span>
@@ -426,7 +427,7 @@ export default function DepositPage() {
             onFocus={() => setUseCustom(true)}
             onChange={(e) => { setCustomInput(e.target.value); setUseCustom(true); setError(""); }}
             placeholder="e.g. 2500"
-            className={`w-full px-4 py-3 bg-[var(--bg)] border rounded-xl text-[var(--text-primary)] text-base outline-none transition-colors ${useCustom ? "border-[#7C3AED]" : "border-[var(--border)]"} focus:border-[#7C3AED]`}
+            className={`w-full px-4 py-3 bg-[var(--bg)] border rounded-xl text-[var(--text-primary)] text-base outline-none transition-colors ${useCustom ? "border-[#23856C]" : "border-[var(--border)]"} focus:border-[#23856C]`}
           />
         </div>
 
@@ -435,7 +436,7 @@ export default function DepositPage() {
           {isValidAmount && (
             <motion.div
               initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-              className="flex items-center justify-between px-4 py-3 bg-[#7C3AED]/5 border border-[#7C3AED]/20 rounded-xl"
+              className="flex items-center justify-between px-4 py-3 bg-[#23856C]/5 border border-[#23856C]/20 rounded-xl"
             >
               <span className="text-sm text-[var(--text-muted)]">You pay</span>
               <span className="text-sm font-bold text-emerald-400">${usdtAmount.toFixed(2)} USDT</span>
@@ -459,7 +460,7 @@ export default function DepositPage() {
         whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
         onClick={() => { if (isValidAmount) setStep(2); }}
         disabled={!isValidAmount}
-        className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-[#23856C] hover:bg-[#196A55] text-white font-bold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
         Continue — {isValidAmount ? `${fmtCoins(effectiveCoinAmount)} Coins ($${usdtAmount.toFixed(2)})` : "Select amount"}
       </motion.button>
@@ -472,7 +473,7 @@ export default function DepositPage() {
       <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-4 flex items-center justify-between">
         <div>
           <p className="text-xs text-[var(--text-muted)]">You will receive</p>
-          <p className="text-lg font-black text-[#7C3AED]">{fmtCoins(effectiveCoinAmount)} Coins</p>
+          <p className="text-lg font-black text-[#23856C]">{fmtCoins(effectiveCoinAmount)} Coins</p>
         </div>
         <div className="text-right">
           <p className="text-xs text-[var(--text-muted)]">You pay</p>
@@ -512,7 +513,7 @@ export default function DepositPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-bold text-[var(--text-primary)]">{n.label}</span>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${n.badgeColor}`}>
-                        {n.emoji} {n.badge}
+                        <SymbolIcon name={n.emoji} size={12} /> {n.badge}
                       </span>
                     </div>
                     <p className="text-xs text-[var(--text-muted)] mt-0.5">{n.desc}</p>
@@ -535,7 +536,7 @@ export default function DepositPage() {
         whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
         onClick={() => { if (network) setStep(3); }}
         disabled={!network}
-        className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-[#23856C] hover:bg-[#196A55] text-white font-bold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {network ? `Continue with ${NETWORKS.find(n => n.id === network)?.label}` : "Select a network"}
       </motion.button>
@@ -583,7 +584,7 @@ export default function DepositPage() {
               <motion.button
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                 onClick={resetAll}
-                className="mt-2 px-6 py-3 rounded-xl bg-[#7C3AED] text-white font-bold text-sm"
+                className="mt-2 px-6 py-3 rounded-xl bg-[#23856C] text-white font-bold text-sm"
               >
                 Start New Deposit
               </motion.button>
@@ -599,13 +600,13 @@ export default function DepositPage() {
                 animate={{ rotate: [0, -10, 10, -10, 0], scale: [1, 1.2, 1] }}
                 transition={{ duration: 0.6 }}
                 className="text-6xl"
-              >🎉</motion.div>
+              ><SymbolIcon name="success" size={44} /></motion.div>
               <div className="text-2xl font-black text-emerald-400">+{fmtCoins(payment.coin_amount)} Coins</div>
               <p className="text-xs text-[var(--text-muted)]">Credited to your wallet</p>
               <motion.button
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                 onClick={resetAll}
-                className="mt-3 px-6 py-3 rounded-xl bg-[#7C3AED] text-white font-bold text-sm"
+                className="mt-3 px-6 py-3 rounded-xl bg-[#23856C] text-white font-bold text-sm"
               >
                 Make Another Deposit
               </motion.button>
@@ -681,7 +682,7 @@ export default function DepositPage() {
           <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-4 flex items-center justify-between">
             <div>
               <p className="text-xs text-[var(--text-muted)]">You will receive</p>
-              <p className="text-lg font-black text-[#7C3AED]">{fmtCoins(effectiveCoinAmount)} Coins</p>
+              <p className="text-lg font-black text-[#23856C]">{fmtCoins(effectiveCoinAmount)} Coins</p>
             </div>
             <div className="text-right">
               <p className="text-xs text-[var(--text-muted)]">Network</p>
@@ -721,7 +722,7 @@ export default function DepositPage() {
             htmlFor="agree-checkbox"
             className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
               agreed
-                ? "border-[#7C3AED]/50 bg-[#7C3AED]/8"
+                ? "border-[#23856C]/50 bg-[#23856C]/8"
                 : "border-[var(--border)] bg-[var(--card-bg)]"
             }`}
           >
@@ -734,8 +735,8 @@ export default function DepositPage() {
               />
               <motion.div
                 animate={{
-                  background: agreed ? "#7C3AED" : "transparent",
-                  borderColor: agreed ? "#7C3AED" : "rgba(255,255,255,0.2)",
+                  background: agreed ? "#23856C" : "transparent",
+                  borderColor: agreed ? "#23856C" : "rgba(255,255,255,0.2)",
                 }}
                 className="w-5 h-5 rounded-md border-2 flex items-center justify-center"
               >
@@ -764,7 +765,7 @@ export default function DepositPage() {
             whileHover={{ scale: agreed ? 1.01 : 1 }} whileTap={{ scale: agreed ? 0.98 : 1 }}
             onClick={handleCreatePayment}
             disabled={!agreed || submitting}
-            className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-[#23856C] hover:bg-[#196A55] text-white font-bold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {submitting
               ? <><Loader2 size={16} className="animate-spin" /> Creating Payment…</>
@@ -789,9 +790,9 @@ export default function DepositPage() {
             const st    = d.nowpayments_status ?? d.status;
             return (
               <div key={d.id} className="flex items-center gap-3 p-3 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl">
-                <span className="text-xl">🪙</span>
+                <SymbolIcon name="coins" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold text-[#7C3AED]">+{fmtCoins(coins)} Coins</div>
+                  <div className="text-sm font-bold text-[#23856C]">+{fmtCoins(coins)} Coins</div>
                   <div className="text-[10px] text-[var(--text-muted)] flex items-center gap-1.5 flex-wrap">
                     <span>${usdt.toFixed(2)} USDT</span>
                     {d.network && <><span className="opacity-40">·</span><span>{d.network}</span></>}

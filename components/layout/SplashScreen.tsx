@@ -48,7 +48,7 @@ export default function SplashScreen({ onDone }: SplashScreenProps) {
             className="absolute inset-0 pointer-events-none"
             style={{
               background:
-                "radial-gradient(ellipse 60% 50% at 50% 50%, rgba(124,58,237,0.18) 0%, transparent 70%)",
+                "radial-gradient(ellipse 60% 50% at 50% 50%, rgba(35,133,108,0.18) 0%, transparent 70%)",
             }}
             animate={{ opacity: [0.6, 1, 0.6] }}
             transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
@@ -59,7 +59,7 @@ export default function SplashScreen({ onDone }: SplashScreenProps) {
             className="absolute inset-0 pointer-events-none opacity-5"
             style={{
               backgroundImage:
-                "linear-gradient(rgba(124,58,237,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(124,58,237,0.4) 1px, transparent 1px)",
+                "linear-gradient(rgba(35,133,108,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(35,133,108,0.4) 1px, transparent 1px)",
               backgroundSize: "48px 48px",
             }}
           />
@@ -70,7 +70,7 @@ export default function SplashScreen({ onDone }: SplashScreenProps) {
             style={{
               width: 180,
               height: 180,
-              border: "1px solid rgba(124,58,237,0.25)",
+              border: "1px solid rgba(35,133,108,0.25)",
               clipPath: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)",
             }}
             animate={{ rotate: 360 }}
@@ -81,7 +81,7 @@ export default function SplashScreen({ onDone }: SplashScreenProps) {
             style={{
               width: 140,
               height: 140,
-              border: "1px solid rgba(168,85,247,0.15)",
+              border: "1px solid rgba(99,217,180,0.15)",
               clipPath: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)",
             }}
             animate={{ rotate: -360 }}
@@ -100,9 +100,9 @@ export default function SplashScreen({ onDone }: SplashScreenProps) {
               className="relative"
               animate={{
                 filter: [
-                  "drop-shadow(0 0 12px rgba(124,58,237,0.5))",
-                  "drop-shadow(0 0 32px rgba(168,85,247,0.7))",
-                  "drop-shadow(0 0 12px rgba(124,58,237,0.5))",
+                  "drop-shadow(0 0 12px rgba(35,133,108,0.5))",
+                  "drop-shadow(0 0 32px rgba(99,217,180,0.7))",
+                  "drop-shadow(0 0 12px rgba(35,133,108,0.5))",
                 ],
               }}
               transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
@@ -119,13 +119,13 @@ export default function SplashScreen({ onDone }: SplashScreenProps) {
             >
               <h1
                 className="text-5xl font-black tracking-[0.2em] text-white"
-                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                style={{ fontFamily: "'Inter', sans-serif" }}
               >
                 LUDZO
               </h1>
               <motion.p
                 className="mt-2 text-xs font-semibold tracking-[0.35em] uppercase"
-                style={{ color: "#A855F7" }}
+                style={{ color: "#63D9B4" }}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.75, duration: 0.5 }}
@@ -144,12 +144,12 @@ export default function SplashScreen({ onDone }: SplashScreenProps) {
           >
             <div
               className="w-full h-0.5 rounded-full overflow-hidden"
-              style={{ background: "rgba(124,58,237,0.2)" }}
+              style={{ background: "rgba(35,133,108,0.2)" }}
             >
               <motion.div
                 className="h-full rounded-full"
                 style={{
-                  background: "linear-gradient(90deg, #7C3AED, #A855F7)",
+                  background: "linear-gradient(90deg, #23856C, #63D9B4)",
                   width: `${progress}%`,
                   transition: "width 0.05s linear",
                 }}
