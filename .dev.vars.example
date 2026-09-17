@@ -1,0 +1,11 @@
+# Local-only vars for `wrangler dev` / `npm run preview` (Cloudflare runtime).
+# Copy to `.dev.vars` (gitignored, never commit real secrets) and fill in.
+# Next.js itself still reads `.env.local`; these are the Worker-side values.
+
+# Which Next.js `.env` files to load during local dev (defaults to "production").
+NEXTJS_ENV=development
+
+# --- Secrets needed by the Worker at runtime (local preview) ---
+# SUPABASE_SERVICE_ROLE_KEY=
+# TELEGRAM_BOT_TOKEN=
+# JWT_SECRET=

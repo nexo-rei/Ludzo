@@ -231,13 +231,27 @@ Bot admin nahi hai? → verification unavailable (admin ko batana chahiye).
 
 ---
 
-## Deployment (Cloudflare Pages)
+## Deployment (Cloudflare Workers — OpenNext)
 
-1. Connect your Git repository to Cloudflare Pages
-2. Build command: `npm run build`
-3. Build output directory: `.next`
-4. Add all environment variables in Cloudflare Pages dashboard
-5. Enable **Next.js** preset (or use `@cloudflare/next-on-pages`)
+The app deploys to Cloudflare Workers via the OpenNext adapter (`@opennextjs/cloudflare`).
+The adapter config is committed (`open-next.config.ts` + `wrangler.jsonc`), so deploys
+never run the adapter's auto-migrate.
+
+1. Connect your Git repository to Cloudflare Workers (Workers Builds) **or** deploy from CLI
+2. Build command: `npm run build` (runs `opennextjs-cloudflare build` → `next build` once, then adapts to a Worker)
+3. Deploy command: `npx wrangler deploy` (or `npm run deploy` to build + deploy in one go)
+4. Add all environment variables in the Cloudflare dashboard / `wrangler secret`:
+   - `NEXT_PUBLIC_*` values are inlined at **build time**, so they must be set as build-time vars
+   - Server secrets (`SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, …) as Worker secrets/vars
+5. Local preview in the real Workers runtime: `npm run preview` (uses `.dev.vars`, see `.dev.vars.example`)
+
+Notes:
+
+- `next.config.ts` calls `initOpenNextCloudflareForDev()` **only** when `NODE_ENV=development`.
+  Never call it unguarded — it starts workerd mid-build and crashes with `SQLITE_BUSY`.
+- `open-next.config.ts` pins `buildCommand: "next build"` — without it the adapter would
+  invoke `npm run build` (the default), which **is** the adapter → infinite recursion.
+- Next.js `<Image>` is `unoptimized` (Workers have no image optimizer without the `IMAGES` binding).
 
 ---
 
