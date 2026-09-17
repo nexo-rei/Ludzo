@@ -6,6 +6,7 @@ import { PlayIcon } from "@/components/ui/DuotoneIcons";
 import Button from "@/components/ui/Button";
 import { showToast } from "@/components/ui/Toast";
 import { useApp } from "@/hooks/useApp";
+import LudzoCoin from "@/components/ui/LudzoCoin";
 import type { DailyStreak, HomePageStreak } from "@/types";
 
 interface StreakSectionProps {
@@ -132,8 +133,10 @@ export default function StreakSection({ streak, todayReward, onClaimed }: Streak
             <div className="text-[10px]" style={{ color: "#F59E0B" }}>Day {currentDay} / 7</div>
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-sm font-black font-numeric" style={{ color: "#F59E0B" }}>+{todayReward}</div>
+        <div className="text-right flex flex-col items-end">
+          <div className="text-sm font-black font-numeric flex items-center gap-1" style={{ color: "#F59E0B" }}>
+            <LudzoCoin size={14} /> +{todayReward}
+          </div>
           <div className="text-[10px] text-[var(--text-muted)]">Coins today</div>
         </div>
       </div>
@@ -195,7 +198,9 @@ export default function StreakSection({ streak, todayReward, onClaimed }: Streak
             {/* Bonus progress */}
             <div className="flex items-center justify-between mb-2">
               <span className="text-[11px] text-[var(--text-muted)]">Bonus ads: {bonusWatched}/{BONUS_ADS_REQUIRED}</span>
-              <span className="text-[11px] font-semibold" style={{ color: "#F59E0B" }}>+{todayReward} Coins</span>
+              <span className="text-[11px] font-semibold flex items-center gap-1" style={{ color: "#F59E0B" }}>
+                <LudzoCoin size={13} /> +{todayReward} Coins
+              </span>
             </div>
             <div className="h-1.5 rounded-full mb-3 overflow-hidden" style={{ background: "rgba(245,158,11,0.1)" }}>
               <motion.div

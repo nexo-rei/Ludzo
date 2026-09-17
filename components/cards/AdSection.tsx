@@ -6,6 +6,7 @@ import { AdPlayIcon, PlayIcon } from "@/components/ui/DuotoneIcons";
 import Button from "@/components/ui/Button";
 import { showToast } from "@/components/ui/Toast";
 import { useApp } from "@/hooks/useApp";
+import LudzoCoin from "@/components/ui/LudzoCoin";
 
 interface AdSectionProps {
   adsWatchedToday: number;
@@ -101,8 +102,8 @@ export default function AdSection({ adsWatchedToday, dailyLimit, adReward, onAdW
       </div>
 
       <div className="flex items-center justify-between">
-        <span className="text-xs text-[var(--text-muted)]">
-          +{adReward} Coins per ad
+        <span className="text-xs text-[var(--text-muted)] inline-flex items-center gap-1.5">
+          <LudzoCoin size={14} /> +{adReward} Coins per ad
         </span>
         <Button
           variant="primary"

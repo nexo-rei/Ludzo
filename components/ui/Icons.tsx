@@ -2,6 +2,7 @@
 // All icons share 1.5px stroke width and unified design language
 
 import { SVGProps } from "react";
+import LudzoCoin from "@/components/ui/LudzoCoin";
 
 type IconProps = SVGProps<SVGSVGElement> & { size?: number };
 
@@ -34,15 +35,13 @@ export function TaskIcon({ size = 20, ...props }: IconProps) {
   );
 }
 
-export function CoinIcon({ size = 20, ...props }: IconProps) {
-  return (
-    <svg {...base(size, props)}>
-      <circle cx="12" cy="12" r="10" />
-      <path d="M9 8v8h4" />
-      <path d="M9 12h4" />
-      <path d="M15 13.5l1.5-1.5-1.5-1.5" strokeWidth={1} />
-    </svg>
-  );
+/**
+ * Coin mark — a single source of truth.
+ * Always renders the branded Ludzo coin so the same coin appears on
+ * Home, Tasks, Streak, Ads, Ludo arena, Leaderboard, Wallet and Admin.
+ */
+export function CoinIcon({ size = 20, className }: IconProps) {
+  return <LudzoCoin size={size} className={className} />;
 }
 
 export function WalletIcon({ size = 20, ...props }: IconProps) {

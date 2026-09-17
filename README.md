@@ -37,8 +37,9 @@ ludzo-v3/
 │   │   ├── leaderboard/        # USDT earnings leaderboard
 │   │   ├── announcements/      # Public announcements
 │   │   ├── profile/            # User profile + preferences
+│   │   ├── support/            # Support tickets (user create/list/reply)
 │   │   └── home/               # Aggregated home page data
-│   ├── admin/                  # Admin panel (9 pages)
+│   ├── admin/                  # Admin panel (10 pages, includes Support inbox)
 │   ├── auth/                   # Telegram auth page
 │   ├── home/                   # Home dashboard
 │   ├── tasks/                  # Task list
@@ -59,9 +60,10 @@ ludzo-v3/
 │   ├── layout.tsx              # Root layout
 │   └── globals.css             # Global CSS + theme variables
 ├── components/
-│   ├── admin/AdminShell.tsx    # Admin sidebar layout
+│   ├── admin/AdminShell.tsx    # Admin sidebar layout (Dashboard/Users/Tasks/Support/…)
 │   ├── cards/                  # Home page card sections
 │   ├── layout/                 # AppShell, BottomNav, PageHeader, LudzoLogo, SplashScreen
+│   ├── ui/LudzoCoin.tsx        # THE coin mark — used everywhere coins appear
 │   └── ui/                     # Button, Card, Input, Badge, ProgressBar, Skeleton, Toast, EmptyState
 ├── hooks/
 │   ├── useTelegram.ts          # Telegram WebApp integration
@@ -72,12 +74,18 @@ ludzo-v3/
 │   ├── telegram.ts             # Telegram init data validator + Binance webhook
 │   ├── utils.ts                # Formatting utilities
 │   ├── i18n.ts                 # Translation system (10 languages)
+│   ├── coins.ts                # creditCoins() — RPC + fallback reward crediting
+│   ├── telegram-chat.ts        # getChatMember join verification (bot must be admin)
+│   ├── admin-log.ts            # Safe admin action logging (never breaks the action)
 │   └── supabase/               # Supabase client (browser + admin)
 ├── sql/
-│   ├── schema.sql              # All table definitions
-│   ├── functions.sql           # credit_usdt, debit_usdt, get_leaderboard, etc.
-│   ├── policies.sql            # Row Level Security policies
-│   └── seed.sql                # Default admin user + settings
+│   ├── 01_ludo_schema.sql      # Base ludo tables + original RPCs (fresh DB only)
+│   ├── 02_ludo_fixes.sql       # REQUIRED — missing RPCs/columns, race guards
+│   ├── 03_ludo_cron.sql        # Janitor for stuck rooms / queue refunds
+│   ├── 04_ludo_two_tokens_cleanup.sql
+│   └── 05_support_and_task_verification.sql
+│                               # REQUIRED — support_tickets + task chat columns
+│                               # + admin_logs hardening (logs page crash fix)
 ├── types/index.ts              # All TypeScript types
 ├── middleware.ts               # Maintenance mode redirect
 ├── next.config.ts              # Next.js config
@@ -117,24 +125,33 @@ cp .env.example .env.local
 | `BINANCE_WEBHOOK_SECRET` | Binance Pay webhook signing secret |
 | `NEXT_PUBLIC_MONETAG_ZONE_ID` | Monetag rewarded ad zone ID |
 | `JWT_SECRET` | Secret for admin JWT tokens (min 32 chars) |
+| `NEXT_PUBLIC_SUPPORT_USERNAME` | Telegram handle for the Support page buttons (default `LudzoSupport`) |
+| `TELEGRAM_SUPPORT_CHAT_ID` | Optional — naya support ticket aane par is chat me Telegram alert |
 
 ### 3. Database Setup
 
-Run SQL files in this order in your Supabase SQL editor:
+Supabase Dashboard → **SQL Editor** me files ko is order me paste karke **Run** karo
+(poori detail: `sql/README.md`):
 
 ```sql
--- 1. Schema (tables + indexes)
-\i sql/schema.sql
+-- 1. Ludo base tables (fresh DB par hi)
+sql/01_ludo_schema.sql
 
--- 2. Functions (credit_usdt, debit_usdt, etc.)
-\i sql/functions.sql
+-- 2. REQUIRED — missing RPCs / columns / locks
+sql/02_ludo_fixes.sql
 
--- 3. RLS Policies
-\i sql/policies.sql
+-- 3. REQUIRED — janitor cron (stuck rooms + queue refunds)
+sql/03_ludo_cron.sql
 
--- 4. Seed data (default admin + settings)
-\i sql/seed.sql
+-- 4. Two-token cleanup
+sql/04_ludo_two_tokens_cleanup.sql
+
+-- 5. REQUIRED — Support tickets + task join-verification + admin_logs fix
+sql/05_support_and_task_verification.sql
 ```
+
+`05` ke bina: support tickets save nahi honge, channel/group task verify nahi hoga,
+aur `/admin/logs` khaali/error dikha sakta hai.
 
 ### 4. Run Locally
 
@@ -160,10 +177,39 @@ Admin features:
 - Task management (CRUD: channel/group/ad/custom tasks)
 - Deposit management (review, approve, reject)
 - Withdrawal management (review, approve, reject, mark paid)
+- Support inbox (tickets, threads, replies, status/priority)
 - Announcement management (priority levels)
 - Platform settings (all economy values configurable)
 - Maintenance mode toggle
 - Admin action logs
+
+---
+
+## Support Tickets
+
+1. User: **Profile → Support** (ya Legal Center → Support & Disputes → *Go to Support*)
+2. User ticket likhta hai → `support_tickets` + `support_ticket_messages` me save hota hai
+3. Admin: **/admin/support** → filter (open / in progress / resolved / closed), thread padho, reply bhejo
+4. User "My Tickets" section me admin ka reply aur apna thread dekhta hai
+
+---
+
+## Task Verification (channel / group join)
+
+Channel/group task ka reward **sirf tab** milta hai jab Telegram Bot API confirm kare ki
+user sach me join hua hai.
+
+Setup (admin):
+
+1. Bot ko channel/group me add karo → **Administrator** banao → “Manage members / Restrict members” permission do
+2. **Admin → Tasks → New Task** me *Target Link* + *Channel / Group Chat ID* bharo
+   (public channel ho to `@username` bhi chalta hai)
+3. **Check bot access** dabao — ✅ aaye to verification ready hai
+4. Private invite link (`t.me/+hash`) verify nahi ho sakta — wahan numeric chat id (`-100…`) chahiye
+
+User side: **Open Channel → join → Verify & Claim**.
+Join nahi kiya? → “Please first join the channel, then tap Verify again.”
+Bot admin nahi hai? → verification unavailable (admin ko batana chahiye).
 
 ---
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logAdminAction } from "@/lib/admin-log";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdminAuth(req);
@@ -77,11 +78,11 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Invalid action" }, { status: 400 });
     }
 
-    await supabase.from("admin_logs").insert({
-      admin_id: auth.adminId,
+    await logAdminAction(supabase, {
+      adminId: auth.adminId,
       action: `user_${action}`,
-      target_type: "user",
-      target_id: user_id,
+      targetType: "user",
+      targetId: user_id,
       details: { amount, reason },
     });
 

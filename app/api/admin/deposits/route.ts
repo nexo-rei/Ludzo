@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logAdminAction } from "@/lib/admin-log";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdminAuth(req);
@@ -70,11 +71,11 @@ export async function PATCH(req: NextRequest) {
       }).eq("id", deposit_id);
     }
 
-    await supabase.from("admin_logs").insert({
-      admin_id: auth.adminId,
+    await logAdminAction(supabase, {
+      adminId: auth.adminId,
       action: `deposit_${action}`,
-      target_type: "deposit",
-      target_id: deposit_id,
+      targetType: "deposit",
+      targetId: deposit_id,
     });
 
     return NextResponse.json({ success: true });

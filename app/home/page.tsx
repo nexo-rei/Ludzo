@@ -20,6 +20,7 @@ import { useApp } from "@/hooks/useApp";
 import { formatDateTime } from "@/lib/utils";
 import type { HomePageData } from "@/types";
 import LudzoLogo from "@/components/layout/LudzoLogo";
+import LudzoCoin from "@/components/ui/LudzoCoin";
 
 // SVG icon mapping for activity types
 const ACTIVITY_SVG: Record<string, { icon: ReactElement; color: string; bg: string }> = {
@@ -203,10 +204,10 @@ export default function HomePage() {
                     </div>
                     <div className="text-[10px] text-[var(--text-muted)]">{formatDateTime(tx.created_at)}</div>
                   </div>
-                  <div className={`text-sm font-black font-numeric ${Number(tx.amount) > 0 ? "text-[#10B981]" : "text-[#EF4444]"}`}>
+                  <div className={`flex items-center gap-1 text-sm font-black font-numeric ${Number(tx.amount) > 0 ? "text-[#10B981]" : "text-[#EF4444]"}`}>
                     {Number(tx.amount) > 0 ? "+" : ""}{tx.amount}
-                    <span className="text-[10px] font-normal ml-0.5 text-[var(--text-muted)]">
-                      {tx.currency === "usdt" ? "USDT" : "Coins"}
+                    <span className="text-[10px] font-normal text-[var(--text-muted)] inline-flex items-center gap-1">
+                      {tx.currency === "usdt" ? "USDT" : <><LudzoCoin size={11} /> Coins</>}
                     </span>
                   </div>
                 </motion.div>

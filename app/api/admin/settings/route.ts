@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logAdminAction } from "@/lib/admin-log";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdminAuth(req);
@@ -56,8 +57,8 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
     console.log(`[ADMIN SETTINGS] saved. maintenance_mode now = ${JSON.stringify(verify?.value)}`);
 
-    await supabase.from("admin_logs").insert({
-      admin_id: auth.adminId,
+    await logAdminAction(supabase, {
+      adminId: auth.adminId,
       action: "settings_update",
       details: settings,
     });
