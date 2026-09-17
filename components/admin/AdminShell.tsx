@@ -6,18 +6,18 @@ import { ReactNode } from "react";
 import LudzoLogo from "@/components/layout/LudzoLogo";
 import { ToastContainer } from "@/components/ui/Toast";
 import {
-  LayoutDashboard,
-  Users,
-  CheckSquare,
-  ArrowDownCircle,
-  ArrowUpCircle,
-  Megaphone,
-  Settings,
-  ScrollText,
-  LogOut,
-  Menu,
-  X,
-} from "lucide-react";
+  ArrowDownCircleIcon,
+  ArrowUpCircleIcon,
+  CheckSquareIcon,
+  CloseIcon,
+  LogOutIcon,
+  MegaphoneIcon,
+  MenuIcon,
+  OverviewIcon,
+  ScrollIcon,
+  SettingsNavIcon,
+  UsersIcon,
+} from "@/components/ui/DuotoneIcons";
 import { cn } from "@/lib/utils";
 
 interface AdminShellProps {
@@ -26,14 +26,14 @@ interface AdminShellProps {
 }
 
 const NAV_ITEMS = [
-  { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
-  { label: "Users", href: "/admin/users", icon: Users },
-  { label: "Tasks", href: "/admin/tasks", icon: CheckSquare },
-  { label: "Deposits", href: "/admin/deposits", icon: ArrowDownCircle },
-  { label: "Withdrawals", href: "/admin/withdrawals", icon: ArrowUpCircle },
-  { label: "Announcements", href: "/admin/announcements", icon: Megaphone },
-  { label: "Settings", href: "/admin/settings", icon: Settings },
-  { label: "Logs", href: "/admin/logs", icon: ScrollText },
+  { label: "Dashboard", href: "/admin/dashboard", icon: OverviewIcon },
+  { label: "UsersIcon", href: "/admin/users", icon: UsersIcon },
+  { label: "Tasks", href: "/admin/tasks", icon: CheckSquareIcon },
+  { label: "Deposits", href: "/admin/deposits", icon: ArrowDownCircleIcon },
+  { label: "Withdrawals", href: "/admin/withdrawals", icon: ArrowUpCircleIcon },
+  { label: "Announcements", href: "/admin/announcements", icon: MegaphoneIcon },
+  { label: "SettingsNavIcon", href: "/admin/settings", icon: SettingsNavIcon },
+  { label: "Logs", href: "/admin/logs", icon: ScrollIcon },
 ];
 
 export default function AdminShell({ children, title }: AdminShellProps) {
@@ -87,7 +87,7 @@ export default function AdminShell({ children, title }: AdminShellProps) {
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
                      text-gray-500 hover:bg-red-500/10 hover:text-red-400 transition-all"
         >
-          <LogOut size={16} />
+          <LogOutIcon size={16} />
           Logout
         </button>
       </div>
@@ -127,7 +127,7 @@ export default function AdminShell({ children, title }: AdminShellProps) {
             onClick={() => setSidebarOpen(true)}
             className="md:hidden p-2 rounded-lg text-gray-400 hover:text-white hover:bg-[#1a1a1a] mr-2"
           >
-            {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
+            {sidebarOpen ? <CloseIcon size={18} /> : <MenuIcon size={18} />}
           </button>
           <h1 className="text-sm font-bold text-white">{title ?? "Admin"}</h1>
           <div className="ml-auto flex items-center gap-2">

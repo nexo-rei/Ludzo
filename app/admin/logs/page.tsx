@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/DuotoneIcons";
 import AdminShell from "@/components/admin/AdminShell";
 import { formatDateTime } from "@/lib/utils";
 
@@ -125,11 +125,11 @@ export default function AdminLogsPage() {
           <span>Total: {total} entries</span>
           <div className="flex gap-2">
             <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="p-2 rounded-lg bg-[#111] border border-[#333] disabled:opacity-40">
-              <ChevronLeft size={14} />
+              <ChevronLeftIcon size={14} />
             </button>
             <span className="px-3 py-2 rounded-lg bg-[#111] border border-[#333] text-white">{page}/{totalPages || 1}</span>
             <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="p-2 rounded-lg bg-[#111] border border-[#333] disabled:opacity-40">
-              <ChevronRight size={14} />
+              <ChevronRightIcon size={14} />
             </button>
           </div>
         </div>

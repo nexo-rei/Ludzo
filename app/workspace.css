@@ -3,11 +3,13 @@
   --bg:#F5F6F4; --bg-elevated:#EDF0ED; --card-bg:#FFFFFF; --card-bg-2:#F8FAF8;
   --border:#DFE5DF; --border-subtle:#E8EDE8; --text-primary:#1B2924;
   --text-secondary:#52665B; --text-muted:#687D70; --accent:#23856C; --accent-soft:#E6F3EB;
+  --accent-contrast:#FFFFFF; --success-strong:#059669; --success-soft:rgba(5,150,105,0.12);
 }
 [data-theme="dark"] {
   --bg:#111715; --bg-elevated:#202A25; --card-bg:#19211D; --card-bg-2:#1D2721;
   --border:#2E3B33; --border-subtle:#28352D; --text-primary:#EBF0EB;
   --text-secondary:#B0BEB4; --text-muted:#8A9E91; --accent:#63D9B4; --accent-soft:#233C30;
+  --accent-contrast:#0E1B15; --success-strong:#34D399; --success-soft:rgba(52,211,153,0.14);
 }
 html {font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
 body {line-height:1.55;}
@@ -31,7 +33,10 @@ button:disabled {cursor:not-allowed;}
 .sidebar-note h3 {font-size:15px;line-height:1.55;margin:12px 0;font-weight:500;}
 .sidebar-note a {display:flex;align-items:center;gap:8px;color:var(--accent);font-size:12px;}
 .sidebar-footnote {font-size:10px;color:var(--text-muted);margin:24px 12px 0;}
-.mobile-navigation {position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:760px;z-index:50;display:flex;background:var(--card-bg);border-top:1px solid var(--border);padding:8px 8px calc(8px + env(safe-area-inset-bottom));}
+.mobile-navigation {position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:760px;z-index:50;display:flex;background:var(--card-bg);border-top:1px solid var(--border);padding:8px 8px calc(8px + env(safe-area-inset-bottom));box-shadow:0 -12px 32px -20px color-mix(in srgb,var(--text-primary) 30%,transparent);}
+/* Smooth skeleton shimmer (reduced-motion collapses it to a static fill). */
+@keyframes ludzo-shimmer {0% {background-position:200% 0;} 100% {background-position:-200% 0;}}
+.skeleton-shimmer {background:linear-gradient(100deg,var(--border) 30%,var(--border-subtle) 50%,var(--border) 70%);background-size:220% 100%;animation:ludzo-shimmer 1.5s ease-in-out infinite;}
 .mobile-nav-link {position:relative;display:flex;flex:1;align-items:center;justify-content:center;flex-direction:column;gap:5px;min-height:48px;font-size:10px;font-weight:500;color:var(--text-muted);}
 .mobile-nav-link svg,.mobile-nav-link>span:not(.mobile-nav-indicator) {z-index:1;}
 .mobile-nav-link.is-active {color:var(--accent);}
@@ -108,9 +113,12 @@ button:disabled {cursor:not-allowed;}
 }
 @media(min-width:1024px) {
   .app-workspace {padding-left:244px;}
+  /* Standalone pages (deposit / withdraw / settings / history …) have no
+     sidebar — drop the sidebar gutter and center the sheet in the viewport. */
+  .app-workspace.app-workspace-standalone {padding-left:0;}
   .workspace-sidebar {display:flex;flex-direction:column;position:fixed;inset:0 auto 0 0;width:244px;padding:32px 20px 24px;background:var(--card-bg);border-right:1px solid var(--border);z-index:45;overflow-y:auto;}
   .workspace-content {max-width:1100px;padding:20px 30px;}
-  .workspace-content.workspace-standalone {max-width:760px;margin-left:-244px;}
+  .workspace-content.workspace-standalone {max-width:760px;margin:0 auto;}
   .workspace-content>main {padding-bottom:24px;}
   .mobile-navigation {display:none;}
   .dashboard-page {padding:18px 8px 30px;}

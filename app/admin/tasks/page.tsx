@@ -3,7 +3,7 @@ import SymbolIcon from "@/components/ui/SymbolIcon";
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { PencilIcon, PlusIcon, TrashIcon } from "@/components/ui/DuotoneIcons";
 import AdminShell from "@/components/admin/AdminShell";
 import Badge from "@/components/ui/Badge";
 import { showToast } from "@/components/ui/Toast";
@@ -95,7 +95,7 @@ export default function AdminTasksPage() {
             onClick={openCreate}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#23856C] text-white text-sm font-bold hover:bg-[#196A55] transition-colors"
           >
-            <Plus size={15} /> New Task
+            <PlusIcon size={15} /> New Task
           </button>
         </div>
 
@@ -116,14 +116,14 @@ export default function AdminTasksPage() {
                 <div className="text-sm font-bold text-yellow-400 font-numeric">+{task.reward_coins} <SymbolIcon name="coins" size={14} /></div>
                 <div className="flex gap-2">
                   <button onClick={() => openEdit(task)} className="p-2 rounded-lg bg-[#222] text-gray-400 hover:text-[#63D9B4] hover:bg-[#333] transition-colors">
-                    <Pencil size={13} />
+                    <PencilIcon size={13} />
                   </button>
                   <button
                     onClick={() => handleDelete(task.id)}
                     disabled={deleting === task.id}
                     className="p-2 rounded-lg bg-[#222] text-gray-400 hover:text-red-400 hover:bg-[#333] transition-colors disabled:opacity-40"
                   >
-                    <Trash2 size={13} />
+                    <TrashIcon size={13} />
                   </button>
                 </div>
               </div>

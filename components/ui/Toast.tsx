@@ -2,7 +2,13 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle, XCircle, AlertTriangle, Info, X } from "lucide-react";
+import {
+  CheckCircleIcon,
+  CloseCircleIcon,
+  AlertTriangleIcon,
+  InfoIcon,
+  CloseIcon,
+} from "@/components/ui/DuotoneIcons";
 
 export type ToastType = "success" | "error" | "warning" | "info";
 
@@ -19,10 +25,10 @@ export function showToast(message: string, type: ToastType = "info") {
 }
 
 const ICONS = {
-  success: CheckCircle,
-  error: XCircle,
-  warning: AlertTriangle,
-  info: Info,
+  success: CheckCircleIcon,
+  error: CloseCircleIcon,
+  warning: AlertTriangleIcon,
+  info: InfoIcon,
 };
 
 const COLORS = {
@@ -69,9 +75,10 @@ export function ToastContainer() {
               </span>
               <button
                 onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
+                aria-label="Dismiss notification"
                 className="flex-shrink-0 opacity-60 hover:opacity-100"
               >
-                <X size={14} />
+                <CloseIcon size={14} />
               </button>
             </motion.div>
           );

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, type ReactElement } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRightIcon } from "@/components/ui/DuotoneIcons";
 import ArenaArtwork from "@/components/layout/ArenaArtwork";
 import Image from "next/image";
 import AppShell from "@/components/layout/AppShell";
@@ -127,7 +127,7 @@ export default function HomePage() {
         </motion.div>
 
         <section className="dashboard-hero">
-          <div className="hero-copy"><span className="eyebrow"><span /> THE LUDZO WORKSPACE</span><h2>Make your next<br />move count.</h2><p>Play a round. Build your streak. Keep all your rewards in one place.</p><Link href="/games/home" className="hero-link">Enter the arena <ArrowUpRight size={17} /></Link></div>
+          <div className="hero-copy"><span className="eyebrow"><span /> THE LUDZO WORKSPACE</span><h2>Make your next<br />move count.</h2><p>Play a round. Build your streak. Keep all your rewards in one place.</p><Link href="/games/home" className="hero-link">Enter the arena <ArrowUpRightIcon size={17} /></Link></div>
           <ArenaArtwork />
         </section>
         <div className="section-heading"><h2>Your wallet</h2><span>Balances at a glance</span></div>

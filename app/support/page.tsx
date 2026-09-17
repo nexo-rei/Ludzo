@@ -4,7 +4,7 @@ import SymbolIcon from "@/components/ui/SymbolIcon";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { MessageCircle, Send, ChevronRight } from "lucide-react";
+import { MessageIcon, SendIcon, ChevronRightIcon } from "@/components/ui/DuotoneIcons";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
 import { showToast } from "@/components/ui/Toast";
@@ -95,7 +95,7 @@ export default function SupportPage() {
           className="glass rounded-2xl p-5 flex flex-col items-center text-center gap-4"
         >
           <div className="w-14 h-14 rounded-full bg-[#229ED9]/15 border border-[#229ED9]/30 flex items-center justify-center">
-            <MessageCircle size={24} className="text-[#229ED9]" />
+            <MessageIcon size={24} className="text-[#229ED9]" />
           </div>
           <div>
             <h3 className="text-base font-bold text-[var(--text-primary)]">Chat with Support</h3>
@@ -108,7 +108,7 @@ export default function SupportPage() {
             className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#229ED9] text-white font-bold text-sm
                        hover:bg-[#1a8abf] transition-colors shadow-lg shadow-[#229ED9]/25"
           >
-            <MessageCircle size={16} /> Open Telegram
+            <MessageIcon size={16} /> Open Telegram
           </button>
         </motion.div>
 
@@ -188,7 +188,7 @@ export default function SupportPage() {
                            bg-[#23856C] text-white font-bold text-sm hover:bg-[#196A55]
                            transition-colors disabled:opacity-60"
               >
-                <Send size={14} />
+                <SendIcon size={14} />
                 {submitting ? "Submitting…" : "Send Ticket"}
               </button>
             </form>
@@ -210,7 +210,7 @@ export default function SupportPage() {
               style={{ borderTop: i === 0 ? "1px solid var(--border)" : "none", borderBottom: i < QUICK_LINKS.length - 1 ? "1px solid var(--border)" : "none" }}
             >
               <span className="text-sm font-medium text-[var(--text-primary)]">{label}</span>
-              <ChevronRight size={13} className="text-[#475569]" />
+              <ChevronRightIcon size={13} className="text-[#475569]" />
             </button>
           ))}
         </motion.div>

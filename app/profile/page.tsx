@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ChevronRight } from "lucide-react";
+import { ChevronRightIcon } from "@/components/ui/DuotoneIcons";
 import Image from "next/image";
 import Link from "next/link";
 import AppShell from "@/components/layout/AppShell";
@@ -177,7 +177,7 @@ export default function ProfilePage() {
                 </div>
                 <span className="text-xs font-bold text-[var(--text-primary)]">{item.label}</span>
               </div>
-              <ChevronRight size={16} className="text-[var(--text-muted)]" />
+              <ChevronRightIcon size={16} className="text-[var(--text-muted)]" />
             </Link>
           ))}
         </div>

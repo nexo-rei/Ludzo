@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowRight, Check, LockKeyhole } from "lucide-react";
+import { ArrowRightIcon, CheckIcon, LockIcon } from "@/components/ui/DuotoneIcons";
 import OnboardingLayout from "@/components/layout/OnboardingLayout";
 import LudzoLogo from "@/components/layout/LudzoLogo";
 
@@ -38,11 +38,11 @@ export default function LanguagePage() {
       <p className="onboarding-description">Choose your preferred language. You can change it later in settings.</p>
       <div className="grid grid-cols-2 gap-2" role="group" aria-label="Preferred language">
         {LANGUAGES.map((lang, i) => <motion.button key={lang.code} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * .025 }} onClick={() => setSelected(lang.code)} aria-pressed={selected === lang.code} className="language-option">
-          <span className="language-code">{lang.code}</span><span>{lang.name}</span>{selected === lang.code && <Check size={15} className="ml-auto text-[var(--accent)] shrink-0" />}
+          <span className="language-code">{lang.code}</span><span>{lang.name}</span>{selected === lang.code && <CheckIcon size={15} className="ml-auto text-[var(--accent)] shrink-0" />}
         </motion.button>)}
       </div>
-      <button onClick={handleContinue} className="onboarding-continue">Continue<ArrowRight size={17} /></button>
-      <p className="onboarding-footer"><LockKeyhole size={13} />Secure sign-in with Telegram</p>
+      <button onClick={handleContinue} className="onboarding-continue">Continue<ArrowRightIcon size={17} /></button>
+      <p className="onboarding-footer"><LockIcon size={13} />Secure sign-in with Telegram</p>
     </motion.div></OnboardingLayout>
   );
 }

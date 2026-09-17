@@ -1,9 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { BackArrowIcon } from "@/components/ui/DuotoneIcons";
 import LudzoLogo from "./LudzoLogo";
 
 interface PageHeaderProps {
@@ -15,8 +15,15 @@ interface PageHeaderProps {
   className?: string;
   transparent?: boolean;
   showLogo?: boolean;
+  /** Accessible name override for the back control. */
+  backLabel?: string;
 }
 
+/**
+ * Shared workspace header.
+ * The back control is a full 44 × 44 px touch target (WCAG 2.5.5) even though
+ * the glyph itself stays compact — tap area and visual size are decoupled.
+ */
 export default function PageHeader({
   title,
   back = false,
@@ -26,6 +33,7 @@ export default function PageHeader({
   className,
   transparent = false,
   showLogo = false,
+  backLabel = "Go back",
 }: PageHeaderProps) {
   const router = useRouter();
 
@@ -38,9 +46,8 @@ export default function PageHeader({
   return (
     <header
       className={cn(
-        "page-header sticky top-0 z-40 flex items-center h-16 px-5",
-        !transparent &&
-          "border-b",
+        "page-header sticky top-0 z-40 flex items-center h-16 px-4 sm:px-5",
+        !transparent && "border-b",
         className
       )}
       style={
@@ -56,25 +63,27 @@ export default function PageHeader({
     >
       {back ? (
         <button
+          type="button"
           onClick={handleBack}
-          aria-label="Go back"
-          className="flex items-center justify-center w-8 h-8 -ml-1 rounded-lg
-                     text-[var(--text-secondary)] hover:text-[var(--text-primary)]
-                     hover:bg-[rgba(35,133,108,0.1)] transition-all duration-150"
+          aria-label={backLabel}
+          className="back-control flex items-center justify-center w-11 h-11 -ml-1.5
+                     rounded-xl text-[var(--text-secondary)]
+                     hover:text-[var(--text-primary)] hover:bg-[var(--accent-soft)]
+                     active:scale-95 transition-all duration-150"
         >
-          <ArrowLeft size={20} strokeWidth={1.5} />
+          <BackArrowIcon size={21} />
         </button>
       ) : showLogo ? (
-        <LudzoLogo size={30} />
+        <div className="flex items-center h-11 -ml-1.5 pr-1.5">
+          <LudzoLogo size={30} />
+        </div>
       ) : (
-        <div className="w-8" />
+        <div className="w-11" />
       )}
-      <h1 className="flex-1 text-center text-[15px] font-bold text-[var(--text-primary)] tracking-tight">
+      <h1 className="flex-1 text-center text-[15px] font-bold text-[var(--text-primary)] tracking-tight truncate px-1">
         {title}
       </h1>
-      <div className="w-8 flex justify-end">
-        {right ?? null}
-      </div>
+      <div className="w-11 flex items-center justify-end">{right ?? null}</div>
     </header>
   );
 }

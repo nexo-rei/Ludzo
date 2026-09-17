@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/DuotoneIcons";
 import AdminShell from "@/components/admin/AdminShell";
 import Badge from "@/components/ui/Badge";
 import { showToast } from "@/components/ui/Toast";
@@ -193,7 +193,7 @@ export default function AdminDepositsPage() {
               disabled={page === 1}
               className="p-2 rounded-lg bg-[#111] border border-[#333] disabled:opacity-40"
             >
-              <ChevronLeft size={14} />
+              <ChevronLeftIcon size={14} />
             </button>
             <span className="px-3 py-2 rounded-lg bg-[#111] border border-[#333] text-white">
               {page}/{totalPages || 1}
@@ -203,7 +203,7 @@ export default function AdminDepositsPage() {
               disabled={page >= totalPages}
               className="p-2 rounded-lg bg-[#111] border border-[#333] disabled:opacity-40"
             >
-              <ChevronRight size={14} />
+              <ChevronRightIcon size={14} />
             </button>
           </div>
         </div>

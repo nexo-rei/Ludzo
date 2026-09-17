@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Play } from "lucide-react";
+import { AdPlayIcon, PlayIcon } from "@/components/ui/DuotoneIcons";
 import Button from "@/components/ui/Button";
 import { showToast } from "@/components/ui/Toast";
 import { useApp } from "@/hooks/useApp";
@@ -73,9 +73,7 @@ export default function AdSection({ adsWatchedToday, dailyLimit, adReward, onAdW
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center"
             style={{ background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.2)" }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="1.5">
-              <polygon points="5 3 19 12 5 21 5 3" />
-            </svg>
+            <AdPlayIcon size={16} style={{ color: "#3B82F6" }} />
           </div>
           <div>
             <div className="text-sm font-bold text-[var(--text-primary)]">Rewarded Ads</div>
@@ -115,7 +113,7 @@ export default function AdSection({ adsWatchedToday, dailyLimit, adReward, onAdW
           className="gap-1.5 shrink-0"
           style={{ background: limitReached ? "rgba(59,130,246,0.2)" : "linear-gradient(135deg, #3B82F6, #2563EB)" } as React.CSSProperties}
         >
-          <Play size={12} /> Watch Ad
+          <PlayIcon size={12} /> Watch Ad
         </Button>
       </div>
     </motion.div>

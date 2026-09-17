@@ -13,7 +13,7 @@ import SymbolIcon from "@/components/ui/SymbolIcon";
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, RefreshCw } from "lucide-react";
+import { ChevronLeftIcon, RefreshIcon } from "@/components/ui/DuotoneIcons";
 import { useApp } from "@/hooks/useApp";
 import { CoinIcon } from "@/components/ui/Icons";
 import { BattleLogIcon, TokenIcon, LudoIcon } from "@/components/gaming/GamingIcons";
@@ -107,7 +107,7 @@ export default function MatchesPage() {
               aria-label="Back to profile"
               className="flex h-9 w-9 flex-none items-center justify-center rounded-xl border border-purple-500/35 bg-slate-900/70 text-purple-300"
             >
-              <ChevronLeft size={17} />
+              <ChevronLeftIcon size={17} />
             </motion.button>
             <div className="min-w-0">
               <h1 className="truncate text-lg font-black tracking-tight text-slate-50">Battle History</h1>
@@ -123,7 +123,7 @@ export default function MatchesPage() {
             aria-label="Refresh history"
             className="flex h-9 w-9 flex-none items-center justify-center rounded-xl border border-purple-500/35 bg-slate-900/70 text-purple-300"
           >
-            <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
+            <RefreshIcon size={15} className={loading ? "animate-spin" : ""} />
           </motion.button>
         </motion.div>
 

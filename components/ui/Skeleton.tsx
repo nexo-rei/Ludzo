@@ -9,7 +9,7 @@ export function Skeleton({ className }: SkeletonProps) {
   return (
     <div
       className={cn(
-        "animate-pulse rounded-lg bg-[var(--border)]",
+        "skeleton-shimmer rounded-lg bg-[var(--border)]",
         className
       )}
     />
