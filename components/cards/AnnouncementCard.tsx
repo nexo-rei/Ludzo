@@ -38,8 +38,8 @@ export default function AnnouncementCard({ announcement, index = 0 }: Announceme
         onClick={() => setExpanded((p) => !p)}
       >
         <div className="mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-          style={{ background: "rgba(124,58,237,0.12)", border: "1px solid rgba(124,58,237,0.2)" }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A855F7" strokeWidth="1.5">
+          style={{ background: "rgba(35,133,108,0.12)", border: "1px solid rgba(35,133,108,0.2)" }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#63D9B4" strokeWidth="1.5">
             <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>

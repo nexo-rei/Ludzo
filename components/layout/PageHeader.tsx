@@ -38,7 +38,7 @@ export default function PageHeader({
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 flex items-center h-14 px-4",
+        "page-header sticky top-0 z-40 flex items-center h-16 px-5",
         !transparent &&
           "border-b",
         className
@@ -46,10 +46,10 @@ export default function PageHeader({
       style={
         !transparent
           ? {
-              background: "rgba(248,250,252,0.92)",
+              background: "var(--card-bg)",
               backdropFilter: "blur(24px)",
               WebkitBackdropFilter: "blur(24px)",
-              borderBottomColor: "rgba(124,58,237,0.1)",
+              borderBottomColor: "var(--border)",
             }
           : undefined
       }
@@ -57,9 +57,10 @@ export default function PageHeader({
       {back ? (
         <button
           onClick={handleBack}
+          aria-label="Go back"
           className="flex items-center justify-center w-8 h-8 -ml-1 rounded-lg
                      text-[var(--text-secondary)] hover:text-[var(--text-primary)]
-                     hover:bg-[rgba(124,58,237,0.1)] transition-all duration-150"
+                     hover:bg-[rgba(35,133,108,0.1)] transition-all duration-150"
         >
           <ArrowLeft size={20} strokeWidth={1.5} />
         </button>

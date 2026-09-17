@@ -76,7 +76,7 @@ export default function AdminLogsPage() {
               key={type}
               onClick={() => { setActionType(type); setPage(1); }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
-                actionType === type ? "bg-[#7C3AED] text-white" : "bg-[#111] border border-[#333] text-gray-400 hover:border-[#555]"
+                actionType === type ? "bg-[#23856C] text-white" : "bg-[#111] border border-[#333] text-gray-400 hover:border-[#555]"
               }`}
             >
               {type === "all" ? "All" : type.replace(/_/g, " ")}

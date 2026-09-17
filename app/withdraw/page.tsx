@@ -1,4 +1,5 @@
 "use client";
+import SymbolIcon from "@/components/ui/SymbolIcon";
 
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
@@ -79,7 +80,7 @@ export default function WithdrawPage() {
       });
       const data = await res.json();
       if (data.success) {
-        showToast("Withdrawal submitted! Admin will review within 48h. 🕒", "success");
+        showToast("Withdrawal submitted! Admin will review within 48h.", "success");
         setAmount("");
         setAddress("");
         await load();
@@ -122,7 +123,7 @@ export default function WithdrawPage() {
                 onChange={(e) => { setAmount(e.target.value); setErrors({}); }}
                 placeholder="0.00"
                 className="w-full pl-8 pr-4 py-3 bg-[var(--bg)] border border-[var(--border)] rounded-xl
-                           text-[var(--text-primary)] font-numeric text-base outline-none focus:border-[#7C3AED] transition-colors"
+                           text-[var(--text-primary)] font-numeric text-base outline-none focus:border-[#23856C] transition-colors"
               />
             </div>
             {errors.amount && <p className="text-xs text-[#EF4444] mt-1">{errors.amount}</p>}
@@ -136,7 +137,7 @@ export default function WithdrawPage() {
               onChange={(e) => { setAddress(e.target.value); setErrors({}); }}
               placeholder="Your USDT wallet address"
               className="w-full mt-1.5 px-4 py-3 bg-[var(--bg)] border border-[var(--border)] rounded-xl
-                         text-[var(--text-primary)] text-sm outline-none focus:border-[#7C3AED] transition-colors font-mono"
+                         text-[var(--text-primary)] text-sm outline-none focus:border-[#23856C] transition-colors font-mono"
             />
             {errors.address && <p className="text-xs text-[#EF4444] mt-1">{errors.address}</p>}
           </div>
@@ -162,8 +163,8 @@ export default function WithdrawPage() {
           <button
             onClick={handleWithdraw}
             disabled={submitting || !amount || !address}
-            className="w-full py-4 rounded-xl bg-[#7C3AED] hover:bg-[#5B21B6] text-white font-bold text-sm
-                       transition-colors disabled:opacity-60 shadow-lg shadow-[#7C3AED]/30"
+            className="w-full py-4 rounded-xl bg-[#23856C] hover:bg-[#196A55] text-white font-bold text-sm
+                       transition-colors disabled:opacity-60 shadow-lg shadow-[#23856C]/30"
           >
             {submitting ? "Submitting…" : "Submit Withdrawal Request"}
           </button>
@@ -188,7 +189,7 @@ export default function WithdrawPage() {
               {history.map((w) => (
                 <div key={w.id} className="p-3 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl">
                   <div className="flex items-center gap-3">
-                    <span className="text-xl">💸</span>
+                    <SymbolIcon name="withdraw" />
                     <div className="flex-1">
                       <div className="text-sm font-bold font-numeric text-[var(--text-primary)]">
                         ${formatUSDT(w.amount)} → ${formatUSDT(w.net_amount)} USDT

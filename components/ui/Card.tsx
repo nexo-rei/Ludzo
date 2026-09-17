@@ -25,7 +25,7 @@ export default function Card({
         glass
           ? "backdrop-blur-sm bg-[var(--card-bg)]/80 border-[var(--border)]"
           : "bg-[var(--card-bg)] border-[var(--border)]",
-        glow && "shadow-[0_0_20px_rgba(124,58,237,0.15)]",
+        glow && "shadow-[0_0_20px_rgba(35,133,108,0.15)]",
         paddings[padding],
         className
       )}

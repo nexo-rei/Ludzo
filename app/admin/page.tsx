@@ -60,7 +60,7 @@ export default function AdminLoginPage() {
               autoComplete="username"
               required
               className="w-full mt-1.5 px-4 py-3 bg-[#111] border border-[#333] rounded-xl
-                         text-white text-sm outline-none focus:border-[#7C3AED] transition-colors"
+                         text-white text-sm outline-none focus:border-[#23856C] transition-colors"
             />
           </div>
           <div>
@@ -73,14 +73,14 @@ export default function AdminLoginPage() {
               autoComplete="current-password"
               required
               className="w-full mt-1.5 px-4 py-3 bg-[#111] border border-[#333] rounded-xl
-                         text-white text-sm outline-none focus:border-[#7C3AED] transition-colors"
+                         text-white text-sm outline-none focus:border-[#23856C] transition-colors"
             />
           </div>
           {error && <p className="text-xs text-red-400">{error}</p>}
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-4 rounded-xl bg-[#7C3AED] hover:bg-[#5B21B6] text-white font-bold text-sm
+            className="w-full py-4 rounded-xl bg-[#23856C] hover:bg-[#196A55] text-white font-bold text-sm
                        transition-colors disabled:opacity-60"
           >
             {loading ? "Authenticating…" : "Sign In"}

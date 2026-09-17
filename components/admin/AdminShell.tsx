@@ -68,13 +68,13 @@ export default function AdminShell({ children, title }: AdminShellProps) {
               className={cn(
                 "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
                 active
-                  ? "bg-[#7C3AED]/20 text-[#A855F7]"
+                  ? "bg-[#23856C]/20 text-[#63D9B4]"
                   : "text-gray-400 hover:bg-[#1a1a1a] hover:text-white"
               )}
             >
-              <Icon size={16} className={active ? "text-[#7C3AED]" : ""} />
+              <Icon size={16} className={active ? "text-[#23856C]" : ""} />
               {label}
-              {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#7C3AED]" />}
+              {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#23856C]" />}
             </button>
           );
         })}
@@ -131,7 +131,7 @@ export default function AdminShell({ children, title }: AdminShellProps) {
           </button>
           <h1 className="text-sm font-bold text-white">{title ?? "Admin"}</h1>
           <div className="ml-auto flex items-center gap-2">
-            <div className="text-[10px] px-2 py-1 rounded-full bg-[#7C3AED]/20 text-[#A855F7] font-semibold">
+            <div className="text-[10px] px-2 py-1 rounded-full bg-[#23856C]/20 text-[#63D9B4] font-semibold">
               Admin
             </div>
           </div>

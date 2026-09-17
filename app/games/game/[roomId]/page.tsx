@@ -1,4 +1,5 @@
 "use client";
+import SymbolIcon from "@/components/ui/SymbolIcon";
 
 /**
  * LUDZO — Ludo 1v1 Game Screen
@@ -1626,7 +1627,7 @@ export default function LudoGamePage() {
               onClick={(e) => e.stopPropagation()}
               className="w-full max-w-[300px] rounded-2xl bg-slate-950 border border-red-500/25 p-6 text-center space-y-4"
             >
-              <div className="text-3xl">🏳️</div>
+              <div><SymbolIcon name="flag" size={30} /></div>
               <div>
                 <h3 className="text-base font-black text-white tracking-tight">Forfeit match?</h3>
                 <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">

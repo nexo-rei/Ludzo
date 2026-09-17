@@ -3,6 +3,9 @@
 import { useEffect, useState, useCallback, type ReactElement } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
+import ArenaArtwork from "@/components/layout/ArenaArtwork";
 import Image from "next/image";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
@@ -24,8 +27,8 @@ const ACTIVITY_SVG: Record<string, { icon: ReactElement; color: string; bg: stri
   task_reward:         { icon: <><path d="M9 11l3 3L22 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></>, color: "#10B981", bg: "rgba(16,185,129,0.12)" },
   daily_streak:        { icon: <path d="M12 2c0 0-4 4-4 8a4 4 0 008 0c0-4-4-8-4-8z" fill="currentColor" />, color: "#F59E0B", bg: "rgba(245,158,11,0.12)" },
   deposit:             { icon: <><rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" fill="none" /><path d="M2 10h20" stroke="currentColor" strokeWidth="1.5" /></>, color: "#10B981", bg: "rgba(16,185,129,0.12)" },
-  withdrawal:          { icon: <><path d="M12 2v10M8 8l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M4 14v4a2 2 0 002 2h12a2 2 0 002-2v-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></>, color: "#A855F7", bg: "rgba(168,85,247,0.12)" },
-  referral_commission: { icon: <><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.5" fill="none" /><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></>, color: "#A855F7", bg: "rgba(168,85,247,0.12)" },
+  withdrawal:          { icon: <><path d="M12 2v10M8 8l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M4 14v4a2 2 0 002 2h12a2 2 0 002-2v-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></>, color: "#63D9B4", bg: "rgba(99,217,180,0.12)" },
+  referral_commission: { icon: <><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.5" fill="none" /><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></>, color: "#63D9B4", bg: "rgba(99,217,180,0.12)" },
   welcome_bonus:       { icon: <><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="currentColor" strokeWidth="1.5" fill="none" /></>, color: "#F59E0B", bg: "rgba(245,158,11,0.12)" },
   referral_bonus:      { icon: <><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.5" fill="none" /></>, color: "#3B82F6", bg: "rgba(59,130,246,0.12)" },
 };
@@ -89,7 +92,7 @@ export default function HomePage() {
   // ── Main app dashboard (the arena lives under /games/* now) ────────────────
   return (
     <AppShell>
-      <div className="px-4 py-4 space-y-4 pb-6" key={key}>
+      <div className="dashboard-page px-4 py-4 space-y-6 pb-6" key={key}>
         {/* Hero Header */}
         <motion.div
           className="flex items-center justify-between"
@@ -100,10 +103,10 @@ export default function HomePage() {
           <div className="flex items-center gap-3">
             <LudzoLogo size={34} />
             <div>
-              <h1 className="text-lg font-black tracking-tight text-[var(--text-primary)] leading-tight">
-                Hey, {data.user.first_name}
+              <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)] leading-tight">
+                Welcome back, {data.user.first_name}
               </h1>
-              <p className="text-[11px] text-[var(--text-muted)]">Welcome back to LUDZO</p>
+              <p className="text-[11px] text-[var(--text-muted)]">Here’s what’s happening in your workspace.</p>
             </div>
           </div>
           {data.user.photo_url ? (
@@ -113,16 +116,21 @@ export default function HomePage() {
               width={40}
               height={40}
               className="rounded-full"
-              style={{ border: "2px solid rgba(124,58,237,0.5)", boxShadow: "0 0 12px rgba(124,58,237,0.2)" }}
+              style={{ border: "2px solid rgba(35,133,108,0.5)", boxShadow: "0 0 12px rgba(35,133,108,0.2)" }}
             />
           ) : (
             <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white"
-              style={{ background: "linear-gradient(135deg, #7C3AED, #5B21B6)" }}>
+              style={{ background: "linear-gradient(135deg, #23856C, #196A55)" }}>
               {data.user.first_name[0]}
             </div>
           )}
         </motion.div>
 
+        <section className="dashboard-hero">
+          <div className="hero-copy"><span className="eyebrow"><span /> THE LUDZO WORKSPACE</span><h2>Make your next<br />move count.</h2><p>Play a round. Build your streak. Keep all your rewards in one place.</p><Link href="/games/home" className="hero-link">Enter the arena <ArrowUpRight size={17} /></Link></div>
+          <ArenaArtwork />
+        </section>
+        <div className="section-heading"><h2>Your wallet</h2><span>Balances at a glance</span></div>
         {/* Wallet Cards — Won Coins comes from wallets.won_coins_balance (DB) */}
         <WalletCards
           coinBalance={data.wallet.coin_balance}
@@ -131,6 +139,7 @@ export default function HomePage() {
           wonCoins={wallet?.won_coins_balance ?? data.wallet.won_coins_balance ?? wonCoinsBalance}
         />
 
+        <div className="dashboard-rewards">
         {/* Ad Rewards */}
         <AdSection
           adsWatchedToday={data.ads.watched_today}
@@ -146,6 +155,7 @@ export default function HomePage() {
           onClaimed={loadData}
         />
 
+        </div>
         {/* Announcements */}
         {data.announcements.length > 0 && (
           <div>
@@ -168,7 +178,7 @@ export default function HomePage() {
             </h2>
             <button onClick={() => router.push("/history")}
               className="text-[11px] font-semibold transition-opacity hover:opacity-70"
-              style={{ color: "#A855F7" }}>
+              style={{ color: "#63D9B4" }}>
               View All
             </button>
           </div>

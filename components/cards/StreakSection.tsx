@@ -109,17 +109,17 @@ export default function StreakSection({ streak, todayReward, onClaimed }: Streak
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.25 }}
-      className="rounded-2xl p-4"
+      className="rounded-xl p-5"
       style={{
         background: "var(--card-bg)",
-        border: "1px solid rgba(245,158,11,0.15)",
-        boxShadow: "0 2px 16px rgba(0,0,0,0.06)",
+        border: "1px solid var(--border)",
+        boxShadow: "none",
       }}
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center flame"
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center"
             style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.2)" }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="#F59E0B" stroke="none">
               <path d="M12 2c0 0-4 4-4 8a4 4 0 008 0c0-4-4-8-4-8z" opacity="0.3"/>

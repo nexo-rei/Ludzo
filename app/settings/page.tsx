@@ -82,17 +82,17 @@ export default function SettingsPage() {
                   whileTap={{ scale: 0.97 }}
                   className="flex-1 flex flex-col items-center gap-2 py-4 rounded-2xl transition-all duration-150"
                   style={{
-                    background: active ? "rgba(124,58,237,0.12)" : "var(--card-bg)",
-                    border: active ? "1.5px solid rgba(124,58,237,0.5)" : "1px solid var(--border)",
-                    boxShadow: active ? "0 0 16px rgba(124,58,237,0.12)" : "none",
+                    background: active ? "rgba(35,133,108,0.12)" : "var(--card-bg)",
+                    border: active ? "1.5px solid rgba(35,133,108,0.5)" : "1px solid var(--border)",
+                    boxShadow: active ? "0 0 16px rgba(35,133,108,0.12)" : "none",
                   }}
                 >
-                  <svg width="22" height="22" viewBox="0 0 24 24" style={{ color: active ? "#A855F7" : "#64748B" }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" style={{ color: active ? "#63D9B4" : "#64748B" }}>
                     {t.icon}
                   </svg>
-                  <span className="text-xs font-semibold" style={{ color: active ? "#A855F7" : "#64748B" }}>{t.label}</span>
+                  <span className="text-xs font-semibold" style={{ color: active ? "#63D9B4" : "#64748B" }}>{t.label}</span>
                   {active && (
-                    <span className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, #7C3AED, #A855F7)" }}>
+                    <span className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, #23856C, #63D9B4)" }}>
                       <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
                     </span>
                   )}
@@ -115,20 +115,20 @@ export default function SettingsPage() {
                   whileTap={{ scale: 0.98 }}
                   className="flex items-center gap-3 p-3 rounded-xl transition-all duration-150"
                   style={{
-                    background: active ? "rgba(124,58,237,0.1)" : "var(--card-bg)",
-                    border: active ? "1.5px solid rgba(124,58,237,0.4)" : "1px solid var(--border)",
+                    background: active ? "rgba(35,133,108,0.1)" : "var(--card-bg)",
+                    border: active ? "1.5px solid rgba(35,133,108,0.4)" : "1px solid var(--border)",
                   }}
                 >
                   <span className="w-8 h-6 rounded text-[10px] font-black flex items-center justify-center shrink-0"
-                    style={{ background: active ? "rgba(124,58,237,0.2)" : "var(--bg-elevated)", color: active ? "#A855F7" : "#64748B" }}>
+                    style={{ background: active ? "rgba(35,133,108,0.2)" : "var(--bg-elevated)", color: active ? "#63D9B4" : "#64748B" }}>
                     {lang.flag}
                   </span>
                   <span className="flex-1 text-xs font-semibold text-left truncate"
-                    style={{ color: active ? "#A855F7" : "var(--text-secondary)" }}>
+                    style={{ color: active ? "#63D9B4" : "var(--text-secondary)" }}>
                     {lang.name}
                   </span>
                   {active && (
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A855F7" strokeWidth="2.5">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#63D9B4" strokeWidth="2.5">
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
                   )}

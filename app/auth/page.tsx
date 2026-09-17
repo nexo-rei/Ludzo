@@ -3,6 +3,8 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
+import { CircleCheck, ShieldAlert } from "lucide-react";
+import OnboardingLayout from "@/components/layout/OnboardingLayout";
 import LudzoLogo from "@/components/layout/LudzoLogo";
 import { useTelegram } from "@/hooks/useTelegram";
 import { useApp } from "@/hooks/useApp";
@@ -74,7 +76,7 @@ function AuthContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] flex flex-col items-center justify-center px-6">
+    <OnboardingLayout>
       <motion.div
         className="w-full max-w-sm flex flex-col items-center gap-6"
         initial={{ opacity: 0, y: 12 }}
@@ -102,7 +104,7 @@ function AuthContent() {
 
         {status === "success" && (
           <div className="text-center">
-            <span className="text-5xl">✅</span>
+            <CircleCheck size={44} className="mx-auto text-[var(--accent)]" />
             <h2 className="text-xl font-bold text-[var(--text-primary)] mt-3">
               Welcome to LUDZO!
             </h2>
@@ -114,9 +116,9 @@ function AuthContent() {
 
         {status === "error" && (
           <div className="text-center">
-            <span className="text-5xl">⚠️</span>
+            <ShieldAlert size={44} className="mx-auto text-[var(--accent)]" />
             <h2 className="text-xl font-bold text-[var(--text-primary)] mt-3">
-              Authentication Failed
+              Let’s get you connected
             </h2>
 
             <p className="text-sm text-[var(--text-muted)] mt-2 leading-relaxed">
@@ -128,14 +130,14 @@ function AuthContent() {
                 setStatus("loading");
                 authenticate();
               }}
-              className="mt-4 px-6 py-3 rounded-xl bg-[#7C3AED] text-white font-semibold hover:bg-[#5B21B6] transition-colors"
+              className="mt-4 px-6 py-3 rounded-xl bg-[#23856C] text-white font-semibold hover:bg-[#196A55] transition-colors"
             >
               Retry
             </button>
           </div>
         )}
       </motion.div>
-    </div>
+    </OnboardingLayout>
   );
 }
 

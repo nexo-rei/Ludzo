@@ -31,7 +31,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
               "w-full h-11 rounded-xl border bg-[var(--card-bg)] text-[var(--text-primary)]",
               "px-4 text-sm placeholder:text-[var(--text-muted)] outline-none",
               "transition-colors duration-150",
-              "focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED]/30",
+              "focus:border-[#23856C] focus:ring-1 focus:ring-[#23856C]/30",
               "border-[var(--border)]",
               error && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]/30",
               prefix && "pl-9",

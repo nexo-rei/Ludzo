@@ -182,9 +182,9 @@ export default function LeaderboardPage() {
               style={
                 period === p.value
                   ? {
-                      background: "linear-gradient(135deg, #7C3AED, #5B21B6)",
+                      background: "linear-gradient(135deg, #23856C, #196A55)",
                       color: "white",
-                      boxShadow: "0 2px 10px rgba(124,58,237,0.35)",
+                      boxShadow: "0 2px 10px rgba(35,133,108,0.35)",
                     }
                   : { color: "var(--text-muted)" }
               }
@@ -225,8 +225,8 @@ export default function LeaderboardPage() {
                 <div
                   className="relative rounded-2xl px-4 pt-5 pb-0 overflow-hidden"
                   style={{
-                    background: "linear-gradient(180deg, rgba(124,58,237,0.1) 0%, transparent 100%)",
-                    border: "1px solid rgba(124,58,237,0.12)",
+                    background: "linear-gradient(180deg, rgba(35,133,108,0.1) 0%, transparent 100%)",
+                    border: "1px solid rgba(35,133,108,0.12)",
                   }}
                 >
                   <div className="flex items-end justify-center gap-3">
@@ -329,17 +329,17 @@ export default function LeaderboardPage() {
                   animate={{ opacity: 1, y: 0 }}
                   className="flex items-center gap-3 p-3 rounded-xl"
                   style={{
-                    background: "linear-gradient(135deg, rgba(124,58,237,0.12), rgba(91,33,182,0.08))",
-                    border: "1px solid rgba(124,58,237,0.3)",
+                    background: "linear-gradient(135deg, rgba(35,133,108,0.12), rgba(91,33,182,0.08))",
+                    border: "1px solid rgba(35,133,108,0.3)",
                   }}
                 >
-                  <span className="w-7 text-center text-xs font-bold" style={{ color: "#A855F7" }}>
+                  <span className="w-7 text-center text-xs font-bold" style={{ color: "#63D9B4" }}>
                     #{myRank.rank}
                   </span>
                   <div className="flex-1 text-xs font-semibold text-[var(--text-primary)]">
                     You
                   </div>
-                  <div className="text-xs font-black font-numeric text-[#A855F7]">
+                  <div className="text-xs font-black font-numeric text-[#63D9B4]">
                     ${formatUSDT(myRank.usdt_earned)}
                   </div>
                 </motion.div>

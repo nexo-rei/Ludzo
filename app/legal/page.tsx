@@ -21,8 +21,8 @@ const LEGAL_ITEMS = [
     label: "Terms & Conditions",
     description: "The rules that govern your use of LUDZO",
     href: "/terms",
-    color: "#7C3AED",
-    bg: "rgba(124,58,237,0.12)",
+    color: "#23856C",
+    bg: "rgba(35,133,108,0.12)",
     icon: <TermsIcon size={16} />,
   },
   {
@@ -61,8 +61,8 @@ const LEGAL_ITEMS = [
     label: "Fair Play Policy",
     description: "No bots, cheats, or exploits — ever",
     href: "/fair-play",
-    color: "#A855F7",
-    bg: "rgba(168,85,247,0.12)",
+    color: "#63D9B4",
+    bg: "rgba(99,217,180,0.12)",
     icon: <FairPlayIcon size={16} />,
   },
   {
@@ -87,20 +87,20 @@ export default function LegalCenterPage() {
           animate={{ opacity: 1, y: 0 }}
           className="relative rounded-2xl p-5 overflow-hidden"
           style={{
-            background: "linear-gradient(135deg, rgba(124,58,237,0.18) 0%, rgba(59,130,246,0.1) 100%)",
-            border: "1px solid rgba(124,58,237,0.2)",
+            background: "linear-gradient(135deg, rgba(35,133,108,0.18) 0%, rgba(59,130,246,0.1) 100%)",
+            border: "1px solid rgba(35,133,108,0.2)",
           }}
         >
           <div
             className="absolute top-0 right-0 w-32 h-32 pointer-events-none opacity-20"
-            style={{ background: "radial-gradient(circle, #7C3AED 0%, transparent 70%)", transform: "translate(30%, -30%)" }}
+            style={{ background: "radial-gradient(circle, #23856C 0%, transparent 70%)", transform: "translate(30%, -30%)" }}
           />
           <div className="flex items-center gap-3 mb-2">
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-              style={{ background: "rgba(124,58,237,0.18)", border: "1px solid rgba(124,58,237,0.35)" }}
+              style={{ background: "rgba(35,133,108,0.18)", border: "1px solid rgba(35,133,108,0.35)" }}
             >
-              <span style={{ color: "#A855F7" }}>
+              <span style={{ color: "#63D9B4" }}>
                 <LegalIcon size={20} />
               </span>
             </div>
@@ -123,7 +123,7 @@ export default function LegalCenterPage() {
             <button
               key={href}
               onClick={() => router.push(href)}
-              className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-[rgba(124,58,237,0.06)] transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-[rgba(35,133,108,0.06)] transition-colors"
               style={{ borderBottom: i < LEGAL_ITEMS.length - 1 ? "1px solid var(--border)" : "none" }}
             >
               <div

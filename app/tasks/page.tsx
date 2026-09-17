@@ -30,7 +30,7 @@ const TYPE_ICONS: Record<string, ReactElement> = {
     </svg>
   ),
   group_join: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A855F7" strokeWidth="1.5" strokeLinecap="round">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#63D9B4" strokeWidth="1.5" strokeLinecap="round">
       <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" />
       <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
     </svg>
@@ -54,7 +54,7 @@ const DEFAULT_TASK_ICON = (
 
 const TYPE_BG: Record<string, string> = {
   channel_join: "rgba(59,130,246,0.12)",
-  group_join: "rgba(168,85,247,0.12)",
+  group_join: "rgba(99,217,180,0.12)",
   ad_task: "rgba(59,130,246,0.12)",
   custom: "rgba(245,158,11,0.12)",
 };
@@ -135,7 +135,7 @@ export default function TasksPage() {
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <h2 className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Available</h2>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: "rgba(124,58,237,0.15)", color: "#A855F7" }}>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: "rgba(35,133,108,0.15)", color: "#63D9B4" }}>
                   {available.length}
                 </span>
               </div>
@@ -154,13 +154,13 @@ export default function TasksPage() {
                         background: "var(--card-bg)",
                         border: task.user_task?.status === "in_progress"
                           ? "1px solid rgba(245,158,11,0.25)"
-                          : "1px solid rgba(124,58,237,0.12)",
+                          : "1px solid rgba(35,133,108,0.12)",
                         boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
                       }}
                     >
                       <div className="flex items-start gap-3">
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                          style={{ background: TYPE_BG[task.type] ?? "rgba(124,58,237,0.12)", border: "1px solid rgba(124,58,237,0.15)" }}>
+                          style={{ background: TYPE_BG[task.type] ?? "rgba(35,133,108,0.12)", border: "1px solid rgba(35,133,108,0.15)" }}>
                           {TYPE_ICONS[task.type] ?? DEFAULT_TASK_ICON}
                         </div>
                         <div className="flex-1 min-w-0">

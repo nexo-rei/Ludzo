@@ -1,4 +1,5 @@
 "use client";
+import SymbolIcon from "@/components/ui/SymbolIcon";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -23,7 +24,7 @@ const CATEGORIES = [
   { label: "Withdrawals", href: "/withdraw", color: "#10B981", bg: "rgba(16,185,129,0.12)", icon: <WithdrawalIcon size={18} /> },
   { label: "Deposits", href: "/deposit", color: "#3B82F6", bg: "rgba(59,130,246,0.12)", icon: <DepositIcon size={18} /> },
   { label: "Referrals", href: "/refer", color: "#F59E0B", bg: "rgba(245,158,11,0.12)", icon: <ReferralIcon size={18} /> },
-  { label: "Tasks & Games", href: "/games", color: "#A855F7", bg: "rgba(168,85,247,0.12)", icon: <GamesIcon size={18} /> },
+  { label: "Tasks & Games", href: "/games", color: "#63D9B4", bg: "rgba(99,217,180,0.12)", icon: <GamesIcon size={18} /> },
   { label: "FAQ", href: "/faq", color: "#06B6D4", bg: "rgba(6,182,212,0.12)", icon: <FaqIcon size={18} /> },
   { label: "Disputes & Appeals", href: "/support-disputes", color: "#EF4444", bg: "rgba(239,68,68,0.12)", icon: <SupportDisputesIcon size={18} /> },
 ];
@@ -145,14 +146,14 @@ export default function SupportPage() {
 
           {submitted ? (
             <div className="text-center py-4">
-              <div className="text-4xl mb-3">✅</div>
+              <div className="mb-3 text-[var(--accent)]"><SymbolIcon name="success" size={40} /></div>
               <h4 className="font-semibold text-[var(--text-primary)]">Ticket Submitted!</h4>
               <p className="text-xs text-[var(--text-muted)] mt-2 leading-relaxed">
                 We received your message and will respond as soon as possible. Check Telegram for updates.
               </p>
               <button
                 onClick={() => { setSubmitted(false); setSubject(""); setMessage(""); }}
-                className="mt-4 px-5 py-2 text-sm text-[#7C3AED] border border-[#7C3AED]/40 rounded-xl hover:bg-[#7C3AED]/10 transition-colors"
+                className="mt-4 px-5 py-2 text-sm text-[#23856C] border border-[#23856C]/40 rounded-xl hover:bg-[#23856C]/10 transition-colors"
               >
                 Submit Another
               </button>
@@ -165,7 +166,7 @@ export default function SupportPage() {
                   type="text" value={subject} onChange={(e) => setSubject(e.target.value)}
                   placeholder="Briefly describe your issue"
                   className="w-full mt-1.5 px-4 py-3 bg-[var(--bg)] border border-[var(--border)] rounded-xl
-                             text-[var(--text-primary)] text-sm outline-none focus:border-[#7C3AED] transition-colors"
+                             text-[var(--text-primary)] text-sm outline-none focus:border-[#23856C] transition-colors"
                   required
                 />
               </div>
@@ -176,7 +177,7 @@ export default function SupportPage() {
                   placeholder="Describe your issue in detail…"
                   rows={5}
                   className="w-full mt-1.5 px-4 py-3 bg-[var(--bg)] border border-[var(--border)] rounded-xl
-                             text-[var(--text-primary)] text-sm outline-none focus:border-[#7C3AED] transition-colors resize-none"
+                             text-[var(--text-primary)] text-sm outline-none focus:border-[#23856C] transition-colors resize-none"
                   required
                 />
               </div>
@@ -184,7 +185,7 @@ export default function SupportPage() {
                 type="submit"
                 disabled={submitting || !subject.trim() || !message.trim()}
                 className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl
-                           bg-[#7C3AED] text-white font-bold text-sm hover:bg-[#5B21B6]
+                           bg-[#23856C] text-white font-bold text-sm hover:bg-[#196A55]
                            transition-colors disabled:opacity-60"
               >
                 <Send size={14} />
@@ -205,7 +206,7 @@ export default function SupportPage() {
             <button
               key={href}
               onClick={() => router.push(href)}
-              className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-[rgba(124,58,237,0.06)] transition-colors"
+              className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-[rgba(35,133,108,0.06)] transition-colors"
               style={{ borderTop: i === 0 ? "1px solid var(--border)" : "none", borderBottom: i < QUICK_LINKS.length - 1 ? "1px solid var(--border)" : "none" }}
             >
               <span className="text-sm font-medium text-[var(--text-primary)]">{label}</span>

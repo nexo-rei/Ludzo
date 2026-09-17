@@ -1,4 +1,5 @@
 "use client";
+import SymbolIcon from "@/components/ui/SymbolIcon";
 
 import { motion } from "framer-motion";
 
@@ -10,7 +11,7 @@ export default function MaintenancePage() {
         transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
         className="text-6xl mb-6"
       >
-        🔧
+        <SymbolIcon name="tools" size={40} />
       </motion.div>
       <h1 className="text-2xl font-black text-white tracking-tight">
         Under Maintenance
