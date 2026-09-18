@@ -185,8 +185,8 @@ export interface Announcement {
 export interface LeaderboardEntry {
   rank: number;
   user_id: string;
-  username?: string;
-  first_name: string;
+  /** Telegram account name only — @usernames are stripped in lib/leaderboard.ts. */
+  display_name: string;
   photo_url?: string;
   country?: string;
   usdt_earned: number; // renamed from total_usdt_earned to match get_leaderboard() SQL output

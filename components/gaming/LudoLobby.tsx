@@ -15,7 +15,9 @@ import SymbolIcon from "@/components/ui/SymbolIcon";
  * Only the presentation layer was rebuilt:
  *   • stake picker is INLINE (no bottom sheet that the nav bar covered and
  *     which made the lower stake options untappable)
- *   • modals sit on z-[100] with safe-area padding so nothing overlaps them
+ *   • the entry confirmation and the matchmaking radar render through the shared
+ *     <Sheet> (components/ui/Sheet) — viewport-capped panel, scrolling body,
+ *     pinned action row — so no button can ever land under the fold again
  *   • fully responsive (single 480px column, 2-col stake grid, fluid heights)
  */
 
@@ -23,8 +25,10 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { showToast } from "@/components/ui/Toast";
+import Sheet from "@/components/ui/Sheet";
 import { useApp } from "@/hooks/useApp";
 import { CoinIcon } from "@/components/ui/Icons";
+import { displayName } from "@/lib/utils";
 import { LudoIcon, DiceIcon, ArenaHomeIcon, TokenIcon } from "@/components/gaming/GamingIcons";
 
 /** Must match the CHECK constraint on ludo_rooms.stake / ludo_queues.stake. */
@@ -510,158 +514,168 @@ export default function LudoLobby() {
       </div>
 
       {/* ── MATCH CONFIRMATION ─────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {showConfirm && selectedStake && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => !joining && setShowConfirm(false)}
-            className="fixed inset-0 z-[100] flex items-end justify-center bg-black/80 p-4 backdrop-blur-sm sm:items-center"
-            style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
-          >
-            <motion.div
-              initial={{ y: 40, opacity: 0, scale: 0.97 }}
-              animate={{ y: 0, opacity: 1, scale: 1 }}
-              exit={{ y: 30, opacity: 0, scale: 0.97 }}
-              transition={{ type: "spring", damping: 26, stiffness: 320 }}
-              onClick={(e) => e.stopPropagation()}
-              className="surface-glass w-full max-w-sm rounded-3xl p-5"
+      {/* Rendered through <Sheet>: the panel is capped to the visible viewport and
+          only its body scrolls, so Cancel / Join can never end up under the fold
+          or behind the hub nav on a short phone screen. */}
+      <Sheet
+        open={showConfirm && selectedStake !== null}
+        onClose={() => !joining && setShowConfirm(false)}
+        dismissable={!joining}
+        title={selectedStake !== null ? `Enter for ${selectedStake.toLocaleString()} Coins` : "Match entry"}
+        subtitle="Your stake is held in escrow until the match is settled."
+        footer={
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              onClick={() => setShowConfirm(false)}
+              disabled={joining}
+              className="h-11 rounded-xl border text-[12px] font-semibold transition-opacity disabled:opacity-50"
+              style={{ borderColor: "var(--border)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}
             >
-              <div className="text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-purple-500/30 bg-purple-500/10">
-                  <DiceIcon size={22} className="text-purple-300" />
-                </div>
-                <h3 className="mt-3 text-sm font-black uppercase tracking-widest text-white">Match confirmation</h3>
-                <p className="mt-1 text-[11px] font-medium text-slate-400">
-                  Your stake is held until the match is settled.
-                </p>
-              </div>
-
-              <div className="mt-4 space-y-2 border-y border-slate-800/70 py-3 text-[11px] font-semibold">
-                <div className="flex justify-between text-slate-400">
-                  <span>Your entry stake</span>
-                  <span className="text-slate-200">{selectedStake.toLocaleString()} Coins</span>
-                </div>
-                <div className="flex justify-between text-slate-400">
-                  <span>Opponent entry stake</span>
-                  <span className="text-slate-200">{selectedStake.toLocaleString()} Coins</span>
-                </div>
-                <div className="flex justify-between text-purple-300">
-                  <span>Total pool</span>
-                  <span>{(selectedStake * 2).toLocaleString()} Coins</span>
-                </div>
-                <div className="flex justify-between text-[10px] text-slate-500">
-                  <span>Platform fee</span>
-                  <span>{Math.round(PLATFORM_FEE * 100)}%</span>
-                </div>
-                <div className="flex justify-between border-t border-slate-900 pt-2 text-sm font-black text-amber-400">
-                  <span>Winner receives</span>
-                  <span className="tabular-nums">{payoutFor(selectedStake).toLocaleString()} Won Coins</span>
-                </div>
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-2.5">
-                <button
-                  onClick={() => setShowConfirm(false)}
-                  disabled={joining}
-                  className="h-11 rounded-xl border border-slate-800 bg-slate-900/80 text-[11px] font-black uppercase tracking-wider text-slate-400 transition-colors hover:text-white disabled:opacity-50"
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => { if (selectedStake !== null) handleRegister(selectedStake); }}
+              disabled={joining}
+              className="h-11 rounded-xl text-[12px] font-semibold transition-opacity disabled:opacity-60"
+              style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
+            >
+              {joining ? "Joining…" : "Join match"}
+            </button>
+          </div>
+        }
+      >
+        {selectedStake !== null && (
+          <div>
+            <div className="overflow-hidden rounded-xl border" style={{ borderColor: "var(--border)" }}>
+              {[
+                { label: "Your entry stake", value: `${selectedStake.toLocaleString()} Coins` },
+                { label: "Opponent entry stake", value: `${selectedStake.toLocaleString()} Coins` },
+                { label: "Total pool", value: `${(selectedStake * 2).toLocaleString()} Coins` },
+                { label: "Platform fee", value: `${Math.round(PLATFORM_FEE * 100)}%` },
+              ].map((row, i) => (
+                <div
+                  key={row.label}
+                  className="flex items-center justify-between gap-3 px-3 py-2.5 text-[12px]"
+                  style={{
+                    background: "var(--bg-elevated)",
+                    borderBottom: i < 3 ? "1px solid var(--border)" : undefined,
+                  }}
                 >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleRegister(selectedStake)}
-                  disabled={joining}
-                  className="h-11 rounded-xl border border-purple-400/25 bg-gradient-to-r from-purple-600 to-indigo-600 text-[11px] font-black uppercase tracking-wider text-white transition-all hover:from-purple-500 disabled:opacity-60"
-                >
-                  {joining ? "Joining…" : "Join Match"}
-                </button>
+                  <div className="text-[var(--text-muted)]">{row.label}</div>
+                  <div className="font-numeric font-semibold tabular-nums text-[var(--text-primary)]">{row.value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div
+              className="mt-2.5 flex items-center justify-between rounded-xl px-3 py-3"
+              style={{ background: "var(--accent-soft)" }}
+            >
+              <div className="flex items-center gap-2">
+                <TokenIcon size={16} className="text-[var(--accent)]" />
+                <div className="text-[12px] font-medium text-[var(--text-primary)]">Winner receives</div>
               </div>
-            </motion.div>
-          </motion.div>
+              <div className="font-numeric text-[13px] font-semibold tabular-nums text-[var(--accent)]">
+                {payoutFor(selectedStake).toLocaleString()} Won Coins
+              </div>
+            </div>
+
+            <p className="mt-2.5 text-[11px] leading-relaxed text-[var(--text-muted)]">
+              Matching pairs you with a player on the same stake. If nobody joins in time the arena seats a bot, and
+              the stake is refunded if the match is cancelled before the first roll.
+            </p>
+          </div>
         )}
-      </AnimatePresence>
+      </Sheet>
 
       {/* ── MATCHMAKING RADAR ──────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {isQueueing && selectedStake && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/92 p-4 backdrop-blur-md"
+      <Sheet
+        open={isQueueing && selectedStake !== null}
+        onClose={handleCancelMatchmaking}
+        dismissable={false}
+        variant="center"
+        title="Searching for an opponent"
+        subtitle={selectedStake !== null ? `Scanning lobbies for a ${selectedStake.toLocaleString()} Coin match.` : undefined}
+        footer={
+          <button
+            type="button"
+            onClick={handleCancelMatchmaking}
+            className="h-11 w-full rounded-xl border text-[12px] font-semibold text-[#DC2626] transition-colors hover:bg-[rgba(239,68,68,0.08)]"
+            style={{ borderColor: "rgba(239,68,68,0.35)" }}
           >
+            Cancel matchmaking
+          </button>
+        }
+      >
+        <div className="flex flex-col items-center gap-5 py-1 text-center">
+          <div className="relative flex h-24 w-24 items-center justify-center">
             <motion.div
-              initial={{ scale: 0.94, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.96, opacity: 0 }}
-              transition={{ type: "spring", damping: 24, stiffness: 300 }}
-              className="surface-glass flex w-full max-w-sm flex-col items-center space-y-5 rounded-3xl p-6 text-center"
-            >
-              <div className="relative flex h-28 w-28 items-center justify-center">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
-                  className="absolute inset-0 rounded-full border-2 border-purple-500/20 border-t-purple-500"
-                />
-                <motion.div
-                  animate={{ scale: [1, 1.18, 1] }}
-                  transition={{ duration: 1.6, repeat: Infinity }}
-                  className="absolute flex h-20 w-20 items-center justify-center rounded-full border border-purple-500/15 bg-purple-500/5"
-                />
-                <LudoIcon size={34} className="relative z-10 animate-pulse text-purple-300" />
-              </div>
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
+              className="absolute inset-0 rounded-full border-2"
+              style={{ borderColor: "var(--border)", borderTopColor: "var(--accent)" }}
+            />
+            <motion.div
+              animate={{ scale: [1, 1.14, 1] }}
+              transition={{ duration: 1.7, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute h-[68px] w-[68px] rounded-full"
+              style={{ background: "var(--accent-soft)" }}
+            />
+            <LudoIcon size={30} className="relative z-10 text-[var(--accent)]" />
+          </div>
 
-              <div className="space-y-1.5">
-                <h3 className="text-sm font-black uppercase tracking-widest text-white">Searching for opponent…</h3>
-                <p className="mx-auto max-w-[250px] text-[11px] font-semibold leading-relaxed text-slate-400">
-                  Scanning lobbies for a {selectedStake.toLocaleString()} Coin match. A bot opponent is assigned if nobody joins in time.
-                </p>
-              </div>
-
-              <div className="flex w-full items-center justify-center gap-6 py-1">
-                <div className="flex flex-col items-center gap-1.5">
-                  <div className="h-12 w-12 overflow-hidden rounded-full border-2 border-purple-500 bg-slate-900 ring-4 ring-purple-500/20">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={user?.photo_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${userId ?? "me"}`}
-                      alt="Me"
-                      className="h-full w-full object-cover"
-                      onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${userId ?? "me"}`; }}
-                    />
-                  </div>
-                  <span className="max-w-[76px] truncate text-[10px] font-extrabold text-slate-300">
-                    {user?.first_name ?? "You"}
-                  </span>
-                </div>
-
-                <div className="animate-pulse rounded-lg border border-purple-500/25 bg-purple-950/40 px-3 py-1 text-xs font-black text-purple-300">
-                  VS
-                </div>
-
-                <div className="flex flex-col items-center gap-1.5">
-                  <div className="flex h-12 w-12 animate-pulse items-center justify-center rounded-full border-2 border-dashed border-slate-700 bg-slate-900 text-slate-600">
-                    ?
-                  </div>
-                  <span className="text-[10px] font-extrabold text-slate-500">Searching…</span>
-                </div>
-              </div>
-
-              <div className="flex w-full items-center justify-between border-t border-purple-500/10 pt-2.5 font-mono text-[10px]">
-                <span className="font-bold text-slate-500">Elapsed {queueTimer}s</span>
-                <span className="font-black text-purple-300">Stake {selectedStake.toLocaleString()} Coins</span>
-              </div>
-
-              <button
-                onClick={handleCancelMatchmaking}
-                className="h-11 w-full rounded-xl border border-red-500/30 bg-slate-900/80 text-[10px] font-black uppercase tracking-widest text-red-400 transition-colors hover:border-red-500/60"
+          <div className="flex w-full items-center justify-center gap-5">
+            <div className="flex min-w-0 flex-col items-center gap-1.5">
+              <div
+                className="h-12 w-12 overflow-hidden rounded-full"
+                style={{ border: "2px solid var(--accent)", background: "var(--bg-elevated)" }}
               >
-                Cancel matchmaking
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={user?.photo_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${userId ?? "me"}`}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${userId ?? "me"}`; }}
+                />
+              </div>
+              <div className="max-w-[84px] truncate text-[11px] font-medium text-[var(--text-secondary)]">
+                {displayName(user, "You")}
+              </div>
+            </div>
+
+            <div
+              className="flex-none rounded-lg px-2.5 py-1 text-[11px] font-semibold"
+              style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
+            >
+              VS
+            </div>
+
+            <div className="flex flex-col items-center gap-1.5">
+              <div
+                className="flex h-12 w-12 animate-pulse items-center justify-center rounded-full text-sm"
+                style={{ border: "2px dashed var(--border)", background: "var(--bg-elevated)", color: "var(--text-muted)" }}
+              >
+                ?
+              </div>
+              <div className="text-[11px] font-medium text-[var(--text-muted)]">Searching</div>
+            </div>
+          </div>
+
+          <div
+            className="flex w-full items-center justify-between border-t pt-3 text-[11px]"
+            style={{ borderColor: "var(--border)" }}
+          >
+            <div className="font-numeric tabular-nums text-[var(--text-muted)]">Elapsed {queueTimer}s</div>
+            {selectedStake !== null && (
+              <div className="font-numeric font-semibold tabular-nums text-[var(--text-secondary)]">
+                Stake {selectedStake.toLocaleString()} Coins
+              </div>
+            )}
+          </div>
+        </div>
+      </Sheet>
     </div>
   );
 }

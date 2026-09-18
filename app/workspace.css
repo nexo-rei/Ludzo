@@ -173,6 +173,27 @@ button:disabled {cursor:not-allowed;}
 @media(prefers-reduced-motion:reduce) {
   *,*::before,*::after {animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important;}
 }
+/* ── Telegram mini-app hardening: nothing appears on long press ───────────── */
+/* Telegram's WebView answers a long press on a link, icon or card with its own
+   callout — "Open in Browser", "Copy Link", the rendered URL, image sheets — and
+   that callout prints the very address a mini app is supposed to hide. So the
+   visual half is switched off wholesale (callout, text-selection handles, drag
+   previews); components/layout/TelegramHardening.tsx kills the behavioural half.
+   Real form fields, .selectable copy (legal pages) and .allow-longpress (the
+   deposit QR) opt back in. Taps, scrolling and momentum are untouched. */
+*, *::before, *::after { -webkit-touch-callout: none; -webkit-user-drag: none; }
+body { -webkit-user-select: none; user-select: none; }
+input, textarea, select, [contenteditable="true"],
+.selectable, .selectable *, [data-selectable="true"] {
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-user-drag: auto;
+}
+/* Long-press on the deposit QR is a genuine feature (save the code), so that one
+   element keeps its native callout while everything around it stays inert. */
+.allow-longpress, .allow-longpress * { -webkit-touch-callout: default; }
+
 /* Readable hub actions in light mode, overriding the legacy blanket span rule. */
 [data-theme="light"] .gaming-workspace button.bg-gradient-to-r,
 [data-theme="light"] .gaming-workspace button.bg-gradient-to-r span {color:#FFFFFF!important;}

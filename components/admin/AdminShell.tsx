@@ -97,7 +97,9 @@ export default function AdminShell({ children, title }: AdminShellProps) {
   );
 
   return (
-    <div className="min-h-screen bg-black flex">
+    // `.selectable` opts the desktop console out of the mini-app long-press
+    // hardening (app/workspace.css) so staff can still select IDs and right-click.
+    <div className="selectable min-h-screen bg-black flex">
       <ToastContainer />
 
       {/* Desktop sidebar */}

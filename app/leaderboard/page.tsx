@@ -1,353 +1,546 @@
 "use client";
 
-import { useEffect, useState, type ReactElement } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+/**
+ * LUDZO — Leaderboard
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Rebuilt on the workspace design tokens (var(--card-bg) / --border / --accent /
+ * --text-* …) instead of the old hard-coded gold-silver-bronze + blue-purple
+ * palette, so the board finally reads as part of the same app in light AND dark
+ * mode. Nothing here assumes a dark background any more (`text-white` and the
+ * slate-only rank numbers were invisible on the light theme).
+ *
+ * Rows 4+ used to render "First name @handle". Rankings now expose a single
+ * `display_name` (see lib/leaderboard.ts) — the account name, never the handle —
+ * so every row, podium slot and the pinned "your rank" card use one helper.
+ *
+ * Motion is deliberate: a spring-driven segmented period switch, the podium
+ * rising into place, rows staggering in as they enter the viewport, amounts that
+ * count up once, and share bars that grow to their value — all of it collapsed by
+ * MotionConfig / prefers-reduced-motion.
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
-import { SkeletonList } from "@/components/ui/Skeleton";
 import EmptyState from "@/components/ui/EmptyState";
-import { formatUSDT } from "@/lib/utils";
+import { RefreshIcon, TrophyDuotoneIcon } from "@/components/ui/DuotoneIcons";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { cn, displayName, formatUSDT, initials } from "@/lib/utils";
+import { useApp } from "@/hooks/useApp";
+import { useTelegram } from "@/hooks/useTelegram";
+import type { LeaderboardEntry } from "@/types";
 
-interface LeaderboardEntry {
-  rank: number;
-  user_id: string;
-  first_name: string;
-  username?: string;
-  photo_url?: string;
-  usdt_earned: number;
-}
+type Period = "all" | "month" | "week";
 
 interface MyRank {
   rank: number;
   usdt_earned: number;
 }
 
-// ── Visual config ──────────────────────────────────────────────────────────────
+const PERIODS: Array<{ value: Period; label: string; caption: string }> = [
+  { value: "all",   label: "All time", caption: "Lifetime USDT earned" },
+  { value: "month", label: "Monthly",  caption: "USDT earned this calendar month" },
+  { value: "week",  label: "Weekly",   caption: "USDT earned this week" },
+];
 
-const RANK_META: Record<number, { bar: string; glow: string; text: string; height: string; label: string }> = {
+/**
+ * Medal tones, all pulled from the shared theme so light/dark stay consistent.
+ * The champion carries the accent; 2nd and 3rd step down into neutrals, which is
+ * what the rest of the workspace does instead of painting three different hues.
+ */
+const MEDAL_TONE: Record<number, { ring: string; bar: string; amount: string; height: number }> = {
   1: {
-    bar:    "linear-gradient(180deg, #FCD34D 0%, #F59E0B 100%)",
-    glow:   "rgba(245,158,11,0.35)",
-    text:   "#F59E0B",
-    height: "h-20",
-    label:  "1st",
+    ring: "var(--accent)",
+    bar: "linear-gradient(180deg, var(--accent) 0%, var(--accent-soft) 100%)",
+    amount: "var(--accent)",
+    height: 74,
   },
   2: {
-    bar:    "linear-gradient(180deg, #E2E8F0 0%, #94A3B8 100%)",
-    glow:   "rgba(148,163,184,0.25)",
-    text:   "#94A3B8",
-    height: "h-14",
-    label:  "2nd",
+    ring: "var(--text-muted)",
+    bar: "linear-gradient(180deg, var(--border) 0%, var(--bg-elevated) 100%)",
+    amount: "var(--text-secondary)",
+    height: 50,
   },
   3: {
-    bar:    "linear-gradient(180deg, #FDBA74 0%, #D97706 100%)",
-    glow:   "rgba(217,119,6,0.25)",
-    text:   "#D97706",
-    height: "h-10",
-    label:  "3rd",
+    ring: "var(--border)",
+    bar: "linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg) 100%)",
+    amount: "var(--text-secondary)",
+    height: 34,
   },
 };
 
-const TROPHY: Record<number, ReactElement> = {
-  1: (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="#F59E0B" stroke="none">
-      <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" />
-    </svg>
-  ),
-  2: (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="#94A3B8" stroke="none">
-      <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" />
-    </svg>
-  ),
-  3: (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="#D97706" stroke="none">
-      <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" />
-    </svg>
-  ),
-};
+// ── Small pieces ─────────────────────────────────────────────────────────────
 
-const PERIOD_LABEL: Record<string, string> = {
-  all:   "All Time",
-  month: "Monthly",
-  week:  "Weekly",
-};
+/** Counts to `value` once per change; honours the OS reduced-motion setting. */
+function useCountUp(value: number, duration = 650) {
+  const reduceMotion = useReducedMotion();
+  const [display, setDisplay] = useState(reduceMotion ? value : 0);
+  const fromRef = useRef(0);
 
-// ── Avatar ─────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (reduceMotion || !Number.isFinite(value)) {
+      fromRef.current = value;
+      setDisplay(value);
+      return;
+    }
+    const from = fromRef.current;
+    const start = performance.now();
+    let frame = 0;
+
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - (1 - t) ** 3;
+      setDisplay(from + (value - from) * eased);
+      if (t < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      fromRef.current = value;
+    };
+  }, [value, duration, reduceMotion]);
+
+  return display;
+}
+
+function Amount({ value, className }: { value: number; className?: string }) {
+  const animated = useCountUp(value);
+  return <span className={cn("font-numeric tabular-nums", className)}>${formatUSDT(animated)}</span>;
+}
 
 function Avatar({
   entry,
   size,
-  borderColor,
+  ring,
 }: {
   entry: LeaderboardEntry;
   size: number;
-  borderColor: string;
+  ring: string;
 }) {
-  return entry.photo_url ? (
-    <Image
-      src={entry.photo_url}
-      alt={entry.first_name}
-      width={size}
-      height={size}
-      className="rounded-full object-cover"
-      style={{ border: `2.5px solid ${borderColor}` }}
-    />
-  ) : (
-    <div
-      className="rounded-full flex items-center justify-center font-black text-white"
-      style={{
-        width: size,
-        height: size,
-        background: `linear-gradient(135deg, ${borderColor}90, ${borderColor}40)`,
-        border: `2.5px solid ${borderColor}`,
-        fontSize: size * 0.38,
-      }}
+  const name = displayName(entry);
+  return (
+    <span
+      className="flex flex-none items-center justify-center overflow-hidden rounded-full border bg-[var(--bg-elevated)]"
+      style={{ width: size, height: size, borderColor: ring, borderWidth: 2 }}
     >
-      {entry.first_name[0]?.toUpperCase()}
+      {entry.photo_url ? (
+        <Image
+          src={entry.photo_url}
+          alt=""
+          width={size}
+          height={size}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <span className="font-semibold text-[var(--text-secondary)]" style={{ fontSize: size * 0.36 }}>
+          {initials(name)}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function PodiumSlot({
+  entry,
+  rank,
+  isLeader,
+  index,
+}: {
+  entry: LeaderboardEntry;
+  rank: number;
+  isLeader: boolean;
+  index: number;
+}) {
+  const tone = MEDAL_TONE[rank] ?? MEDAL_TONE[3];
+  const reduceMotion = useReducedMotion();
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ delay: 0.06 * index, type: "spring", stiffness: 260, damping: 26 }}
+      className={cn("flex min-w-0 flex-col items-center", isLeader ? "w-[36%] max-w-[132px]" : "w-[28%] max-w-[104px]")}
+    >
+      <span className="flex h-5 items-end justify-center">
+        {isLeader && (
+          <span className={cn("text-[var(--accent)]", !reduceMotion && "crown-bob")}>
+            <TrophyDuotoneIcon size={18} />
+          </span>
+        )}
+      </span>
+
+      <span
+        className="relative mt-1.5 rounded-full"
+        style={{
+          // Only the champion earns a glow — the workspace keeps everything else flat.
+          boxShadow: isLeader ? "0 0 0 3px var(--card-bg), 0 8px 20px -10px var(--accent)" : "0 0 0 3px var(--card-bg)",
+        }}
+      >
+        <Avatar entry={entry} size={isLeader ? 54 : 44} ring={tone.ring} />
+      </span>
+
+      <span
+        className={cn(
+          "mt-2 w-full truncate text-center font-semibold text-[var(--text-primary)]",
+          isLeader ? "text-[13px]" : "text-xs"
+        )}
+      >
+        {displayName(entry)}
+      </span>
+
+      <span style={{ color: tone.amount }}>
+        <Amount value={entry.usdt_earned} className="mt-0.5 block text-center text-[12px] font-semibold" />
+      </span>
+      <span className="mt-1 block w-full text-center text-[9px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+        USDT
+      </span>
+
+      <span
+        className="relative mt-2.5 flex w-full items-start justify-center overflow-hidden rounded-t-xl border-x border-t"
+        style={{ height: tone.height, background: tone.bar, borderColor: "var(--border)" }}
+      >
+        <span
+          className="mt-2 text-[11px] font-semibold font-numeric"
+          style={{ color: isLeader ? "var(--accent-contrast)" : "var(--text-muted)" }}
+        >
+          {rank}
+        </span>
+        {isLeader && !reduceMotion && (
+          <span className="podium-sheen pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-white/25 blur-[2px]" />
+        )}
+      </span>
+    </motion.div>
+  );
+}
+
+function StandingRow({
+  entry,
+  share,
+  index,
+  isMe,
+}: {
+  entry: LeaderboardEntry;
+  share: number;
+  index: number;
+  isMe: boolean;
+}) {
+  return (
+    <motion.li
+      initial={{ opacity: 0, y: 8 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.4 }}
+      transition={{ delay: Math.min(index * 0.03, 0.2), duration: 0.26, ease: "easeOut" }}
+      className={cn(
+        "flex items-center gap-3 px-3.5 py-3 transition-colors",
+        isMe ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-elevated)]"
+      )}
+      style={{ borderBottom: "1px solid var(--border)" }}
+    >
+      <span className="w-6 flex-none text-center text-xs font-semibold font-numeric text-[var(--text-muted)] tabular-nums">
+        {entry.rank}
+      </span>
+
+      <Avatar entry={entry} size={34} ring={isMe ? "var(--accent)" : "var(--border)"} />
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <p className="truncate text-[13px] font-medium text-[var(--text-primary)]">{displayName(entry)}</p>
+          {isMe && (
+            <span className="flex-none rounded-full px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-[var(--accent-contrast)]" style={{ background: "var(--accent)" }}>
+              You
+            </span>
+          )}
+        </div>
+        <div className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full" style={{ background: "var(--bg-elevated)" }}>
+          <motion.span
+            className="block h-full rounded-full"
+            style={{ background: isMe ? "var(--accent)" : "var(--text-muted)", opacity: isMe ? 1 : 0.55 }}
+            initial={{ width: 0 }}
+            whileInView={{ width: `${Math.max(share, 2)}%` }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.12, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          />
+        </div>
+      </div>
+
+      <Amount value={entry.usdt_earned} className="flex-none text-[13px] font-semibold text-[var(--text-primary)]" />
+    </motion.li>
+  );
+}
+
+function BoardSkeleton() {
+  return (
+    <div className="space-y-4" aria-hidden>
+      <div className="rounded-2xl border p-4" style={{ borderColor: "var(--border)", background: "var(--card-bg)" }}>
+        <div className="flex items-end justify-center gap-3">
+          {[58, 46, 38].map((height, i) => (
+            <div key={i} className="flex w-1/3 flex-col items-center gap-2">
+              <Skeleton className="h-11 w-11 rounded-full" />
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-2.5 w-10" />
+              <Skeleton className="w-full rounded-t-xl" style={{ height }} />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="overflow-hidden rounded-2xl border" style={{ borderColor: "var(--border)", background: "var(--card-bg)" }}>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3 border-b px-3.5 py-3 last:border-0" style={{ borderColor: "var(--border)" }}>
+            <Skeleton className="h-4 w-4 rounded" />
+            <Skeleton className="h-8 w-8 rounded-full" />
+            <Skeleton className="h-3 flex-1" />
+            <Skeleton className="h-3 w-12" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-// ── Page ───────────────────────────────────────────────────────────────────────
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function LeaderboardPage() {
-  const [entries, setEntries]   = useState<LeaderboardEntry[]>([]);
-  const [myRank, setMyRank]     = useState<MyRank | null>(null);
-  const [loading, setLoading]   = useState(true);
-  const [period, setPeriod]     = useState("all");
+  const router = useRouter();
+  const { user, userId } = useApp();
+  const { haptic } = useTelegram();
 
-  const load = async (p: string) => {
-    setLoading(true);
-    setEntries([]);
-    setMyRank(null);
-    try {
-      // Read userId from localStorage — same pattern as useApp.tsx wallet fetch
-      const stored = localStorage.getItem("ludzo_user");
-      const userId = stored ? (JSON.parse(stored) as { id: string }).id : null;
-      const headers: HeadersInit = userId ? { "x-user-id": userId } : {};
+  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [myRank, setMyRank] = useState<MyRank | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [period, setPeriod] = useState<Period>("all");
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
 
-      const res  = await fetch(`/api/leaderboard?period=${p}&limit=50`, { headers });
-      const json = await res.json();
-      if (json.success) {
-        setEntries(json.data ?? []);
+  const load = useCallback(
+    async (p: Period) => {
+      setLoading(true);
+      setFailed(false);
+      try {
+        const headers: HeadersInit = userId ? { "x-user-id": userId } : {};
+        const res = await fetch(`/api/leaderboard?period=${p}&limit=50`, { headers, cache: "no-store" });
+        const json = await res.json();
+        if (!res.ok || !json.success) throw new Error("leaderboard");
+        setEntries(Array.isArray(json.data) ? (json.data as LeaderboardEntry[]) : []);
         setMyRank(json.my_rank ?? null);
+        setUpdatedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+      } catch {
+        setFailed(true);
+        setEntries([]);
+        setMyRank(null);
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      /* silent */
-    } finally {
-      setLoading(false);
-    }
+    },
+    [userId]
+  );
+
+  useEffect(() => {
+    load(period);
+  }, [period, load]);
+
+  const myId = user?.id ?? userId ?? "";
+  const iAmInList = useMemo(() => entries.some((e) => e.user_id === myId), [entries, myId]);
+
+  const top3 = entries.slice(0, 3);
+  const rest = entries.slice(3);
+  const leaderAmount = top3[0]?.usdt_earned ?? 0;
+
+  /* Podium order is the classic 2 · 1 · 3, and missing places simply drop out. */
+  const podium = [top3[1], top3[0], top3[2]]
+    .map((entry, i) => ({ entry, rank: [2, 1, 3][i] }))
+    .filter((slot) => Boolean(slot.entry));
+
+  const periodLabel = PERIODS.find((p) => p.value === period)?.label ?? "All time";
+
+  const changePeriod = (next: Period) => {
+    if (next === period) return;
+    haptic("impact");
+    setPeriod(next);
   };
-
-  useEffect(() => { load(period); }, [period]);
-
-  const top3   = entries.slice(0, 3);
-  const rest   = entries.slice(3);
-
-  // Podium display order: 2nd | 1st | 3rd — only slots with real entries
-  const podiumSlots: Array<{ entry: LeaderboardEntry; rank: number }> = [];
-  if (top3[1]) podiumSlots.push({ entry: top3[1], rank: 2 }); // left
-  if (top3[0]) podiumSlots.push({ entry: top3[0], rank: 1 }); // center
-  if (top3[2]) podiumSlots.push({ entry: top3[2], rank: 3 }); // right
-  // Re-sort so center (rank 1) is always in the middle visually
-  const podiumOrder2 = [
-    podiumSlots.find(s => s.rank === 2) ?? null,
-    podiumSlots.find(s => s.rank === 1) ?? null,
-    podiumSlots.find(s => s.rank === 3) ?? null,
-  ].filter(Boolean) as Array<{ entry: LeaderboardEntry; rank: number }>;
-
-  const PERIODS = [
-    { value: "all",   label: "All Time" },
-    { value: "month", label: "Monthly"  },
-    { value: "week",  label: "Weekly"   },
-  ];
 
   return (
     <AppShell hideNav>
-      <PageHeader title="Leaderboard" back />
+      <PageHeader
+        title="Leaderboard"
+        back
+        backHref="/home"
+        right={
+          <button
+            type="button"
+            onClick={() => { haptic("impact"); load(period); }}
+            aria-label="Refresh leaderboard"
+            className="flex h-11 w-11 items-center justify-center rounded-xl text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-elevated)] active:scale-95"
+          >
+            <motion.span animate={loading ? { rotate: 360 } : { rotate: 0 }} transition={loading ? { duration: 1, repeat: Infinity, ease: "linear" } : { duration: 0.2 }}>
+              <RefreshIcon size={18} />
+            </motion.span>
+          </button>
+        }
+      />
 
-      <div className="px-4 py-4 space-y-4 pb-24">
-
-        {/* ── Period tabs ── */}
+      <div className="mx-auto w-full max-w-[560px] px-4 pb-6 pt-4">
+        {/* Period switch — the sliding pill is the only motion in the header. */}
         <div
-          className="flex gap-1 rounded-xl p-1"
-          style={{ background: "var(--card-bg)", border: "1px solid var(--border)" }}
+          className="relative flex gap-1 rounded-xl border p-1"
+          role="group"
+          aria-label="Leaderboard period"
+          style={{ borderColor: "var(--border)", background: "var(--card-bg)" }}
         >
-          {PERIODS.map((p) => (
-            <button
-              key={p.value}
-              onClick={() => setPeriod(p.value)}
-              className="flex-1 py-2 text-xs font-semibold rounded-lg transition-all duration-200"
-              style={
-                period === p.value
-                  ? {
-                      background: "linear-gradient(135deg, #23856C, #196A55)",
-                      color: "white",
-                      boxShadow: "0 2px 10px rgba(35,133,108,0.35)",
-                    }
-                  : { color: "var(--text-muted)" }
-              }
-            >
-              {p.label}
-            </button>
-          ))}
+          {PERIODS.map((option) => {
+            const active = option.value === period;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => changePeriod(option.value)}
+                className="relative flex-1 rounded-lg py-2 text-xs font-semibold transition-colors"
+                style={{ color: active ? "var(--accent-contrast)" : "var(--text-muted)" }}
+              >
+                {active && (
+                  <motion.span
+                    layoutId="leaderboard-period-pill"
+                    transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                    className="absolute inset-0 rounded-lg"
+                    style={{ background: "var(--accent)" }}
+                  />
+                )}
+                <span className="relative z-10">{option.label}</span>
+              </button>
+            );
+          })}
         </div>
 
-        <AnimatePresence mode="wait">
-          {loading ? (
-            <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <SkeletonList count={10} />
-            </motion.div>
-          ) : entries.length === 0 ? (
-            <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <EmptyState
-                title={`No ${PERIOD_LABEL[period]} rankings yet`}
-                description={
-                  period === "all"
-                    ? "Users with USDT balance will appear here."
-                    : "Earn USDT this period to appear on the board!"
-                }
-                variant="compact"
-              />
-            </motion.div>
-          ) : (
-            <motion.div
-              key={period}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="space-y-4"
-            >
-
-              {/* ── Podium ── */}
-              {top3.length >= 1 && (
-                <div
-                  className="relative rounded-2xl px-4 pt-5 pb-0 overflow-hidden"
-                  style={{
-                    background: "linear-gradient(180deg, rgba(35,133,108,0.1) 0%, transparent 100%)",
-                    border: "1px solid rgba(35,133,108,0.12)",
-                  }}
-                >
-                  <div className="flex items-end justify-center gap-3">
-                    {podiumOrder2.map(({ entry, rank }, i) => {
-                      const meta = RANK_META[rank];
-                      const isFirst = rank === 1;
-                      const avatarSize = isFirst ? 56 : 44;
-
-                      return (
-                        <motion.div
-                          key={entry.user_id}
-                          initial={{ opacity: 0, y: 16 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: i * 0.08, type: "spring", stiffness: 200 }}
-                          className="flex flex-col items-center gap-1"
-                          style={{ width: isFirst ? 90 : 72 }}
-                        >
-                          {/* Trophy */}
-                          <div className="flex items-center justify-center mb-0.5">
-                            {TROPHY[rank]}
-                          </div>
-
-                          {/* Avatar with glow */}
-                          <div
-                            className="rounded-full"
-                            style={{ boxShadow: `0 0 16px ${meta.glow}` }}
-                          >
-                            <Avatar entry={entry} size={avatarSize} borderColor={meta.text} />
-                          </div>
-
-                          {/* Name */}
-                          <div
-                            className="text-xs font-bold text-white text-center truncate mt-1"
-                            style={{ maxWidth: isFirst ? 84 : 68 }}
-                          >
-                            {entry.first_name}
-                          </div>
-
-                          {/* Amount */}
-                          <div
-                            className="text-[11px] font-black font-numeric text-center"
-                            style={{ color: meta.text }}
-                          >
-                            ${formatUSDT(entry.usdt_earned)}
-                          </div>
-
-                          {/* Podium bar */}
-                          <div
-                            className={`w-full ${meta.height} rounded-t-lg mt-1`}
-                            style={{ background: meta.bar }}
-                          />
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* ── Ranks 4–N ── */}
-              {rest.length > 0 && (
-                <div className="space-y-2">
-                  {rest.map((entry, i) => (
-                    <motion.div
-                      key={entry.user_id}
-                      initial={{ opacity: 0, x: -6 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.025 }}
-                      className="flex items-center gap-3 p-3 rounded-xl"
-                      style={{ background: "var(--card-bg)", border: "1px solid var(--border)" }}
-                    >
-                      <span className="w-7 text-center text-xs font-bold text-[#475569]">
-                        #{entry.rank}
-                      </span>
-
-                      <Avatar entry={entry} size={36} borderColor="var(--border)" />
-
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-semibold text-[var(--text-primary)] truncate">
-                          {entry.first_name}
-                          {entry.username && (
-                            <span className="text-[var(--text-muted)] font-normal ml-1">
-                              @{entry.username}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="text-xs font-black font-numeric text-[#10B981]">
-                        ${formatUSDT(entry.usdt_earned)}
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              )}
-
-              {/* ── My rank (if outside top list) ── */}
-              {myRank && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center gap-3 p-3 rounded-xl"
-                  style={{
-                    background: "linear-gradient(135deg, rgba(35,133,108,0.12), rgba(91,33,182,0.08))",
-                    border: "1px solid rgba(35,133,108,0.3)",
-                  }}
-                >
-                  <span className="w-7 text-center text-xs font-bold" style={{ color: "#63D9B4" }}>
-                    #{myRank.rank}
-                  </span>
-                  <div className="flex-1 text-xs font-semibold text-[var(--text-primary)]">
-                    You
-                  </div>
-                  <div className="text-xs font-black font-numeric text-[#63D9B4]">
-                    ${formatUSDT(myRank.usdt_earned)}
-                  </div>
-                </motion.div>
-              )}
-
-            </motion.div>
+        <div className="mt-2 flex items-center justify-between px-0.5">
+          <p className="text-[11px] text-[var(--text-muted)]">
+            {loading ? "Loading rankings…" : PERIODS.find((p) => p.value === period)?.caption}
+          </p>
+          {!loading && updatedAt && (
+            <p className="text-[11px] font-numeric text-[var(--text-muted)]">Updated {updatedAt}</p>
           )}
-        </AnimatePresence>
+        </div>
+
+        <div className="mt-3 space-y-3">
+          <AnimatePresence mode="wait" initial={false}>
+            {loading ? (
+              <motion.div key="skeleton" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <BoardSkeleton />
+              </motion.div>
+            ) : failed ? (
+              <motion.div key="error" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                <EmptyState
+                  variant="compact"
+                  title="Leaderboard unavailable"
+                  description="We could not reach the rankings. Check your connection and try again."
+                  action={{ label: "Retry", onClick: () => load(period) }}
+                />
+              </motion.div>
+            ) : entries.length === 0 ? (
+              <motion.div key="empty" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                <EmptyState
+                  emoji="🏆"
+                  variant="compact"
+                  title={`No ${periodLabel.toLowerCase()} rankings yet`}
+                  description="Earn USDT from matches and streaks and you will appear on this board."
+                  action={{ label: "Back to home", onClick: () => router.push("/home") }}
+                />
+              </motion.div>
+            ) : (
+              <motion.div key={period} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
+                {/* ── Podium ── */}
+                {podium.length > 0 && (
+                  <section
+                    className="overflow-hidden rounded-2xl border"
+                    style={{ borderColor: "var(--border)", background: "var(--card-bg)" }}
+                    aria-label={`Top ${podium.length} for ${periodLabel.toLowerCase()}`}
+                  >
+                    <div className="flex items-center justify-between px-4 pt-3.5">
+                      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                        Podium
+                      </h2>
+                      <span className="text-[11px] font-numeric text-[var(--text-muted)]">{periodLabel}</span>
+                    </div>
+
+                    <div className="flex items-end justify-center gap-2 px-3 pt-2">
+                      {podium.map((slot, i) => (
+                        <PodiumSlot key={slot.entry.user_id} entry={slot.entry} rank={slot.rank} isLeader={slot.rank === 1} index={i} />
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* ── Ranks 4 … n ── */}
+                {rest.length > 0 && (
+                  <section
+                    className="overflow-hidden rounded-2xl border"
+                    style={{ borderColor: "var(--border)", background: "var(--card-bg)" }}
+                  >
+                    <div className="flex items-center justify-between border-b px-4 py-2.5" style={{ borderColor: "var(--border)" }}>
+                      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                        Standings
+                      </h2>
+                      <span className="text-[11px] font-numeric text-[var(--text-muted)] tabular-nums">
+                        {rest.length} ranked
+                      </span>
+                    </div>
+                    <ul>
+                      {rest.map((entry, i) => (
+                        <StandingRow
+                          key={entry.user_id}
+                          entry={entry}
+                          index={i}
+                          isMe={entry.user_id === myId}
+                          share={leaderAmount > 0 ? (entry.usdt_earned / leaderAmount) * 100 : 0}
+                        />
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
+                {/* ── Your rank, pinned while the list scrolls ── */}
+                {myRank && !iAmInList && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1, type: "spring", stiffness: 300, damping: 28 }}
+                    className="sticky bottom-3 z-30"
+                  >
+                    <div
+                      className="flex items-center gap-3 rounded-2xl border px-3.5 py-3"
+                      style={{
+                        borderColor: "var(--accent)",
+                        background: "var(--card-bg)",
+                        boxShadow: "0 14px 34px -18px rgba(0,0,0,0.45)",
+                      }}
+                    >
+                      <span
+                        className="flex h-8 w-8 flex-none items-center justify-center rounded-xl text-xs font-semibold font-numeric"
+                        style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
+                      >
+                        {myRank.rank}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[13px] font-medium text-[var(--text-primary)]">
+                          {displayName(user, "Your rank")}
+                        </p>
+                        <p className="text-[10px] text-[var(--text-muted)]">
+                          {myRank.rank > entries.length && entries.length > 0
+                            ? `Outside this ${periodLabel.toLowerCase()} top ${entries.length}`
+                            : `Rank #${myRank.rank} · ${periodLabel.toLowerCase()}`}
+                        </p>
+                      </div>
+                      <Amount value={myRank.usdt_earned} className="flex-none text-[13px] font-semibold" />
+                    </div>
+                  </motion.div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </AppShell>
   );

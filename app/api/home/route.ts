@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSettings, getStreakReward } from "@/lib/settings";
+import { normalizeLeaderboardRows } from "@/lib/leaderboard";
 import { startOfDay, differenceInCalendarDays } from "date-fns";
 
 // Aggregated home page data in one request
@@ -87,7 +88,8 @@ console.log("HOME USER ERROR:", JSON.stringify(userError));
         },
         announcements: announcementsRes.data ?? [],
         recent_activity: recentActivityRes.data ?? [],
-        leaderboard_top3: leaderboardRes.data ?? [],
+        // Names only — @usernames are stripped before the row reaches the client.
+        leaderboard_top3: normalizeLeaderboardRows(leaderboardRes.data as never[]),
         settings: {
           coin_rate: settings.coin_rate,
         },

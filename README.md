@@ -170,6 +170,16 @@ npm run dev
 
 App runs at `http://localhost:3000`
 
+UI regressions (leaderboard tokens, dialog sizing, Telegram long-press suppression) are covered by
+a static + unit contract test:
+
+```bash
+npm run verify:ui
+```
+
+Full invariant suite (engine, SQL, support, UI): `npm run verify`. Design notes live in
+[`docs/UI-REDESIGN.md`](docs/UI-REDESIGN.md).
+
 ---
 
 ## Admin Panel

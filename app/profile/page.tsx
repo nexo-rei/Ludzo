@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ChevronRightIcon } from "@/components/ui/DuotoneIcons";
 import Image from "next/image";
+import { displayName, initials } from "@/lib/utils";
 import Link from "next/link";
 import AppShell from "@/components/layout/AppShell";
 import LudzoCoin from "@/components/ui/LudzoCoin";
@@ -90,7 +91,7 @@ export default function ProfilePage() {
             ) : (
               <div className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-black text-white"
                 style={{ background: "linear-gradient(135deg, #23856C, #63D9B4)", boxShadow: "0 0 16px rgba(35,133,108,0.3)", border: "2px solid rgba(99,217,180,0.4)" }}>
-                {profile?.user.first_name[0]}
+                {initials(displayName(profile?.user), 1)}
               </div>
             )}
             <div className="flex-1 min-w-0">

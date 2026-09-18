@@ -17,7 +17,7 @@ import LeaderboardPreview from "@/components/cards/LeaderboardPreview";
 import { SkeletonList } from "@/components/ui/Skeleton";
 import EmptyState from "@/components/ui/EmptyState";
 import { useApp } from "@/hooks/useApp";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, displayName, initials } from "@/lib/utils";
 import type { HomePageData } from "@/types";
 import LudzoLogo from "@/components/layout/LudzoLogo";
 import LudzoCoin from "@/components/ui/LudzoCoin";
@@ -82,7 +82,7 @@ export default function HomePage() {
             <LudzoLogo size={34} />
             <div>
               <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)] leading-tight">
-                Welcome back, {data.user.first_name}
+                Welcome back, {data.user.first_name?.trim() || "player"}
               </h1>
               <p className="text-[11px] text-[var(--text-muted)]">Here’s what’s happening in your workspace.</p>
             </div>
@@ -99,7 +99,7 @@ export default function HomePage() {
           ) : (
             <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white"
               style={{ background: "linear-gradient(135deg, #23856C, #196A55)" }}>
-              {data.user.first_name[0]}
+              {initials(displayName(data.user), 1)}
             </div>
           )}
         </motion.div>
