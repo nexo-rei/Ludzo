@@ -1,22 +1,6 @@
 "use client";
 import SymbolIcon from "@/components/ui/SymbolIcon";
 
-/**
- * LUDZO — Gaming Hub Profile (/games/profile)
- * ─────────────────────────────────────────────────────────────────────────────
- * Tab 3 of the 3-tab game section. It is the hub for EVERYTHING that is not
- * Home or Play — most importantly the Matches / battle-history entry that used
- * to be its own nav tab.
- *
- * Data sources (no local guessing anywhere):
- *   • wallets    → coin_balance, won_coins_balance, usdt_balance  (/api/wallet)
- *   • ludo_stats → wins, losses, win_rate, streaks, total_won_coins
- *                  (/api/ludo/stats — written by settle_ludo_match())
- *
- * That is why "matches won" and "coins won" now actually appear here: the old
- * screen rendered localStorage demo stats that real matches never touched.
- */
-
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -53,42 +37,42 @@ const EMPTY_STATS: Stats = {
   current_streak: 0, best_streak: 0, total_won_coins: 0,
 };
 
-const RULES = [
-  { icon: "dice", text: "Roll a 6 to release a token from your yard." },
-  { icon: "target", text: "Both of your tokens must reach home to win the pool." },
-  { icon: "repeat", text: "A 6, a capture or a finished token grants a bonus roll." },
-  { icon: "warning", text: "Three 6s in a row — the third roll is forfeited." },
-  { icon: "shield", text: "★ cells are safe; nobody can capture you there." },
-  { icon: "⏱️", text: "18 seconds per turn, 8 minute cap, 3 hearts." },
-];
-
 interface MenuItem {
-  label: string;
-  hint: string;
+  labelKey: string;
+  hintKey: string;
   href?: string;
   action?: "rules" | "support" | "exit";
   tint: string;
   Icon: React.ComponentType<{ size?: number; className?: string; active?: boolean }>;
 }
 
-const MENU: MenuItem[] = [
-  { label: "Battle History",  hint: "Every match & Coin result", href: "/games/matches", tint: "#63D9B4", Icon: BattleLogIcon },
-  { label: "Leaderboard",     hint: "Top earners this season",   href: "/leaderboard",   tint: "#F59E0B", Icon: TrophyDuotoneIcon },
-  { label: "How to Play",     hint: "Rules in 20 seconds",       action: "rules",        tint: "#3B82F6", Icon: BookIcon },
-  { label: "Transactions",    hint: "Deposits, wins & payouts",  href: "/history",       tint: "#10B981", Icon: ReceiptIcon },
-  { label: "Settings",        hint: "Theme, language & sound",   href: "/settings",      tint: "#94A3B8", Icon: SettingsNavIcon },
-  { label: "Gaming Support",  hint: "Talk to the arena team",    action: "support",      tint: "#22D3EE", Icon: LifeBuoyIcon },
-  { label: "Exit Gaming Hub", hint: "Back to the main app",      action: "exit",         tint: "#F97316", Icon: LogOutIcon },
-];
-
 export default function GamingProfilePage() {
   const router = useRouter();
-  const { user, userId, wallet, refreshWallet } = useApp();
+  const { user, userId, wallet, refreshWallet, t } = useApp();
 
   const [stats, setStats] = useState<Stats>(EMPTY_STATS);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+
+  const RULES = [
+    { icon: "dice", text: t("ludo_how_to_play") },
+    { icon: "target", text: t("ludo_desc") },
+    { icon: "repeat", text: t("daily_streak") },
+    { icon: "warning", text: t("important_notice") },
+    { icon: "shield", text: t("fair_play") },
+    { icon: "⏱️", text: "18s / turn, 8 min cap, 3 hearts" },
+  ];
+
+  const MENU: MenuItem[] = [
+    { labelKey: "battle_history",  hintKey: "arena_recent_battles", href: "/games/matches", tint: "#63D9B4", Icon: BattleLogIcon },
+    { labelKey: "leaderboard_title", hintKey: "top_earners",   href: "/leaderboard",   tint: "#F59E0B", Icon: TrophyDuotoneIcon },
+    { labelKey: "how_to_play",     hintKey: "how_it_works",       action: "rules",        tint: "#3B82F6", Icon: BookIcon },
+    { labelKey: "history_title",    hintKey: "recent_activity",  href: "/history",       tint: "#10B981", Icon: ReceiptIcon },
+    { labelKey: "settings_title",   hintKey: "language_setting",   href: "/settings",      tint: "#94A3B8", Icon: SettingsNavIcon },
+    { labelKey: "support_title",    hintKey: "chat_support",    action: "support",      tint: "#22D3EE", Icon: LifeBuoyIcon },
+    { labelKey: "exit_hub",         hintKey: "nav_home",      action: "exit",         tint: "#F97316", Icon: LogOutIcon },
+  ];
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -148,7 +132,7 @@ export default function GamingProfilePage() {
           className="flex items-start justify-between gap-3"
         >
           <div>
-            <h1 className="text-xl font-black tracking-tight text-slate-50">Gamer Profile</h1>
+            <h1 className="text-xl font-black tracking-tight text-slate-50">{t("game_profile")}</h1>
             <p className="mt-0.5 text-[10px] font-black uppercase tracking-widest text-purple-400">
               Pro Identity
             </p>
@@ -211,7 +195,7 @@ export default function GamingProfilePage() {
           className="grid grid-cols-2 gap-2.5"
         >
           <div className="surface-glass rounded-2xl px-4 py-3">
-            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Playable Coins</span>
+            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">{t("playable_coins")}</span>
             <div className="mt-1 flex items-center gap-1.5">
               <CoinIcon size={16} className="text-amber-400" />
               <span className="text-lg font-black tabular-nums text-white">{coins.toLocaleString()}</span>
@@ -219,7 +203,7 @@ export default function GamingProfilePage() {
           </div>
 
           <div className="surface-glass rounded-2xl px-4 py-3">
-            <span className="text-[9px] font-black uppercase tracking-widest text-purple-300">Won Coins</span>
+            <span className="text-[9px] font-black uppercase tracking-widest text-purple-300">{t("won_coins_title")}</span>
             <div className="mt-1 flex items-center gap-1.5">
               <TokenIcon size={16} className="text-purple-300" />
               <span className="text-lg font-black tabular-nums text-purple-300">{wonCoins.toLocaleString()}</span>
@@ -228,7 +212,7 @@ export default function GamingProfilePage() {
 
           <div className="surface-glass col-span-2 flex items-center justify-between gap-3 rounded-2xl px-4 py-3">
             <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-              Cash · 100 Won Coins = $1
+              Cash · 100 {t("won_coins")} = $1
             </span>
             <span className="font-mono text-sm font-black text-emerald-400">${usdt.toFixed(2)}</span>
           </div>
@@ -245,7 +229,7 @@ export default function GamingProfilePage() {
             <h3 className="text-[10px] font-black uppercase tracking-widest text-purple-300">
               Gaming Statistics
             </h3>
-            {loading && <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Syncing…</span>}
+            {loading && <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">{t("loading")}</span>}
           </div>
 
           {!hasPlayed && !loading ? (
@@ -254,9 +238,9 @@ export default function GamingProfilePage() {
                 <DiceIcon size={26} />
               </div>
               <div>
-                <h4 className="text-xs font-black uppercase tracking-wide text-slate-200">No matches yet</h4>
+                <h4 className="text-xs font-black uppercase tracking-wide text-slate-200">{t("arena_no_battles")}</h4>
                 <p className="mx-auto mt-1 max-w-[230px] text-[10px] font-medium leading-relaxed text-slate-500">
-                  Finish your first Ludo match and your wins, streaks and Won Coins will appear here.
+                  {t("arena_no_battles_desc")}
                 </p>
               </div>
               <motion.button
@@ -264,16 +248,16 @@ export default function GamingProfilePage() {
                 onClick={() => router.push("/games")}
                 className="h-9 rounded-xl border border-purple-400/40 bg-gradient-to-r from-purple-600 to-indigo-600 px-4 text-[10px] font-black uppercase tracking-widest text-white"
               >
-                Play first match
+                {t("arena_play_now")}
               </motion.button>
             </div>
           ) : (
             <>
               <div className="grid grid-cols-3 gap-2.5">
                 {[
-                  { label: "Battles", value: stats.total_matches, tone: "text-slate-100" },
-                  { label: "Wins", value: stats.wins, tone: "text-emerald-400" },
-                  { label: "Losses", value: stats.losses, tone: "text-red-400" },
+                  { label: t("arena_battles"), value: stats.total_matches, tone: "text-slate-100" },
+                  { label: t("arena_wins"), value: stats.wins, tone: "text-emerald-400" },
+                  { label: t("failed"), value: stats.losses, tone: "text-red-400" },
                 ].map((cell, i) => (
                   <motion.div
                     key={cell.label}
@@ -292,7 +276,7 @@ export default function GamingProfilePage() {
 
               <div className="grid grid-cols-3 gap-2.5">
                 {[
-                  { label: "Win Rate", value: stats.win_rate, tone: "text-purple-300" },
+                  { label: t("arena_win_rate"), value: stats.win_rate, tone: "text-purple-300" },
                   { label: "Streak", value: `${stats.current_streak}`, tone: "text-amber-400" },
                   { label: "Best", value: `${stats.best_streak}`, tone: "text-amber-400" },
                 ].map((cell, i) => (
@@ -361,8 +345,8 @@ export default function GamingProfilePage() {
                     <Icon size={17} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-xs font-extrabold text-slate-100">{item.label}</span>
-                    <span className="mt-0.5 block truncate text-[10px] font-semibold text-slate-500">{item.hint}</span>
+                    <span className="block text-xs font-extrabold text-slate-100">{t(item.labelKey)}</span>
+                    <span className="mt-0.5 block truncate text-[10px] font-semibold text-slate-500">{t(item.hintKey)}</span>
                   </span>
                   <ChevronRightIcon size={16} className="flex-none text-slate-500" />
                 </div>
@@ -370,7 +354,7 @@ export default function GamingProfilePage() {
 
               return (
                 <motion.div
-                  key={item.label}
+                  key={item.labelKey}
                   initial={{ opacity: 0, x: -6 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.24 + i * 0.04 }}
@@ -399,12 +383,10 @@ export default function GamingProfilePage() {
       </div>
 
       {/* ── RULES SHEET ────────────────────────────────────────────────────── */}
-      {/* Shared <Sheet>: capped to the visible viewport with a pinned close row,
-          so the "Enter the arena" action is always on screen. */}
       <Sheet
         open={rulesOpen}
         onClose={() => setRulesOpen(false)}
-        title="How to play"
+        title={t("how_to_play")}
         subtitle="Two tokens, one roll at a time — first to bring both home wins the pool."
         footer={
           <button
@@ -414,7 +396,7 @@ export default function GamingProfilePage() {
             style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
           >
             <DiceIcon size={16} />
-            Enter the arena
+            {t("enter_arena")}
           </button>
         }
       >

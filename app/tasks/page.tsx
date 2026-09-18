@@ -60,12 +60,11 @@ const JOIN_TYPES = ["channel_join", "group_join"];
 const isJoinTask = (type: string) => JOIN_TYPES.includes(type);
 
 export default function TasksPage() {
-  const { userId, refreshWallet } = useApp();
+  const { userId, refreshWallet, t } = useApp();
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState<string | null>(null);
   const [verifying, setVerifying] = useState<string | null>(null);
-  /** Task ke andar dikhne wala inline hint (jaise "pehle channel join karo") */
   const [hints, setHints] = useState<Record<string, string>>({});
 
   const setHint = (taskId: string, message: string | null) =>
@@ -92,7 +91,7 @@ export default function TasksPage() {
   const openLink = (task: TaskItem, url?: string | null) => {
     const link = url ?? task.target_link;
     if (!link) return;
-    setHint(task.id, "Channel join karke wapas aao, phir “Verify & Claim” dabao.");
+    setHint(task.id, t("bot_check_note"));
     try {
       const tg = (window as Window & { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram?.WebApp;
       if (tg?.openTelegramLink && /^https?:\/\/t\.me\//i.test(link)) tg.openTelegramLink(link);
@@ -112,11 +111,11 @@ export default function TasksPage() {
         body: JSON.stringify({ task_id: task.id }),
       });
       const data = await res.json();
-      if (!data.success) { showToast(data.error ?? "Failed to start task", "error"); return; }
-      setHint(task.id, isJoinTask(task.type) ? "Channel join karke wapas aao, phir Verify & Claim dabao." : null);
+      if (!data.success) { showToast(data.error ?? t("error"), "error"); return; }
+      setHint(task.id, isJoinTask(task.type) ? t("bot_check_note") : null);
       openLink(task, data.data?.target_link ?? task.target_link);
       await loadTasks();
-    } catch { showToast("Connection error. Please try again.", "error"); }
+    } catch { showToast(t("error"), "error"); }
     finally { setStarting(null); }
   };
 
@@ -133,47 +132,38 @@ export default function TasksPage() {
       const data = await res.json();
 
       if (data.success) {
-        showToast(`+${data.data?.reward ?? task.reward_coins} Coins earned!`, "success");
+        showToast(t("tasks_earned_toast", { amount: data.data?.reward ?? task.reward_coins }), "success");
         setHint(task.id, null);
         await Promise.all([loadTasks(), refreshWallet()]);
         return;
       }
 
-      // Error code ke hisaab se clear message
       switch (data.code) {
         case "not_joined":
-          setHint(task.id, "Please first join the channel/group — uske baad hi coins milenge.");
-          showToast("Please first join the channel, then tap Verify & Claim.", "error");
-          break;
-        case "bot_not_admin":
-          setHint(task.id, "Verification abhi available nahi hai. Support ko batao.");
-          showToast(data.error ?? "Verification temporarily unavailable", "error");
-          break;
-        case "chat_not_configured":
-          setHint(task.id, "Is task ka channel admin ne set nahi kiya.");
-          showToast(data.error ?? "Task setup incomplete", "error");
+          setHint(task.id, t("bot_check_note"));
+          showToast(t("bot_check_note"), "error");
           break;
         case "already_completed":
           setHint(task.id, null);
-          showToast("Task already completed", "error");
+          showToast(t("already_done"), "error");
           await loadTasks();
           break;
         default:
-          setHint(task.id, data.error ?? "Verification failed. Please try again.");
-          showToast(data.error ?? "Verification failed", "error");
+          setHint(task.id, data.error ?? t("error"));
+          showToast(data.error ?? t("error"), "error");
       }
     } catch {
-      showToast("Connection error. Please try again.", "error");
+      showToast(t("error"), "error");
     } finally { setVerifying(null); }
   };
 
-  const available = tasks.filter((t) => !t.user_task || t.user_task.status === "in_progress");
-  const completed = tasks.filter((t) => t.user_task?.status === "completed");
+  const available = tasks.filter((tItem) => !tItem.user_task || tItem.user_task.status === "in_progress");
+  const completed = tasks.filter((tItem) => tItem.user_task?.status === "completed");
 
   return (
     <AppShell>
       <PageHeader
-        title="Tasks"
+        title={t("tasks_title")}
         right={
           <button onClick={loadTasks} className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
             <RefreshIcon size={15} />
@@ -188,13 +178,13 @@ export default function TasksPage() {
             {/* Available */}
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <h2 className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Available</h2>
+                <h2 className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{t("tasks_available")}</h2>
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: "rgba(35,133,108,0.15)", color: "#63D9B4" }}>
                   {available.length}
                 </span>
               </div>
               {available.length === 0 ? (
-                <EmptyState title="All tasks completed!" description="Check back later for new tasks." variant="compact" />
+                <EmptyState title={t("no_available_tasks")} description={t("no_available_tasks_desc")} variant="compact" />
               ) : (
                 <div className="space-y-3">
                   {available.map((task, i) => {
@@ -232,7 +222,7 @@ export default function TasksPage() {
                             )}
                             {join && (
                               <p className="text-[10px] text-[var(--text-muted)] mt-1.5 leading-relaxed">
-                                Coins sirf tab milte hain jab aap sach me join karte ho — bot membership check karta hai.
+                                {t("bot_check_note")}
                               </p>
                             )}
                           </div>
@@ -245,13 +235,13 @@ export default function TasksPage() {
                         <div className="flex gap-2 mt-3">
                           {!inProgress ? (
                             <Button variant="primary" size="sm" className="flex-1 gap-1.5" loading={starting === task.id} onClick={() => handleStart(task)}>
-                              <ExternalLinkIcon size={12} /> {join ? "Open Channel" : "Start Task"}
+                              <ExternalLinkIcon size={12} /> {join ? t("open_channel") : t("start_task")}
                             </Button>
                           ) : (
                             <>
                               {task.target_link && (
                                 <Button variant="secondary" size="sm" className="flex-1 gap-1.5" onClick={() => openLink(task)}>
-                                  <ExternalLinkIcon size={12} /> Open
+                                  <ExternalLinkIcon size={12} /> {t("open_channel")}
                                 </Button>
                               )}
                               <Button
@@ -259,7 +249,7 @@ export default function TasksPage() {
                                 style={{ background: "linear-gradient(135deg, #10B981, #059669)", color: "white" } as React.CSSProperties}
                                 loading={verifying === task.id} onClick={() => handleVerify(task)}
                               >
-                                <CheckIcon size={12} /> Verify &amp; Claim
+                                <CheckIcon size={12} /> {t("verify_claim")}
                               </Button>
                             </>
                           )}
@@ -275,7 +265,7 @@ export default function TasksPage() {
             {completed.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <h2 className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Completed</h2>
+                  <h2 className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{t("tasks_completed")}</h2>
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: "rgba(16,185,129,0.12)", color: "#10B981" }}>
                     {completed.length}
                   </span>
@@ -294,7 +284,7 @@ export default function TasksPage() {
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[var(--text-muted)]">
                         <LudzoCoin size={12} /> +{task.reward_coins}
                       </span>
-                      <Badge variant="success" size="sm">Done</Badge>
+                      <Badge variant="success" size="sm">{t("done")}</Badge>
                     </div>
                   ))}
                 </div>

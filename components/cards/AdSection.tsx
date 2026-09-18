@@ -7,6 +7,7 @@ import Button from "@/components/ui/Button";
 import { showToast } from "@/components/ui/Toast";
 import { useApp } from "@/hooks/useApp";
 import LudzoCoin from "@/components/ui/LudzoCoin";
+import { useI18n } from "@/hooks/useI18n";
 
 interface AdSectionProps {
   adsWatchedToday: number;
@@ -24,6 +25,7 @@ declare global {
 export default function AdSection({ adsWatchedToday, dailyLimit, adReward, onAdWatched }: AdSectionProps) {
   const [loading, setLoading] = useState(false);
   const { userId, refreshWallet } = useApp();
+  const { t } = useI18n();
   const limitReached = adsWatchedToday >= dailyLimit;
   const remaining = Math.max(0, dailyLimit - adsWatchedToday);
   const progress = dailyLimit > 0 ? Math.min((adsWatchedToday / dailyLimit) * 100, 100) : 0;
@@ -44,7 +46,7 @@ export default function AdSection({ adsWatchedToday, dailyLimit, adReward, onAdW
       });
       const data = await res.json();
       if (data.success) {
-        showToast(`+${adReward} Coins earned!`, "success");
+        showToast(t("earned_coins_toast", { amount: adReward }), "success");
         await refreshWallet();
         onAdWatched?.();
       } else {
@@ -71,9 +73,9 @@ export default function AdSection({ adsWatchedToday, dailyLimit, adReward, onAdW
             <AdPlayIcon size={18} />
           </div>
           <div className="min-w-0">
-            <h3 className="reward-title">Rewarded ads</h3>
+            <h3 className="reward-title">{t("rewarded_ads")}</h3>
             <p className="reward-sub">
-              {limitReached ? "Daily limit reached · come back tomorrow" : `${remaining} left today`}
+              {limitReached ? t("limit_reached") : t("ads_left_today", { remaining })}
             </p>
           </div>
         </div>
@@ -94,7 +96,7 @@ export default function AdSection({ adsWatchedToday, dailyLimit, adReward, onAdW
 
       <div className="reward-card-foot">
         <span className="reward-payout">
-          <LudzoCoin size={15} /> +{adReward} coins / ad
+          <LudzoCoin size={15} /> {t("coins_per_ad", { amount: adReward })}
         </span>
         <Button
           variant="primary"
@@ -104,7 +106,7 @@ export default function AdSection({ adsWatchedToday, dailyLimit, adReward, onAdW
           onClick={handleWatchAd}
           className="gap-1.5 shrink-0"
         >
-          <PlayIcon size={12} /> {limitReached ? "Done" : "Watch ad"}
+          <PlayIcon size={12} /> {limitReached ? t("done") : t("watch_ad")}
         </Button>
       </div>
     </motion.article>

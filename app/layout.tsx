@@ -5,6 +5,7 @@ import "./workspace.css";
 import MotionPreferences from "@/components/layout/MotionPreferences";
 import TelegramHardening from "@/components/layout/TelegramHardening";
 import { AppProvider } from "@/hooks/useApp";
+import { I18nProvider } from "@/hooks/useI18n";
 
 export const metadata: Metadata = {
   title: "LUDZO – Earn • Play • Win",
@@ -17,19 +18,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script src="https://telegram.org/js/telegram-web-app.js" />
 
-            <Script
-  src="//libtl.com/sdk.js"
-  data-zone="11113056"
-  data-sdk="show_11113056"
-  strategy="afterInteractive"
-/>
-        
+        <Script
+          src="//libtl.com/sdk.js"
+          data-zone="11113056"
+          data-sdk="show_11113056"
+          strategy="afterInteractive"
+        />
+
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="theme-color" content="#111715" />
       </head>
       <body>
         <TelegramHardening />
-        <MotionPreferences><AppProvider>{children}</AppProvider></MotionPreferences>
+        <MotionPreferences>
+          <I18nProvider>
+            <AppProvider>{children}</AppProvider>
+          </I18nProvider>
+        </MotionPreferences>
       </body>
     </html>
   );

@@ -29,7 +29,7 @@ const STATUS_COLOR: Record<string, "success" | "warning" | "error" | "default"> 
 const WITHDRAWAL_FEE_PCT = 5;
 
 export default function WithdrawPage() {
-  const { userId } = useApp();
+  const { userId, t } = useApp();
   const [amount, setAmount] = useState("");
   const [address, setAddress] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -61,10 +61,10 @@ export default function WithdrawPage() {
 
   const validate = (): boolean => {
     const errs: typeof errors = {};
-    if (!amountNum || amountNum < 5) errs.amount = "Minimum withdrawal is $5";
-    else if (amountNum > balance) errs.amount = "Insufficient balance";
-    if (!address.trim()) errs.address = "Wallet address is required";
-    else if (address.trim().length < 20) errs.address = "Invalid wallet address format";
+    if (!amountNum || amountNum < 5) errs.amount = t("min_withdraw_note", { amount: 5 });
+    else if (amountNum > balance) errs.amount = t("insufficient_balance");
+    if (!address.trim()) errs.address = t("error");
+    else if (address.trim().length < 20) errs.address = t("error");
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -85,22 +85,22 @@ export default function WithdrawPage() {
         setAddress("");
         await load();
       } else {
-        setErrors({ general: data.error ?? "Withdrawal failed" });
+        setErrors({ general: data.error ?? t("failed") });
       }
-    } catch { setErrors({ general: "Connection error. Please try again." }); }
+    } catch { setErrors({ general: t("error") }); }
     finally { setSubmitting(false); }
   };
 
   return (
     <AppShell hideNav>
-      <PageHeader title="Withdraw USDT" back />
+      <PageHeader title={t("withdraw_title")} back />
       <div className="px-4 py-4 space-y-5 pb-6">
         {/* Balance */}
         <motion.div
           initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
           className="glass rounded-2xl p-5 text-center"
         >
-          <p className="text-xs text-[var(--text-muted)] mb-1">Available Balance</p>
+          <p className="text-xs text-[var(--text-muted)] mb-1">{t("available_balance")}</p>
           <p className="text-4xl font-black font-numeric text-[#10B981]">
             ${formatUSDT(balance)} <span className="text-lg text-[var(--text-muted)]">USDT</span>
           </p>
@@ -111,11 +111,11 @@ export default function WithdrawPage() {
           initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}
           className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 space-y-4"
         >
-          <h3 className="text-sm font-bold text-[var(--text-primary)]">Withdrawal Request</h3>
+          <h3 className="text-sm font-bold text-[var(--text-primary)]">{t("withdrawal_request")}</h3>
 
           {/* Amount */}
           <div>
-            <label className="text-xs text-[var(--text-muted)] font-medium">Amount (USDT)</label>
+            <label className="text-xs text-[var(--text-muted)] font-medium">{t("amount")} (USDT)</label>
             <div className="relative mt-1.5">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] font-semibold">$</span>
               <input
@@ -131,7 +131,7 @@ export default function WithdrawPage() {
 
           {/* Wallet address */}
           <div>
-            <label className="text-xs text-[var(--text-muted)] font-medium">Wallet Address (TRC20 / BEP20)</label>
+            <label className="text-xs text-[var(--text-muted)] font-medium">{t("wallet_address_label")}</label>
             <input
               type="text" value={address}
               onChange={(e) => { setAddress(e.target.value); setErrors({}); }}
@@ -146,9 +146,9 @@ export default function WithdrawPage() {
           {amountNum > 0 && (
             <div className="bg-[var(--bg)] rounded-xl p-3 space-y-1.5 text-xs">
               {[
-                { label: "Withdrawal Amount", value: `$${formatUSDT(amountNum)}` },
-                { label: `Fee (${WITHDRAWAL_FEE_PCT}%)`, value: `-$${formatUSDT(fee)}`, className: "text-[#EF4444]" },
-                { label: "You Receive", value: `$${formatUSDT(Math.max(0, netAmount))}`, bold: true },
+                { label: t("amount"), value: `$${formatUSDT(amountNum)}` },
+                { label: t("fee_note", { fee: WITHDRAWAL_FEE_PCT }), value: `-$${formatUSDT(fee)}`, className: "text-[#EF4444]" },
+                { label: t("you_pay"), value: `$${formatUSDT(Math.max(0, netAmount))}`, bold: true },
               ].map(({ label, value, className, bold }) => (
                 <div key={label} className="flex justify-between">
                   <span className="text-[var(--text-muted)]">{label}</span>
@@ -166,24 +166,24 @@ export default function WithdrawPage() {
             className="w-full py-4 rounded-xl bg-[#23856C] hover:bg-[#196A55] text-white font-bold text-sm
                        transition-colors disabled:opacity-60 shadow-lg shadow-[#23856C]/30"
           >
-            {submitting ? "Submitting…" : "Submit Withdrawal Request"}
+            {submitting ? t("submitting") : t("submit_withdrawal")}
           </button>
 
           <div className="flex items-start gap-2 bg-[#F59E0B]/10 border border-[#F59E0B]/30 rounded-xl p-3">
             <span className="text-base">⏰</span>
             <p className="text-[10px] text-[#F59E0B] leading-relaxed">
-              Withdrawals are manually reviewed by our team within 48 hours. You&apos;ll be notified once processed.
+              {t("review_note")}
             </p>
           </div>
         </motion.div>
 
         {/* History */}
         <div>
-          <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wide mb-3">Withdrawal History</h3>
+          <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wide mb-3">{t("withdrawal_history")}</h3>
           {loading ? (
             <SkeletonCard />
           ) : history.length === 0 ? (
-            <EmptyState emoji="💸" title="No withdrawals yet" description="Submit your first withdrawal above." />
+            <EmptyState emoji="💸" title={t("no_withdrawals")} description={t("no_withdrawals_desc")} />
           ) : (
             <div className="space-y-2">
               {history.map((w) => (
