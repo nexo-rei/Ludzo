@@ -1,17 +1,29 @@
+// Keep this list as the single source of truth for onboarding, settings and
+// server-side preference validation. The names are intentionally native so a
+// person can recognise a language before changing the app language.
 export const SUPPORTED_LANGUAGES = [
-  { code: "en", name: "English",    flag: "🇺🇸", nativeName: "English"    },
-  { code: "ru", name: "Russian",    flag: "🇷🇺", nativeName: "Русский"    },
-  { code: "uk", name: "Ukrainian",  flag: "🇺🇦", nativeName: "Українська" },
-  { code: "es", name: "Spanish",    flag: "🇪🇸", nativeName: "Español"    },
-  { code: "pt", name: "Portuguese", flag: "🇵🇹", nativeName: "Português"  },
-  { code: "fr", name: "French",     flag: "🇫🇷", nativeName: "Français"   },
-  { code: "de", name: "German",     flag: "🇩🇪", nativeName: "Deutsch"    },
-  { code: "it", name: "Italian",    flag: "🇮🇹", nativeName: "Italiano"   },
-  { code: "tr", name: "Turkish",    flag: "🇹🇷", nativeName: "Türkçe"     },
-  { code: "hi", name: "Hindi",      flag: "🇮🇳", nativeName: "हिन्दी"      },
+  { code: "en", name: "English",    nativeName: "English",    country: "United States", countryCode: "US" },
+  { code: "ru", name: "Russian",    nativeName: "Русский",    country: "Russia",        countryCode: "RU" },
+  { code: "uk", name: "Ukrainian",  nativeName: "Українська", country: "Ukraine",      countryCode: "UA" },
+  { code: "es", name: "Spanish",    nativeName: "Español",    country: "Spain",        countryCode: "ES" },
+  { code: "pt", name: "Portuguese", nativeName: "Português",  country: "Portugal",     countryCode: "PT" },
+  { code: "fr", name: "French",     nativeName: "Français",   country: "France",       countryCode: "FR" },
+  { code: "de", name: "German",     nativeName: "Deutsch",    country: "Germany",      countryCode: "DE" },
+  { code: "it", name: "Italian",    nativeName: "Italiano",   country: "Italy",        countryCode: "IT" },
+  { code: "tr", name: "Turkish",    nativeName: "Türkçe",     country: "Türkiye",      countryCode: "TR" },
+  { code: "hi", name: "Hindi",      nativeName: "हिन्दी",      country: "India",        countryCode: "IN" },
 ] as const;
 
 export type LanguageCode = (typeof SUPPORTED_LANGUAGES)[number]["code"];
+
+export function isSupportedLanguage(value: unknown): value is LanguageCode {
+  return typeof value === "string" && SUPPORTED_LANGUAGES.some((language) => language.code === value);
+}
+
+export function normalizeLanguage(value: unknown): LanguageCode {
+  const code = typeof value === "string" ? value.toLowerCase().split("-")[0] : "";
+  return isSupportedLanguage(code) ? code : "en";
+}
 
 const EN: Record<string, string> = {
   // Nav
@@ -121,7 +133,7 @@ export const translations: Partial<Record<LanguageCode, Record<string, string>>>
 };
 
 export function getTranslation(lang: string, key: string, vars?: Record<string, string | number>): string {
-  const code = (SUPPORTED_LANGUAGES.some((l) => l.code === lang) ? lang : "en") as LanguageCode;
+  const code = normalizeLanguage(lang);
   let text = translations[code]?.[key] ?? translations.en?.[key] ?? key;
   if (vars) {
     for (const [k, v] of Object.entries(vars)) {

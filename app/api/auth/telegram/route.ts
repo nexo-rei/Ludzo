@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { validateTelegramInitData } from "@/lib/telegram";
 import { getSettings } from "@/lib/settings";
+import { isSupportedLanguage, normalizeLanguage } from "@/lib/i18n";
 
 // ---------------------------------------------------------------------------
 // Bot command webhook handler (GET)
@@ -116,7 +117,11 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     console.log("FULL BODY:", JSON.stringify(body));
-    const { initData, referralCode } = body as { initData?: string; referralCode?: string };
+    const { initData, referralCode, selectedLanguage } = body as {
+      initData?: string;
+      referralCode?: string;
+      selectedLanguage?: string;
+    };
     console.log("BODY REFERRAL CODE:", referralCode);
 
     if (!initData) {
@@ -163,7 +168,11 @@ export async function POST(req: NextRequest) {
     console.log("STEP 2 - SETTINGS LOADED");
   
     const telegramId = String(tgUser.id);
+    const preferredLanguage = isSupportedLanguage(selectedLanguage)
+      ? selectedLanguage
+      : normalizeLanguage(tgUser.language_code);
     console.log("STEP 3 - TELEGRAM ID:", telegramId);
+    console.log("PREFERRED LANGUAGE:", preferredLanguage);
 
     // Upsert user
     //redeploy
@@ -219,7 +228,7 @@ export async function POST(req: NextRequest) {
       await supabase.from("user_preferences").insert({
         user_id: user.id,
         theme: "dark",
-        language: tgUser.language_code ?? "en",
+        language: preferredLanguage,
       });
 
     console.log("REFERRAL CODE:", referralCode);
@@ -251,6 +260,19 @@ if (referralCode && referralCode !== telegramId) {
   }
 }
 }
+
+    // If the account already existed, still honour the language selected on
+    // this device. This matters when a returning Telegram user opens LUDZO on
+    // a fresh browser/WebView and sees the first-run language screen again.
+    if (!isNewUser && isSupportedLanguage(selectedLanguage)) {
+      const { error: preferenceError } = await supabase
+        .from("user_preferences")
+        .upsert(
+          { user_id: user.id, language: preferredLanguage, updated_at: new Date().toISOString() },
+          { onConflict: "user_id" },
+        );
+      if (preferenceError) console.error("LANGUAGE PREFERENCE ERROR:", preferenceError);
+    }
 
     // Fetch fresh wallet
     const { data: freshWallet } = await supabase
