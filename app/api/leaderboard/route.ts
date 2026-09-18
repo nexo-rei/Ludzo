@@ -28,7 +28,14 @@ export async function GET(req: NextRequest) {
     }
 
     // Display rows: account name only — never a @username (lib/leaderboard.ts).
-    const entries = normalizeLeaderboardRows(data as never[]);
+    let entries = normalizeLeaderboardRows(data as never[]);
+    // Admin-managed display profiles are deliberately read-only leaderboard rows;
+    // they never receive auth, wallet access, or a game seat.
+    const { data: displays } = await supabase.from("ludo_display_profiles").select("id, display_name, avatar_url, usdt_balance").eq("active", true);
+    if (displays?.length) {
+      const displayEntries = displays.map((p) => ({ user_id: `display_${p.id}`, display_name: p.display_name, photo_url: p.avatar_url, usdt_earned: Number(p.usdt_balance) || 0, rank: 0 }));
+      entries = [...entries, ...displayEntries].sort((a, b) => b.usdt_earned - a.usdt_earned).slice(0, limit).map((e, i) => ({ ...e, rank: i + 1 }));
+    }
 
     // ── Fetch caller's rank if they're outside the top-N list ─
     let my_rank: { rank: number; usdt_earned: number } | null = null;

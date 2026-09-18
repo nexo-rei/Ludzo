@@ -12,6 +12,13 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const adType: "normal" | "bonus" = body.ad_type === "bonus" ? "bonus" : "normal";
+    // Rewarded ads must remain open for the full provider viewing window. The
+    // check is server-side so navigating back cannot immediately claim coins.
+    const startedAt = Number(body.started_at);
+    const elapsed = Date.now() - startedAt;
+    if (!Number.isFinite(startedAt) || elapsed < 10_000 || elapsed > 30 * 60_000) {
+      return NextResponse.json({ success: false, error: "Please watch the ad for at least 10 seconds." }, { status: 400 });
+    }
 
     const supabase = createAdminClient();
     const settings = await getSettings(supabase);
