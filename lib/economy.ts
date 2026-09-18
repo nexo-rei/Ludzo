@@ -32,10 +32,28 @@ export function isValidWonWithdrawalAmount(coins: number): boolean {
   );
 }
 
+/** The USDT payout networks supported by the withdrawal flow. */
+export const WITHDRAWAL_NETWORKS = ["TRC20", "BEP20"] as const;
+export type WithdrawalNetwork = (typeof WITHDRAWAL_NETWORKS)[number];
+
+const TRON_ADDRESS = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
+const EVM_ADDRESS = /^0x[a-fA-F0-9]{40}$/;
+
+export function isWithdrawalNetwork(value: unknown): value is WithdrawalNetwork {
+  return typeof value === "string" && (WITHDRAWAL_NETWORKS as readonly string[]).includes(value);
+}
+
 /** Accept the two USDT networks shown by the converter (TRC20 and BEP20). */
-export function isValidUsdtWalletAddress(address: string): boolean {
+export function isValidUsdtWalletAddress(address: string, network?: WithdrawalNetwork): boolean {
   const value = address.trim();
-  const tron = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
-  const evm = /^0x[a-fA-F0-9]{40}$/;
-  return tron.test(value) || evm.test(value);
+  if (network === "TRC20") return TRON_ADDRESS.test(value);
+  if (network === "BEP20") return EVM_ADDRESS.test(value);
+  return TRON_ADDRESS.test(value) || EVM_ADDRESS.test(value);
+}
+
+/** Mask a payout address for confirmation screens and receipts. */
+export function maskWalletAddress(address: string): string {
+  const value = address.trim();
+  if (value.length <= 12) return value;
+  return `${value.slice(0, 6)}…${value.slice(-6)}`;
 }

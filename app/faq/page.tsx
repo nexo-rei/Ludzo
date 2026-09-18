@@ -36,7 +36,7 @@ const FAQ_DATA = [
   {
     category: "Withdrawals",
     items: [
-      { q: "How do withdrawals work?", a: "Go to the Convert Won Coins page, enter an eligible Won-Coin amount and your TRC20 or BEP20 USDT wallet address, and submit the request. Only Won Coins from settled Ludo matches are eligible; your request is queued for manual review before payment is sent." },
+      { q: "How do withdrawals work?", a: "Open the Withdraw page from the Convert Ludo Won Coins card on Home or your Games profile. Step 1 selects the Won-Coin amount, step 2 selects the payout network (TRC20 or BEP20) and your USDT wallet address, and step 3 confirms the request. Only Won Coins from settled Ludo matches are eligible; your request is queued for manual review within 48 hours before payment is sent." },
       { q: "What is the minimum withdrawal?", a: "The minimum is exactly 1,000 Won Coins, equal to $5 USDT. Requests must use 200 Won-Coin steps. Playable Coins and protected deposit/admin funds are not eligible." },
       { q: "Is there a withdrawal fee?", a: "Yes, a 5% fee is deducted from your withdrawal amount. The net amount you receive is shown before you confirm." },
       { q: "How long do withdrawals take?", a: "Withdrawals are manually reviewed by our admin team within 48 hours. Once approved, payment is processed to your wallet address." },

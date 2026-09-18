@@ -49,7 +49,7 @@ ludzo-v3/
 │   ├── settings/               # Theme + language settings
 │   ├── leaderboard/            # USDT leaderboard
 │   ├── deposit/                # Binance Pay deposit
-│   ├── withdraw/               # USDT withdrawal
+│   ├── withdraw/               # 3-step Won-Coin → USDT withdrawal wizard
 │   ├── history/                # Transaction history
 │   ├── faq/                    # FAQ
 │   ├── privacy/                # Privacy policy
@@ -277,6 +277,24 @@ Bot admin nahi hai? → verification unavailable (admin ko batana chahiye).
 | Withdrawal fee | 5% |
 
 **Important:** Playable Coins from ads, tasks, streaks, referrals, deposits, welcome bonuses, and admin credits cannot be withdrawn or converted. Only locked Won Coins awarded by settled Ludo matches can be converted, and Won Coins cannot be staked in a match.
+
+### Withdrawal flow (`/withdraw`)
+
+The Convert CTA on Home (wallet section) and on the Games profile opens the existing
+`/withdraw` route, which uses the same card/step style as the deposit page:
+
+1. **Select amount** — protected deposit/admin USDT is shown as *not withdrawable*,
+   Won Coins are selectable with presets/custom input (min 1,000, 200-Coin steps),
+   and gross / fee / estimated net payout update live.
+2. **Network & wallet** — TRC20 or BEP20 network cards, then a network-aware
+   wallet-address field. Submitting calls the atomic
+   `create_ludo_won_withdrawal` RPC, which debits only `won_coins_balance`.
+3. **Confirmation** — converted Won Coins, gross, fee, net payout, network, masked
+   address, request ID, and the 48-hour review notice, plus a button back to the
+   existing withdrawal history.
+
+Rejecting a request refunds the original Won Coins to the locked Won-Coin ledger.
+Legacy (pre-economy) withdrawal records stay visible and are labelled `Legacy`.
 
 ---
 

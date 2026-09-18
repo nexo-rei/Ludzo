@@ -21,6 +21,7 @@ import { CoinIcon } from "@/components/ui/Icons";
 import { showToast } from "@/components/ui/Toast";
 import Sheet from "@/components/ui/Sheet";
 import { BattleLogIcon, DiceIcon, TokenIcon, LudoIcon } from "@/components/gaming/GamingIcons";
+import ConvertWonCoinsCard from "@/components/cards/ConvertWonCoinsCard";
 
 interface Stats {
   wins: number;
@@ -212,9 +213,14 @@ export default function GamingProfilePage() {
 
           <div className="surface-glass col-span-2 flex items-center justify-between gap-3 rounded-2xl px-4 py-3">
             <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-              Protected funds · 100 {t("won_coins")} = $0.50
+              Protected funds · not withdrawable
             </span>
             <span className="font-mono text-sm font-black text-emerald-400">${usdt.toFixed(2)} locked</span>
+          </div>
+
+          {/* Compact conversion entry point → existing /withdraw route. */}
+          <div className="col-span-2">
+            <ConvertWonCoinsCard wonCoins={wonCoins} />
           </div>
         </motion.div>
 

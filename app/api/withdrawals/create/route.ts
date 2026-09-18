@@ -9,6 +9,8 @@ import {
   coinsToUsd,
   isValidWonWithdrawalAmount,
   isValidUsdtWalletAddress,
+  isWithdrawalNetwork,
+  WITHDRAWAL_NETWORKS,
 } from "@/lib/economy";
 
 /**
@@ -33,6 +35,7 @@ export async function POST(req: NextRequest) {
     );
     const coinAmount = Number(rawCoinAmount);
     const walletAddress = String(body.wallet_address ?? "").trim();
+    const network = String(body.network ?? "TRC20").trim().toUpperCase();
 
     if (!isValidWonWithdrawalAmount(coinAmount)) {
       return NextResponse.json(
@@ -44,9 +47,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!isValidUsdtWalletAddress(walletAddress)) {
+    if (!isWithdrawalNetwork(network)) {
       return NextResponse.json(
-        { success: false, error: "Enter a valid TRC20 or BEP20 USDT wallet address." },
+        { success: false, error: `Select a supported network (${WITHDRAWAL_NETWORKS.join(" or ")}).` },
+        { status: 400 },
+      );
+    }
+
+    if (!isValidUsdtWalletAddress(walletAddress, network)) {
+      return NextResponse.json(
+        { success: false, error: `Enter a valid ${network} USDT wallet address.` },
         { status: 400 },
       );
     }
@@ -78,6 +88,7 @@ export async function POST(req: NextRequest) {
         p_coin_amount: coinAmount,
         p_wallet_address: walletAddress,
         p_fee_pct: feePct,
+        p_network: network,
       },
     );
 
@@ -105,6 +116,8 @@ export async function POST(req: NextRequest) {
         id: withdrawalId,
         withdrawal_id: withdrawalId,
         source: "ludo_won",
+        network,
+        wallet_address: walletAddress,
         coin_amount: coinAmount,
         amount: grossAmount,
         fee_amount: feeAmount,

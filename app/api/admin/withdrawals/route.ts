@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     const supabase = createAdminClient();
     let query = supabase
       .from("withdrawals")
-      .select("id, user_id, amount, coin_amount, source, fee_amount, net_amount, wallet_address, status, created_at, reviewed_at", { count: "exact" })
+      .select("id, user_id, amount, coin_amount, source, network, fee_amount, net_amount, wallet_address, status, created_at, reviewed_at", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 

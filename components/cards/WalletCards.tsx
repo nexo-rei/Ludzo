@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { formatCoins, formatUSDT } from "@/lib/utils";
 import { coinsToUsd, COINS_PER_HALF_USD } from "@/lib/economy";
+import ConvertWonCoinsCard from "@/components/cards/ConvertWonCoinsCard";
 import {
   ArrowDownLeftIcon,
   ArrowUpRightIcon,
@@ -33,6 +34,7 @@ export default function WalletCards({
   const wonValue = coinsToUsd(wonCoins).toFixed(2);
 
   return (
+    <>
     <section className="balance-grid" aria-label={t("your_wallet")}>
       <motion.div className="balance-card" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
         <div className="balance-label"><span>{t("playable_coins")}</span><CoinsDuotoneIcon size={19} /></div>
@@ -55,13 +57,12 @@ export default function WalletCards({
         <div className="balance-label"><span>{t("won_coins_title")}</span><TrophyDuotoneIcon size={19} /></div>
         <div className="balance-value font-numeric">{formatCoins(wonCoins)}<span>{t("coins").toLowerCase()}</span></div>
         <p>${wonValue} eligible value · Ludo prizes only</p>
-        <div className="flex items-center justify-between gap-2">
-          <div className="balance-footer">{COINS_PER_HALF_USD} Coins = $0.50 · min 1,000</div>
-          <Link href="/withdraw" className="text-[10px] font-bold text-[var(--accent)] hover:underline whitespace-nowrap">
-            Convert
-          </Link>
-        </div>
+        <div className="balance-footer">{COINS_PER_HALF_USD} Coins = $0.50 · min 1,000 · locked Ludo prizes</div>
       </motion.div>
     </section>
+
+    {/* Compact conversion entry point — the full flow lives at /withdraw. */}
+    <ConvertWonCoinsCard wonCoins={wonCoins} className="mt-3" />
+    </>
   );
 }
