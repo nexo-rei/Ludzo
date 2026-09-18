@@ -90,6 +90,44 @@ const expect = (cond, m) => cond ? ok(m) : fail(m);
   await exec(sql04);   // idempotent re-run
   ok("04 applied twice (2-token boards + janitor one-shot, cron step skipped gracefully)");
 
+  step = "07_arena_players.sql (first run)";
+  await exec(read("sql/07_arena_players.sql"));
+  ok("07 applied (display profiles dropped, roster seeded, 20–28 s matchmaking installed)");
+
+  step = "07_arena_players.sql (second run — idempotency)";
+  await exec(read("sql/07_arena_players.sql"));
+  ok("07 re-applied without error");
+
+  step = "arena roster";
+  {
+    const [roster] = await q(`SELECT
+        count(*)::int                                            AS total,
+        count(*) FILTER (WHERE active)::int                      AS active,
+        count(*) FILTER (WHERE bot_name LIKE 'Bot %' OR bot_name LIKE 'bot\\_%')::int AS old_bots
+      FROM public.ludo_bot_profiles`);
+    expect(roster.total === 20 && roster.active === 20,
+           `roster holds exactly 20 active arena players (total ${roster.total}, active ${roster.active})`);
+    expect(roster.old_bots === 0, "old 'Bot …' profiles are gone");
+
+    const names = await q(`SELECT bot_name FROM public.ludo_bot_profiles ORDER BY bot_name`);
+    const female = ["Riya Sharma", "Ananya Verma", "Priya Nair", "Sneha Patel", "Kavya Iyer"];
+    const male   = ["Aarav Mehta", "Rohit Kumar", "Vikram Singh", "Arjun Reddy", "Karan Malhotra",
+                    "Sahil Khan", "Aditya Rao", "Manish Gupta", "Rahul Yadav", "Nikhil Joshi",
+                    "Ishaan Bose", "Devansh Chauhan", "Suresh Menon", "Harsh Vardhan", "Yash Thakur"];
+    const got = names.map(n => n.bot_name);
+    expect(female.every(n => got.includes(n)), "all 5 female arena names present");
+    expect(male.every(n => got.includes(n)), "all 15 male arena names present");
+    expect(got.every(n => /^[A-Z][a-z]+ [A-Z][a-z]+$/.test(n)),
+           "every roster name is a real two-word human name (no 'Bot …')");
+
+    const [drop] = await q(`SELECT to_regclass('public.ludo_display_profiles') AS t`);
+    expect(drop.t === null, "ludo_display_profiles table is dropped (Display Profiles feature removed)");
+
+    const [col] = await q(`SELECT count(*)::int AS n FROM information_schema.columns
+                           WHERE table_schema='public' AND table_name='ludo_queues' AND column_name='bot_after_secs'`);
+    expect(col.n === 1, "ludo_queues.bot_after_secs exists");
+  }
+
   step = "99_verify.sql";
   const verifyResults = await db.exec(read("sql/99_verify.sql"));
   const verifyRows = verifyResults.find(r => r.rows && r.rows.length && r.rows[0].status)?.rows ?? [];
@@ -232,26 +270,82 @@ const expect = (cond, m) => cond ? ok(m) : fail(m);
   const settle = (await q(`SELECT * FROM ludo_settlements WHERE room_id='${roomId}'`))[0];
   expect(settle && settle.reward === 196 && settle.platform_fee === 4 && settle.bot_match === false, "settlement audit row written (fee 4)");
 
-  // ── Bot match after 20 s ─────────────────────────────────────────────────
-  step = "bot fallback";
+  // ── Arena opponent after a random 20–28 s ────────────────────────────────
+  step = "arena window (20–28 s)";
   const [{ join_ludo_queue: q3 }] = await q(`SELECT join_ludo_queue('${u1.id}', 500)`);
-  let [{ match_ludo_queue: m3 }] = await q(`SELECT match_ludo_queue('${q3}', '${u1.id}')`);
-  expect(m3.matched === false, "no bot before 20 s");
-  await q(`UPDATE ludo_queues SET joined_at = now() - interval '25 seconds' WHERE id='${q3}'`);
-  [{ match_ludo_queue: m3 }] = await q(`SELECT match_ludo_queue('${q3}', '${u1.id}')`);
-  expect(m3.matched === true && m3.match_type === "bot" && m3.opponent_id.startsWith("bot_"), `bot assigned after 20 s (${m3.opponent_id})`);
-  const [botRoom] = await q(`SELECT * FROM ludo_rooms WHERE id='${m3.room_id}'`);
-  expect(botRoom.board_state.bot_profile && botRoom.board_state.bot_profile.name.startsWith("Bot "),
-         `bot_profile embedded (${botRoom.board_state.bot_profile.name}, ${botRoom.board_state.bot_profile.skill_level})`);
-  expect(botRoom.player_1_id === u1.id && botRoom.turn_player_id === u1.id, "human is player_1 in bot rooms");
+  const [q3row] = await q(`SELECT bot_after_secs FROM ludo_queues WHERE id='${q3}'`);
+  expect(q3row.bot_after_secs >= 20 && q3row.bot_after_secs <= 28,
+         `join_ludo_queue stores a random 20–28 s window (got ${q3row.bot_after_secs})`);
 
+  let [{ match_ludo_queue: m3 }] = await q(`SELECT match_ludo_queue('${q3}', '${u1.id}')`);
+  expect(m3.matched === false, "no opponent on the very first poll");
+
+  await q(`UPDATE ludo_queues SET joined_at = now() - interval '19 seconds', bot_after_secs = 20 WHERE id='${q3}'`);
+  [{ match_ludo_queue: m3 }] = await q(`SELECT match_ludo_queue('${q3}', '${u1.id}')`);
+  expect(m3.matched === false && m3.search_secs === 20,
+         `nothing is seated before the 20 s floor (${JSON.stringify(m3)})`);
+
+  await q(`UPDATE ludo_queues SET joined_at = now() - interval '20.5 seconds' WHERE id='${q3}'`);
+  [{ match_ludo_queue: m3 }] = await q(`SELECT match_ludo_queue('${q3}', '${u1.id}')`);
+  expect(m3.matched === true && m3.match_type === "bot" && m3.opponent_id.startsWith("bot_"),
+         `arena opponent seated once the window passes (${m3.opponent_id})`);
+
+  const [botRoom] = await q(`SELECT * FROM ludo_rooms WHERE id='${m3.room_id}'`);
+  const arenaName = botRoom.board_state.bot_profile?.name ?? "";
+  expect(/^[A-Z][a-z]+ [A-Z][a-z]+$/.test(arenaName),
+         `arena profile holds a real two-word name (${arenaName} / ${botRoom.board_state.bot_profile?.skill_level})`);
+  expect(!arenaName.startsWith("Bot "), "the seated opponent is not named 'Bot …'");
+  expect(botRoom.player_1_id === u1.id && botRoom.turn_player_id === u1.id, "human is player_1 in arena rooms");
+
+  // ── Arena opponent can win, and history keeps the real name ──────────────
   await q(`SELECT activate_ludo_room('${botRoom.id}')`);
   const [{ settle_ludo_match: sb }] = await q(`SELECT settle_ludo_match('${botRoom.id}', '${botRoom.player_2_id}', '${u1.id}', 'timeout', 480)`);
-  expect(sb === true, "bot can win (settle ok with bot winner)");
+  expect(sb === true, "arena opponent can win (settle ok with a bot winner)");
   const bs = (await q(`SELECT * FROM ludo_settlements WHERE room_id='${botRoom.id}'`))[0];
-  expect(bs.bot_match === true && bs.winner_id.startsWith("bot_"), "bot win recorded in audit (coins not silently lost)");
+  expect(bs.bot_match === true && bs.winner_id.startsWith("bot_"), "arena win recorded in audit (coins not silently lost)");
   const bh = (await q(`SELECT opponent_name FROM ludo_match_history WHERE room_id='${botRoom.id}' AND user_id='${u1.id}'`))[0];
-  expect(bh.opponent_name === botRoom.board_state.bot_profile.name, "history shows the real bot name, not 'Ludo Bot'");
+  expect(bh.opponent_name === arenaName, `match history shows the real opponent name (${bh.opponent_name})`);
+
+  // ── Regression: an all-disabled roster used to dead-end matchmaking ──────
+  step = "all-disabled roster self-heals";
+  {
+    // Exactly the state that broke production: roster hai, par har row inactive.
+    await q(`UPDATE ludo_bot_profiles SET active = false`);
+
+    const [{ join_ludo_queue: qh }] = await q(`SELECT join_ludo_queue('${u1.id}', 50)`);
+    await q(`UPDATE ludo_queues SET joined_at = now() - interval '30 seconds', bot_after_secs = 21 WHERE id='${qh}'`);
+    const [{ match_ludo_queue: mh }] = await q(`SELECT match_ludo_queue('${qh}', '${u1.id}')`);
+    expect(mh.matched === true && mh.match_type === "bot",
+           `inactive roster no longer dead-ends matchmaking (${JSON.stringify(mh)})`);
+    const [healed] = await q(`SELECT count(*) FILTER (WHERE active)::int AS n FROM ludo_bot_profiles`);
+    expect(healed.n >= 1, "the RPC re-activated the roster by itself");
+
+    const [healRoom] = await q(`SELECT * FROM ludo_rooms WHERE id='${mh.room_id}'`);
+    await q(`SELECT activate_ludo_room('${healRoom.id}')`);
+    await q(`SELECT settle_ludo_match('${healRoom.id}', '${u1.id}', '${healRoom.player_2_id}', 'normal', 60)`);
+    await q(`UPDATE ludo_bot_profiles SET active = true`);
+
+    const [after] = await q(`SELECT count(*)::int AS total, count(*) FILTER (WHERE active)::int AS active FROM ludo_bot_profiles`);
+    expect(after.total === 20 && after.active === 20, "roster is still exactly the 20 arena players");
+  }
+
+  // ── Regression: live room → hand it back instead of a unique-index 500 ───
+  step = "live room is handed back, not a 500";
+  {
+    const [{ id: liveId }] = await q(
+      `INSERT INTO ludo_rooms (stake, player_1_id, player_2_id, status, board_state, turn_player_id)
+       VALUES (50, '${u1.id}', 'bot_livecheck', 'countdown', '{}', '${u1.id}') RETURNING id`);
+    const [qRow] = await q(`INSERT INTO ludo_queues (user_id, stake, status, bot_after_secs)
+                            VALUES ('${u1.id}', 50, 'waiting', 20) RETURNING id`);
+    const [{ match_ludo_queue: ml }] = await q(`SELECT match_ludo_queue('${qRow.id}', '${u1.id}')`);
+    expect(ml.matched === true && ml.room_id === liveId,
+           `matchmaking hands back the existing live room (${JSON.stringify(ml)})`);
+    const [qr] = await q(`SELECT status, room_id FROM ludo_queues WHERE id='${qRow.id}'`);
+    expect(qr.status === "matched" && qr.room_id === liveId, "queue row points at that live room");
+    await q(`DELETE FROM ludo_rooms  WHERE id='${liveId}'`);
+    await q(`DELETE FROM ludo_queues WHERE id='${qRow.id}'`);
+  }
+
 
   // ── Janitor ──────────────────────────────────────────────────────────────
   step = "ludo_janitor";

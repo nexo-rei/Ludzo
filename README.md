@@ -86,9 +86,11 @@ ludzo-v3/
 │   ├── 05_support_and_task_verification.sql
 │                               # REQUIRED — support_tickets + task chat columns
 │                               # + admin_logs hardening (logs page crash fix)
-│   └── 06_admin_tasks_withdrawals.sql
+│   ├── 06_admin_tasks_withdrawals.sql
 │                               # REQUIRED — task hard-delete CASCADE,
 │                               # withdrawal statuses + wallet RPCs
+│   └── 07_arena_players.sql    # REQUIRED — Display Profiles removed, 20 arena
+│                               # players seeded, 20–28 s random matchmaking
 ├── types/index.ts              # All TypeScript types
 ├── middleware.ts               # Maintenance mode redirect
 ├── next.config.ts              # Next.js config
@@ -154,6 +156,10 @@ sql/05_support_and_task_verification.sql
 
 -- 6. REQUIRED — Admin task delete + withdrawal approve/reject
 sql/06_admin_tasks_withdrawals.sql
+
+-- 7. REQUIRED — Display Profiles removed, arena roster (5 ladkiyan + 15 ladke),
+--    arena opponent 20–28 second ke beech random time pe seat leta hai
+sql/07_arena_players.sql
 ```
 
 `05` ke bina: support tickets save nahi honge, channel/group task verify nahi hoga,
@@ -161,6 +167,12 @@ aur `/admin/logs` khaali/error dikha sakta hai.
 
 `06` ke bina: admin task delete FK pe atak sakta hai, aur withdrawal approve/reject
 status check / missing `credit_usdt(p_reason)` ki wajah se fail ho sakta hai.
+
+`07` ke bina: bots inactive reh sakte hain (pichli Display Profiles migration ne
+`ludo_bot_profiles.active = false` kar diya tha) → radar ghoomta rehta hai aur
+"bot ke saath match nahi lag raha" wala error aata hai. `07` purane `Bot …`
+profiles hata kar 20 real-naam arena players seed karta hai aur match ke liye
+har queue entry pe ek random **20–28 s** window set karta hai.
 
 ### 4. Run Locally
 
