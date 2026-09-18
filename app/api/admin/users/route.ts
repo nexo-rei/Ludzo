@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { startOfDay } from "date-fns";
 import { requireAdminAuth } from "@/lib/auth";
+import { isModerator, isSuperAdmin, moderatorForbidden } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logAdminAction } from "@/lib/admin-log";
 import { creditCoins, creditUsdt } from "@/lib/coins";
@@ -15,6 +17,7 @@ export async function GET(req: NextRequest) {
     const offset = (page - 1) * limit;
     const search = url.searchParams.get("search") ?? "";
     const status = url.searchParams.get("status") ?? "all";
+    const todayOnly = url.searchParams.get("today") === "1";
 
     const supabase = createAdminClient();
     let query = supabase
@@ -27,9 +30,16 @@ export async function GET(req: NextRequest) {
       query = query.or(`first_name.ilike.%${search}%,username.ilike.%${search}%,telegram_id.eq.${search}`);
     }
     if (status !== "all") query = query.eq("status", status);
+    if (todayOnly) query = query.gte("created_at", startOfDay(new Date()).toISOString());
 
     const { data: users, count, error } = await query;
     if (error) throw error;
+
+    // Moderators ko wallet balances nahi dikhate (limited access).
+    if (isModerator(auth.role)) {
+      const items = (users ?? []).map((u) => ({ ...u, wallet: null }));
+      return NextResponse.json({ success: true, data: { items, total: count ?? 0, page, limit } });
+    }
 
     // Fetch wallet data for user list
     const userIds = (users ?? []).map((u) => u.id);
@@ -55,6 +65,8 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const auth = await requireAdminAuth(req);
   if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: 401 });
+  // Suspend/unsuspend + wallet adjustments — sirf full admin. Moderator NAHI.
+  if (!isSuperAdmin(auth.role)) return moderatorForbidden();
 
   try {
     const body = await req.json();

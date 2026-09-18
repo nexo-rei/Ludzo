@@ -6,6 +6,7 @@ import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/DuotoneIcons"
 import AdminShell from "@/components/admin/AdminShell";
 import Badge from "@/components/ui/Badge";
 import { showToast } from "@/components/ui/Toast";
+import { useAdminUser, isModeratorUser } from "@/hooks/useAdminUser";
 import { formatUSDT, formatDateTime } from "@/lib/utils";
 
 interface WithdrawalItem {
@@ -29,6 +30,8 @@ const STATUS_COLOR: Record<string, "success" | "warning" | "error" | "default"> 
 
 export default function AdminWithdrawalsPage() {
   const router = useRouter();
+  const { user: me } = useAdminUser();
+  const isMod = isModeratorUser(me);
   const [items, setItems] = useState<WithdrawalItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -79,6 +82,13 @@ export default function AdminWithdrawalsPage() {
   return (
     <AdminShell title="Withdrawals">
       <div className="p-4 md:p-6 space-y-4">
+        {/* Moderator note */}
+        {isMod && (
+          <div className="px-4 py-3 rounded-xl bg-sky-500/10 border border-sky-500/25 text-sky-300 text-xs font-semibold">
+            View only — withdrawal requests monitor karo; approve / reject / mark-paid sirf full admin kar sakta hai.
+          </div>
+        )}
+
         {/* Filters */}
         <div className="flex gap-2 flex-wrap">
           {["all", "pending", "approved", "paid", "rejected"].map((s) => (
@@ -131,7 +141,7 @@ export default function AdminWithdrawalsPage() {
                       onClick={() => setSelected(w)}
                       className="px-3 py-1 rounded-lg bg-[#23856C]/20 text-[#63D9B4] text-xs font-semibold hover:bg-[#23856C]/30"
                     >
-                      Review
+                      {isMod ? "View" : "Review"}
                     </button>
                   </td>
                 </tr>
@@ -181,32 +191,40 @@ export default function AdminWithdrawalsPage() {
                 </div>
               ))}
             </div>
-            {selected.status === "pending" && (
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() => handleAction(selected.id, "approve")}
-                  disabled={processing === selected.id}
-                  className="flex-1 py-2.5 rounded-xl bg-green-500/20 text-green-400 text-sm font-bold hover:bg-green-500/30 disabled:opacity-40"
-                >
-                  Approve
-                </button>
-                <button
-                  onClick={() => handleAction(selected.id, "reject")}
-                  disabled={processing === selected.id}
-                  className="flex-1 py-2.5 rounded-xl bg-red-500/20 text-red-400 text-sm font-bold hover:bg-red-500/30 disabled:opacity-40"
-                >
-                  Reject
-                </button>
+            {isMod ? (
+              <div className="pt-2 px-3 py-2.5 rounded-xl bg-sky-500/10 border border-sky-500/25 text-sky-300 text-xs font-semibold text-center">
+                Read-only: koi payout action available nahi hai.
               </div>
-            )}
-            {selected.status === "approved" && (
-              <button
-                onClick={() => handleAction(selected.id, "mark_paid")}
-                disabled={processing === selected.id}
-                className="w-full py-2.5 rounded-xl bg-[#23856C] text-white text-sm font-bold hover:bg-[#196A55] disabled:opacity-40"
-              >
-                ✓ Mark as Paid
-              </button>
+            ) : (
+              <>
+                {selected.status === "pending" && (
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={() => handleAction(selected.id, "approve")}
+                      disabled={processing === selected.id}
+                      className="flex-1 py-2.5 rounded-xl bg-green-500/20 text-green-400 text-sm font-bold hover:bg-green-500/30 disabled:opacity-40"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => handleAction(selected.id, "reject")}
+                      disabled={processing === selected.id}
+                      className="flex-1 py-2.5 rounded-xl bg-red-500/20 text-red-400 text-sm font-bold hover:bg-red-500/30 disabled:opacity-40"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
+                {selected.status === "approved" && (
+                  <button
+                    onClick={() => handleAction(selected.id, "mark_paid")}
+                    disabled={processing === selected.id}
+                    className="w-full py-2.5 rounded-xl bg-[#23856C] text-white text-sm font-bold hover:bg-[#196A55] disabled:opacity-40"
+                  >
+                    ✓ Mark as Paid
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>

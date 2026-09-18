@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/auth";
+import { isSuperAdmin, moderatorForbidden } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logAdminAction } from "@/lib/admin-log";
 
@@ -20,6 +21,8 @@ export async function POST(req: NextRequest) {
   if (!auth.ok) {
     return NextResponse.json({ success: false, error: auth.error }, { status: 401 });
   }
+  // Broadcast = mass message to every user — sirf full admin.
+  if (!isSuperAdmin(auth.role)) return moderatorForbidden();
 
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) {

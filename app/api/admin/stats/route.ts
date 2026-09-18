@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/auth";
+import { isModerator } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { startOfDay, subDays } from "date-fns";
 
@@ -8,6 +9,38 @@ export async function GET(req: NextRequest) {
   if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: 401 });
 
   try {
+    // ── Moderator dashboard: sirf counts, koi money/revenue data NAHI ──────
+    if (isModerator(auth.role)) {
+      const supabase = createAdminClient();
+      const todayStart = startOfDay(new Date()).toISOString();
+      const [totalUsers, newToday, suspended, openTickets, inProgressTickets, pendingWithdrawals, activeTodayRes] =
+        await Promise.all([
+          supabase.from("users").select("id", { count: "exact", head: true }),
+          supabase.from("users").select("id", { count: "exact", head: true }).gte("created_at", todayStart),
+          supabase.from("users").select("id", { count: "exact", head: true }).eq("status", "suspended"),
+          supabase.from("support_tickets").select("id", { count: "exact", head: true }).eq("status", "open"),
+          supabase.from("support_tickets").select("id", { count: "exact", head: true }).eq("status", "in_progress"),
+          supabase.from("withdrawals").select("id", { count: "exact", head: true }).eq("status", "pending"),
+          supabase.from("ad_logs").select("user_id").gte("created_at", todayStart),
+        ]);
+
+      const activeToday = new Set((activeTodayRes.data ?? []).map((r: { user_id: string }) => r.user_id)).size;
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          moderator_view: true,
+          total_users: totalUsers.count ?? 0,
+          new_users_today: newToday.count ?? 0,
+          active_users_today: activeToday,
+          suspended_users: suspended.count ?? 0,
+          open_support_tickets: openTickets.count ?? 0,
+          in_progress_tickets: inProgressTickets.count ?? 0,
+          pending_withdrawals: pendingWithdrawals.count ?? 0,
+        },
+      });
+    }
+
     const supabase = createAdminClient();
     const now = new Date();
     const todayStart = startOfDay(now).toISOString();

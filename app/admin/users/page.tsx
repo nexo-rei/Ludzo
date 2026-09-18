@@ -2,11 +2,22 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { ChevronLeftIcon, ChevronRightIcon, SearchIcon } from "@/components/ui/DuotoneIcons";
 import AdminShell from "@/components/admin/AdminShell";
 import Badge from "@/components/ui/Badge";
 import { showToast } from "@/components/ui/Toast";
+import { useAdminUser, isModeratorUser } from "@/hooks/useAdminUser";
 import { formatUSDT, formatCoins, formatDateTime } from "@/lib/utils";
+
+/** Filter tabs — "today user, all user, suspend user etc." */
+const FILTER_TABS = [
+  { id: "all", label: "All Users" },
+  { id: "today", label: "New Today" },
+  { id: "active", label: "Active" },
+  { id: "suspended", label: "Suspended" },
+] as const;
+type FilterTab = (typeof FILTER_TABS)[number]["id"];
 
 interface AdminUser {
   id: string;
@@ -21,11 +32,13 @@ interface AdminUser {
 
 export default function AdminUsersPage() {
   const router = useRouter();
+  const { user: me } = useAdminUser();
+  const isMod = isModeratorUser(me);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("all");
+  const [filter, setFilter] = useState<FilterTab>("all");
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<AdminUser | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -36,7 +49,9 @@ export default function AdminUsersPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(page), status });
+      const params = new URLSearchParams({ page: String(page) });
+      if (filter === "today") params.set("today", "1");
+      else if (filter !== "all") params.set("status", filter);
       if (search) params.set("search", search);
       const res = await fetch(`/api/admin/users?${params}`, { headers: { Authorization: `Bearer ${getToken()}` } });
       if (res.status === 401) { router.replace("/admin"); return; }
@@ -44,7 +59,7 @@ export default function AdminUsersPage() {
       if (data.success) { setUsers(data.data.items); setTotal(data.data.total); }
     } catch { /* silent */ }
     finally { setLoading(false); }
-  }, [page, search, status, router]);
+  }, [page, search, filter, router]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -77,7 +92,30 @@ export default function AdminUsersPage() {
   return (
     <AdminShell title="Users">
       <div className="p-4 md:p-6 space-y-4">
-        {/* Filters */}
+        {/* Filter tabs */}
+        <div className="flex gap-2 flex-wrap">
+          {FILTER_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => { setFilter(tab.id); setPage(1); }}
+              className={`relative px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                filter === tab.id
+                  ? "bg-[#23856C] text-white"
+                  : "bg-[#111] border border-[#333] text-gray-400 hover:border-[#555] hover:text-white"
+              }`}
+            >
+              {tab.label}
+              {filter === tab.id && (
+                <motion.span
+                  layoutId="users-tab-dot"
+                  className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white/80"
+                />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
         <div className="flex flex-col md:flex-row gap-3">
           <div className="relative flex-1">
             <SearchIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
@@ -87,14 +125,11 @@ export default function AdminUsersPage() {
               className="w-full pl-9 pr-4 py-2.5 bg-[#111] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#23856C]"
             />
           </div>
-          <select
-            value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-            className="px-3 py-2.5 bg-[#111] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#23856C]"
-          >
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="suspended">Suspended</option>
-          </select>
+          {isMod && (
+            <div className="px-3 py-2.5 rounded-xl bg-sky-500/10 border border-sky-500/25 text-sky-300 text-xs font-semibold self-start">
+              View only
+            </div>
+          )}
         </div>
 
         {/* Table */}
@@ -102,7 +137,10 @@ export default function AdminUsersPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#222]">
-                {["User", "Telegram ID", "Playable Coins", "Won Coins", "Protected USDT", "Status", "Joined", "Actions"].map((h) => (
+                {(isMod
+                  ? ["User", "Telegram ID", "Status", "Joined"]
+                  : ["User", "Telegram ID", "Playable Coins", "Won Coins", "Protected USDT", "Status", "Joined", "Actions"]
+                ).map((h) => (
                   <th key={h} className="text-left text-xs text-gray-500 font-semibold uppercase tracking-wide px-4 py-3">{h}</th>
                 ))}
               </tr>
@@ -119,21 +157,27 @@ export default function AdminUsersPage() {
                     {user.username && <div className="text-xs text-gray-500">@{user.username}</div>}
                   </td>
                   <td className="px-4 py-3 text-gray-400 font-mono text-xs">{user.telegram_id}</td>
-                  <td className="px-4 py-3 text-yellow-400 font-numeric">{formatCoins(user.wallet?.coin_balance ?? 0)}</td>
-                  <td className="px-4 py-3 text-purple-300 font-numeric">{formatCoins(user.wallet?.won_coins_balance ?? 0)}</td>
-                  <td className="px-4 py-3 text-green-400 font-numeric">${formatUSDT(user.wallet?.usdt_balance ?? 0)} <span className="text-[9px] text-gray-500">locked</span></td>
+                  {!isMod && (
+                    <>
+                      <td className="px-4 py-3 text-yellow-400 font-numeric">{formatCoins(user.wallet?.coin_balance ?? 0)}</td>
+                      <td className="px-4 py-3 text-purple-300 font-numeric">{formatCoins(user.wallet?.won_coins_balance ?? 0)}</td>
+                      <td className="px-4 py-3 text-green-400 font-numeric">${formatUSDT(user.wallet?.usdt_balance ?? 0)} <span className="text-[9px] text-gray-500">locked</span></td>
+                    </>
+                  )}
                   <td className="px-4 py-3">
                     <Badge variant={user.status === "active" ? "success" : "error"} size="sm">{user.status}</Badge>
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{formatDateTime(user.created_at)}</td>
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => setSelected(user)}
-                      className="px-3 py-1 rounded-lg bg-[#23856C]/20 text-[#63D9B4] text-xs font-semibold hover:bg-[#23856C]/30 transition-colors"
-                    >
-                      Manage
-                    </button>
-                  </td>
+                  {!isMod && (
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => setSelected(user)}
+                        className="px-3 py-1 rounded-lg bg-[#23856C]/20 text-[#63D9B4] text-xs font-semibold hover:bg-[#23856C]/30 transition-colors"
+                      >
+                        Manage
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -155,8 +199,8 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
-      {/* User action modal */}
-      {selected && (
+      {/* User action modal — sirf full admin (moderator view-only hai) */}
+      {selected && !isMod && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 py-6 overflow-y-auto">
           <div className="w-full max-w-sm bg-[#111] border border-[#333] rounded-2xl p-5 space-y-4">
             <div className="flex items-center justify-between">

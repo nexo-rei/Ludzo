@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/auth";
+import { isSuperAdmin, moderatorForbidden } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
@@ -33,6 +34,7 @@ type LogRow = Record<string, unknown>;
 export async function GET(req: NextRequest) {
   const auth = await requireAdminAuth(req);
   if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: 401 });
+  if (!isSuperAdmin(auth.role)) return moderatorForbidden();
 
   try {
     const url = new URL(req.url);

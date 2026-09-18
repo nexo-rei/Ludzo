@@ -168,6 +168,13 @@ sql/07_arena_players.sql
 -- 8. REQUIRED — fixed 100 Coins = $0.50 economy, separate playable/won ledgers,
 --    1,000 Won Coins ($5) minimum, and Won-Coin-only withdrawals
 sql/08_coin_economy_and_won_withdrawals.sql
+
+-- 9. Minimum deposit $3.00 (600 Coins) pin + deposits CHECK
+sql/09_min_deposit_three_usd.sql
+
+-- 10. Moderator role — admin_users me role/is_active columns + CHECK.
+--     Moderators /admin/moderators se bante hain (limited-access staff).
+sql/10_moderators.sql
 ```
 
 `05` ke bina: support tickets save nahi honge, channel/group task verify nahi hoga,
@@ -230,6 +237,23 @@ Admin features:
 - Platform settings (reward values configurable; the 200 Coins = $1 conversion rate is fixed)
 - Maintenance mode toggle
 - Admin action logs
+- **Moderator team** (`/admin/moderators`) — create/disable/delete limited-access staff
+
+### Moderator Role
+
+Login page wahi hai (`/admin`) — account ki `role` decide karti hai kaunsa panel dikhega:
+
+| | Full Admin | Moderator |
+|---|---|---|
+| Dashboard | Full stats + revenue | Counts only (tickets/users/withdrawals) |
+| Users | Manage, suspend, wallets | View only — Today / All / Active / Suspended filters |
+| Support | Full | Full (reply, status) — yahi moderator ka main kaam hai |
+| Withdrawals | Approve / reject / mark paid | **View only** (wallet address masked) |
+| Deposits, Tasks, Announcements, Broadcast, Settings, Logs, Moderators | ✅ | ❌ (403) |
+
+Moderators `/admin/moderators` page se bante hain (sirf full admin ko dikhta hai).
+SQL migration: `sql/10_moderators.sql`. Disable karte hi moderator ka token turant
+invalid ho jata hai (har request pe liveness check).
 
 ---
 
