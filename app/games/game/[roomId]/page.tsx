@@ -95,14 +95,14 @@ const SAFE_SPOTS = new Set([1, 9, 14, 22, 27, 35, 40, 48]);
 const STAR_SPOTS = new Set([9, 22, 35, 48]);
 const CELL       = 100 / 15;
 
-// Viewer-perspective palette: the local player's tokens/UI are always BLUE and
-// the opponent's are always RED, regardless of which seat (player_1/player_2)
+// Viewer-perspective palette: the local player's tokens/UI are always GREEN and
+// the opponent's are always AMBER, regardless of which seat (player_1/player_2)
 // each one occupies. Board furniture (drawn at fixed seat positions) resolves
 // to these via P1_COLOR/P2_COLOR inside LudoBoard.
-const MY_COLOR  = "#3B82F6";
-const MY_INNER  = "#1E3A8A";
-const OPP_COLOR = "#EF4444";
-const OPP_INNER = "#7F1D1D";
+const MY_COLOR  = "#22C55E";
+const MY_INNER  = "#15803D";
+const OPP_COLOR = "#F59E0B";
+const OPP_INNER = "#B45309";
 
 // MUST equal TURN_TIMEOUT_SECS in lib/ludo-engine.ts. The server sends
 // turn_remaining_seconds counting down from 18; the timer bar used to divide by
@@ -235,9 +235,9 @@ function DiceFace({ value, size = 40, rolling = false }: { value: number; size?:
       animate={rolling ? { rotate: [0, -20, 20, -15, 15, 0], scale: [1, 1.15, 0.94, 1.08, 1] } : { rotate: 0, scale: 1 }}
       transition={{ duration: 0.4, ease: "easeInOut" }}
     >
-      <rect width="100" height="100" rx="20" fill="#1E293B" stroke="#A855F7" strokeWidth="4" />
+      <rect width="100" height="100" rx="20" fill="#1E293B" stroke="#22C55E" strokeWidth="4" />
       {dots.map(([cx, cy], i) => (
-        <circle key={i} cx={cx} cy={cy} r="9" fill="#A855F7" />
+        <circle key={i} cx={cx} cy={cy} r="9" fill="#F59E0B" />
       ))}
     </motion.svg>
   );
@@ -270,14 +270,14 @@ function LoadingScreen({ message }: { message: string }) {
         animate={{ rotate: 360 }}
         transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
       >
-        <div className="absolute inset-0 rounded-full border-2 border-purple-500/20" />
-        <div className="absolute inset-0 rounded-full border-2 border-t-purple-500 border-r-transparent border-b-transparent border-l-transparent" />
+        <div className="absolute inset-0 rounded-full border-2 border-emerald-500/20" />
+        <div className="absolute inset-0 rounded-full border-2 border-t-emerald-500 border-r-transparent border-b-transparent border-l-transparent" />
       </motion.div>
       <motion.p
         key={message}
         initial={{ opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-[11px] text-purple-400 font-black uppercase tracking-[0.2em]"
+        className="text-[11px] text-emerald-400 font-black uppercase tracking-[0.2em]"
       >
         {message}
       </motion.p>
@@ -300,7 +300,7 @@ function ErrorScreen({ message, onBack }: { message: string; onBack: () => void 
       </div>
       <button
         onClick={onBack}
-        className="px-6 py-3 rounded-xl bg-purple-600 text-white text-xs font-black uppercase tracking-wider"
+        className="px-6 py-3 rounded-xl bg-emerald-600 text-white text-xs font-black uppercase tracking-wider hover:bg-emerald-500 transition-colors"
       >
         Back to Lobby
       </button>
@@ -382,9 +382,16 @@ function LudoBoard({
     : (room.board_state?.pieces?.player_1 ?? [0, 0]);
 
   // Board furniture (fixed at P1=top-left / P2=bottom-right) resolved to the
-  // viewer-perspective palette: I'm always blue, my opponent is always red.
+  // viewer-perspective palette: I'm always green, my opponent is always amber.
   const P1_COLOR = amPlayer1 ? MY_COLOR : OPP_COLOR;
   const P2_COLOR = amPlayer1 ? OPP_COLOR : MY_COLOR;
+
+  // Board flip: rotate the entire board 180° for P1 so their yard appears at the
+  // bottom of the screen. This gives both players the "my pieces at the bottom"
+  // perspective. Text elements need counter-rotation to stay readable.
+  const flipTransform = amPlayer1 ? "rotate(180, 50, 50)" : "";
+  const flipText = (cx: number, cy: number) =>
+    amPlayer1 ? `rotate(180, ${cx}, ${cy})` : "";
 
   const prevMineRef = useRef<number[] | null>(null);
   const prevOppRef  = useRef<number[] | null>(null);
@@ -440,15 +447,19 @@ function LudoBoard({
   return (
     <svg className="absolute inset-0 w-full h-full rounded-2xl" viewBox="0 0 100 100" fill="none" preserveAspectRatio="xMidYMid meet">
       <rect width="100" height="100" rx="4" fill="#080D18" />
+      {/* Board flip: when the viewer is P1, the entire board rotates 180° so their
+          yard appears at the bottom-right, giving both players a "my pieces at the
+          bottom" perspective. */}
+      <g transform={flipTransform}>
 
-      {/* Player 1 yard (fixed top-left; colored by ownership, not seat) */}
+      {/* Player 1 yard (colored by ownership, not seat) */}
       <rect x="0" y="0" width="40" height="40" rx="4" fill={`${P1_COLOR}12`} stroke={P1_COLOR} strokeWidth="0.5" />
       <rect x="6" y="6" width="28" height="28" rx="3" fill="#090E1C" stroke={P1_COLOR} strokeWidth="0.4" />
       {p1Yard.map(([cx, cy], i) => (
         <circle key={i} cx={cx} cy={cy} r={i < 2 ? 4.4 : 3.6} fill={`${P1_COLOR}25`} stroke={P1_COLOR} strokeWidth={i < 2 ? 0.6 : 0.35} />
       ))}
 
-      {/* Player 2 yard (fixed bottom-right; colored by ownership, not seat) */}
+      {/* Player 2 yard (colored by ownership, not seat) */}
       <rect x="60" y="60" width="40" height="40" rx="4" fill={`${P2_COLOR}12`} stroke={P2_COLOR} strokeWidth="0.5" />
       <rect x="66" y="66" width="28" height="28" rx="3" fill="#090E1C" stroke={P2_COLOR} strokeWidth="0.4" />
       {p2Yard.map(([cx, cy], i) => (
@@ -464,16 +475,13 @@ function LudoBoard({
       <polygon points="60,40 50,50 60,60" fill={`${P2_COLOR}18`} stroke={P2_COLOR} strokeWidth="0.4" />
       <polygon points="40,40 50,50 60,40" fill="#0F172A" stroke="#1E293B" strokeWidth="0.2" />
       <polygon points="40,60 50,50 60,60" fill="#0F172A" stroke="#1E293B" strokeWidth="0.2" />
-      <circle cx="50" cy="50" r="4" fill="#A855F718" stroke="#A855F7" strokeWidth="0.5" />
+      <circle cx="50" cy="50" r="4" fill="#22C55E18" stroke="#22C55E" strokeWidth="0.5" />
 
-      {/* Main track cells */}
+      {/* Main track cells — green/amber themed safe spots */}
       {TRACK.map((cell, idx) => {
         const x = cell.x * CELL;
         const y = cell.y * CELL;
         const isStar        = STAR_SPOTS.has(idx);
-        // Launch squares are exactly the cells each player's relPos 1 maps to,
-        // i.e. TRACK[1] (red) and TRACK[27] (blue) — same numbers the server's
-        // toAbsTrack() now uses, so art and logic finally agree.
         const isLaunchRed   = idx === 1;
         const isLaunchBlue  = idx === 27;
         const isSafe        = SAFE_SPOTS.has(idx);
@@ -482,8 +490,8 @@ function LudoBoard({
         let sw     = 0.15;
         if (isLaunchRed)       { fill = `${P1_COLOR}35`; stroke = P1_COLOR; sw = 0.4; }
         else if (isLaunchBlue) { fill = `${P2_COLOR}35`; stroke = P2_COLOR; sw = 0.4; }
-        else if (isStar)       { fill = "#A855F720"; stroke = "#A855F7"; sw = 0.35; }
-        else if (isSafe)       { fill = "#A855F712"; stroke = "#A855F7"; sw = 0.25; }
+        else if (isStar)       { fill = "#22C55E20"; stroke = "#22C55E"; sw = 0.35; }
+        else if (isSafe)       { fill = "#22C55E12"; stroke = "#22C55E"; sw = 0.25; }
         return (
           <g key={idx}>
             <rect
@@ -493,7 +501,11 @@ function LudoBoard({
               fill={fill} stroke={stroke} strokeWidth={sw}
             />
             {isStar && (
-              <text x={x + CELL / 2} y={y + CELL / 2 + 1.5} textAnchor="middle" fontSize="3.5" fill="#A855F7" opacity="0.9">★</text>
+              <text
+                x={x + CELL / 2} y={y + CELL / 2 + 1.5}
+                textAnchor="middle" fontSize="3.5" fill="#22C55E" opacity="0.9"
+                transform={flipText(x + CELL / 2, y + CELL / 2 + 1.5)}
+              >★</text>
             )}
           </g>
         );
@@ -617,6 +629,8 @@ function LudoBoard({
           </motion.g>
         );
       })}
+
+      </g>{/* end flipTransform group */}
     </svg>
   );
 }
@@ -676,6 +690,9 @@ export default function LudoGamePage() {
   // Mutation epoch — bumped when the player rolls/moves so any poll that was
   // already in flight is discarded (its own authoritative fetch wins instead).
   const mutationEpochRef   = useRef(0);
+  // Audio pre-cache: Audio elements are reused via cloneNode so overlapping
+  // rapid plays (dice → move → capture) don't cut each other off.
+  const audioCacheRef      = useRef<Map<string, HTMLAudioElement>>(new Map());
 
   // ── FIX 1: Synchronous in-flight locks (refs, not state) ──────────────────
   // React state updates are batched/async — using a ref means the lock is set
@@ -694,9 +711,19 @@ export default function LudoGamePage() {
 
   const playSound = useCallback((name: string) => {
     try {
-      const a = new Audio(`/sounds/${name}.mp3`);
-      a.volume = 0.6;
-      a.play().catch(() => {});
+      // Pre-load into cache; cloneNode allows overlapping plays of the same sound
+      if (!audioCacheRef.current.has(name)) {
+        const base = new Audio(`/sounds/${name}.mp3`);
+        base.preload = "auto";
+        base.volume = 0.6;
+        audioCacheRef.current.set(name, base);
+      }
+      const base = audioCacheRef.current.get(name)!;
+      // cloneNode so multiple rapid plays (dice + move + capture) don't cut each other off
+      const instance = base.cloneNode(true) as HTMLAudioElement;
+      instance.volume = 0.6;
+      instance.currentTime = 0;
+      instance.play().catch(() => {});
     } catch {}
   }, []);
 
@@ -1213,21 +1240,21 @@ export default function LudoGamePage() {
       <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[999] px-6">
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex items-center gap-8">
           <div className="flex flex-col items-center gap-2">
-            <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-purple-500 shadow-[0_0_24px_rgba(168,85,247,0.5)] bg-slate-900">
+            <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-emerald-500 shadow-[0_0_24px_rgba(34,197,94,0.5)] bg-slate-900">
               <img src={myProf?.avatar || "https://api.dicebear.com/7.x/adventurer/svg?seed=me"} alt="Me"
                 className="w-full h-full object-cover"
                 onError={e => { (e.target as HTMLImageElement).src = "https://api.dicebear.com/7.x/adventurer/svg?seed=me"; }} />
             </div>
-            <span className="text-xs font-black text-purple-300 max-w-[80px] truncate text-center">{myProf?.name ?? "You"}</span>
+            <span className="text-xs font-black text-emerald-300 max-w-[80px] truncate text-center">{myProf?.name ?? "You"}</span>
           </div>
           <div className="text-2xl font-black text-amber-400 animate-pulse">VS</div>
           <div className="flex flex-col items-center gap-2">
-            <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-blue-500 shadow-[0_0_24px_rgba(59,130,246,0.5)] bg-slate-900">
+            <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-amber-500 shadow-[0_0_24px_rgba(245,158,11,0.5)] bg-slate-900">
               <img src={oppProf?.avatar || "https://api.dicebear.com/7.x/adventurer/svg?seed=opp"} alt="Opponent"
                 className="w-full h-full object-cover"
                 onError={e => { (e.target as HTMLImageElement).src = "https://api.dicebear.com/7.x/adventurer/svg?seed=opp"; }} />
             </div>
-            <span className="text-xs font-black text-blue-300 max-w-[80px] truncate text-center">{oppProf?.name ?? "Opponent"}</span>
+            <span className="text-xs font-black text-amber-300 max-w-[80px] truncate text-center">{oppProf?.name ?? "Opponent"}</span>
           </div>
         </motion.div>
         <div className="mt-8 text-center">
@@ -1246,21 +1273,21 @@ export default function LudoGamePage() {
       <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[999] px-6">
         <div className="flex items-center gap-8 mb-10">
           <div className="flex flex-col items-center gap-2">
-            <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-purple-500 bg-slate-900">
+            <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-emerald-500 bg-slate-900">
               <img src={myProf?.avatar || "https://api.dicebear.com/7.x/adventurer/svg?seed=me"} alt="Me"
                 className="w-full h-full object-cover"
                 onError={e => { (e.target as HTMLImageElement).src = "https://api.dicebear.com/7.x/adventurer/svg?seed=me"; }} />
             </div>
-            <span className="text-[10px] font-black text-purple-300 truncate max-w-[70px] text-center">{myProf?.name ?? "You"}</span>
+            <span className="text-[10px] font-black text-emerald-300 truncate max-w-[70px] text-center">{myProf?.name ?? "You"}</span>
           </div>
           <div className="text-lg font-black text-amber-400">VS</div>
           <div className="flex flex-col items-center gap-2">
-            <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-blue-500 bg-slate-900">
+            <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-amber-500 bg-slate-900">
               <img src={oppProf?.avatar || "https://api.dicebear.com/7.x/adventurer/svg?seed=opp"} alt="Opponent"
                 className="w-full h-full object-cover"
                 onError={e => { (e.target as HTMLImageElement).src = "https://api.dicebear.com/7.x/adventurer/svg?seed=opp"; }} />
             </div>
-            <span className="text-[10px] font-black text-blue-300 truncate max-w-[70px] text-center">{oppProf?.name ?? "Opponent"}</span>
+            <span className="text-[10px] font-black text-amber-300 truncate max-w-[70px] text-center">{oppProf?.name ?? "Opponent"}</span>
           </div>
         </div>
         <AnimatePresence mode="wait">
@@ -1275,7 +1302,7 @@ export default function LudoGamePage() {
             {countdown === 0 ? "GO!" : countdown}
           </motion.div>
         </AnimatePresence>
-        <p className="mt-6 text-[10px] text-purple-400/70 font-bold uppercase tracking-widest">Get ready to play!</p>
+        <p className="mt-6 text-[10px] text-emerald-400/70 font-bold uppercase tracking-widest">Get ready to play!</p>
       </div>
     );
   }
@@ -1289,7 +1316,7 @@ export default function LudoGamePage() {
           initial={{ opacity: 0, scale: 0.85, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 260, damping: 20 }}
-          className="w-full max-w-xs rounded-3xl bg-slate-950 border border-purple-500/20 p-7 text-center space-y-5 shadow-2xl"
+          className="w-full max-w-xs rounded-3xl bg-slate-950 border border-emerald-500/20 p-7 text-center space-y-5 shadow-2xl"
         >
           <div className="flex justify-center">
             <EmoteSVG type={iWon ? "Crown" : "Shock"} size={64} />
@@ -1321,7 +1348,7 @@ export default function LudoGamePage() {
           )}
           <button
             onClick={() => { stopAllTimers(); router.replace("/games"); }}
-            className="w-full h-12 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-black uppercase tracking-widest"
+            className="w-full h-12 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 text-white text-xs font-black uppercase tracking-widest"
           >
             Return to Lobby
           </button>
@@ -1363,7 +1390,7 @@ export default function LudoGamePage() {
               transition={{ duration: 0.45 }}
               className={`absolute ${mine ? "bottom-28 left-4" : "top-24 right-4"}`}
             >
-              <div className="bg-slate-900/90 backdrop-blur-sm rounded-2xl p-2 border border-purple-500/30 shadow-xl">
+              <div className="bg-slate-900/90 backdrop-blur-sm rounded-2xl p-2 border border-emerald-500/30 shadow-xl">
                 <EmoteSVG type={type as EmoteType} size={36} />
               </div>
             </motion.div>
@@ -1419,7 +1446,7 @@ export default function LudoGamePage() {
           <div className="flex items-center gap-2 flex-none">
             <button
               onClick={() => setShowEmotes(v => !v)}
-              className="w-11 h-11 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center"
+              className="w-11 h-11 rounded-lg bg-slate-800 border border-slate-700/70 flex items-center justify-center"
               aria-label="Emotes"
             >
               <EmoteSVG type="Clap" size={20} />
@@ -1444,7 +1471,7 @@ export default function LudoGamePage() {
       <div className="flex-none px-3 pb-1">
         <div className="flex items-center justify-between text-[9px] font-mono font-bold mb-1">
           <span className="text-slate-500">
-            Turn: <span className={turnSecs <= 5 ? "text-red-400 animate-pulse" : "text-purple-300"}>{turnSecs}s</span>
+            Turn: <span className={turnSecs <= 5 ? "text-red-400 animate-pulse" : "text-emerald-400"}>{turnSecs}s</span>
           </span>
           <span className="text-amber-400 font-black">{(room.stake ?? 0) * 2} Pool</span>
           <span className="text-slate-500">
@@ -1453,7 +1480,7 @@ export default function LudoGamePage() {
         </div>
         <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all duration-1000 ${turnSecs <= 5 ? "bg-red-500 animate-pulse" : "bg-purple-500"}`}
+            className={`h-full rounded-full transition-all duration-1000 ${turnSecs <= 5 ? "bg-red-500 animate-pulse" : "bg-emerald-500"}`}
             style={{ width: `${Math.max(0, Math.min(100, (turnSecs / TURN_TIMEOUT_SECS) * 100))}%` }}
           />
         </div>
@@ -1502,17 +1529,17 @@ export default function LudoGamePage() {
           <div className="flex-none">
             {isMyTurn && room.status === "active" ? (
               !room.dice_rolled ? (
-                <motion.button
+                  <motion.button
                   whileTap={{ scale: 0.88 }}
                   disabled={rollButtonDisabled}
                   onClick={handleRoll}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-[10px] font-black uppercase tracking-wider border border-purple-400/30 disabled:opacity-60 min-w-[80px]"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 text-[10px] font-black uppercase tracking-wider border border-emerald-400/30 disabled:opacity-60 min-w-[80px]"
                 >
                   <DiceFace value={diceDisplay} size={18} rolling={rollingAnim} />
                   {isRollingDisplay ? "Rolling" : "Roll!"}
                 </motion.button>
               ) : (
-                <div className="flex items-center gap-1.5 bg-purple-950/50 border border-purple-500/30 px-2.5 py-1.5 rounded-xl">
+                <div className="flex items-center gap-1.5 bg-emerald-950/50 border border-emerald-500/30 px-2.5 py-1.5 rounded-xl">
                   <motion.div
                     key={room.last_roll}
                     initial={{ scale: 0.35, rotate: -200 }}
@@ -1522,7 +1549,7 @@ export default function LudoGamePage() {
                     <DiceFace value={room.last_roll || diceDisplay} size={22} />
                   </motion.div>
                   <div>
-                    <div className="text-[8px] text-purple-400 font-black uppercase leading-none">Rolled</div>
+                    <div className="text-[8px] text-emerald-400 font-black uppercase leading-none">Rolled</div>
                     <div className="text-sm font-black text-amber-400 tabular-nums">{room.last_roll}</div>
                   </div>
                 </div>
@@ -1548,10 +1575,10 @@ export default function LudoGamePage() {
         <div className="flex items-center mt-2 px-1">
           <div className="flex-1 flex justify-start">
             {isMyTurn && room.dice_rolled && (
-              <motion.div
+                <motion.div
                 animate={{ opacity: [1, 0.5, 1] }}
                 transition={{ duration: 1.2, repeat: Infinity }}
-                className="text-[9px] text-purple-400 font-black uppercase tracking-wider"
+                className="text-[9px] text-emerald-400 font-black uppercase tracking-wider"
               >
                 Tap a piece to move
               </motion.div>
@@ -1591,15 +1618,15 @@ export default function LudoGamePage() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 16, scale: 0.95 }}
               transition={{ duration: 0.2 }}
-              className="absolute top-[72px] right-3 z-40 bg-slate-950/98 border border-purple-500/30 rounded-2xl p-3 shadow-2xl"
+              className="absolute top-[72px] right-3 z-40 bg-slate-950/98 border border-emerald-500/30 rounded-2xl p-3 shadow-2xl"
             >
-              <div className="text-[9px] text-purple-400 font-black uppercase tracking-widest mb-2 px-1">React</div>
+              <div className="text-[9px] text-emerald-400 font-black uppercase tracking-widest mb-2 px-1">React</div>
               <div className="grid grid-cols-4 gap-2">
                 {EMOTES.map(type => (
                   <button
                     key={type}
                     onClick={() => handleEmote(type)}
-                    className="flex flex-col items-center gap-1 p-2 rounded-xl bg-slate-900 hover:bg-purple-950/40 border border-slate-800 hover:border-purple-500/40 transition-all"
+                    className="flex flex-col items-center gap-1 p-2 rounded-xl bg-slate-900 hover:bg-emerald-950/40 border border-slate-800 hover:border-emerald-500/40 transition-all"
                   >
                     <EmoteSVG type={type} size={26} />
                     <span className="text-[8px] text-slate-400 font-semibold">{type}</span>
@@ -1625,7 +1652,7 @@ export default function LudoGamePage() {
               initial={{ scale: 0.9, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0 }}
               transition={{ type: "spring", stiffness: 300, damping: 24 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[300px] rounded-2xl bg-slate-950 border border-red-500/25 p-6 text-center space-y-4"
+              className="w-full max-w-[300px] rounded-2xl bg-slate-950 border border-red-500/25 p-6 text-center space-y-4 shadow-2xl"
             >
               <div><SymbolIcon name="flag" size={30} /></div>
               <div>
@@ -1660,7 +1687,7 @@ export default function LudoGamePage() {
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            className="w-10 h-10 border-2 border-purple-400/30 border-t-purple-400 rounded-full"
+            className="w-10 h-10 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full"
           />
         </div>
       )}
