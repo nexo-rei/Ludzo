@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import LegalPageLayout from "@/components/legal/LegalPageLayout";
+import { SUPPORT_TELEGRAM_URL } from "@/lib/support";
 
 const SECTIONS = [
   {
@@ -79,13 +80,11 @@ const SECTIONS = [
   },
 ];
 
-const SUPPORT_USERNAME = process.env.NEXT_PUBLIC_SUPPORT_USERNAME ?? "LudzoSupport";
-
 export default function SupportDisputesPage() {
   const router = useRouter();
 
   const openTelegramSupport = () => {
-    const url = `https://t.me/${SUPPORT_USERNAME}`;
+    const url = SUPPORT_TELEGRAM_URL;
     const tg = typeof window !== "undefined"
       ? (window as Window & { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram?.WebApp
       : undefined;

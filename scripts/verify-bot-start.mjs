@@ -15,6 +15,9 @@
  *      extra buttons are present in the /start reply.
  *   8. A deep-link (referral) payload is still processed internally and never
  *      rendered — and auth / user-creation code stays untouched.
+ *   9. /start is the ONLY supported command: /help, /profile, /paidpromotion
+ *      and any unknown slash command are rejected with one static reply and
+ *      never execute an old handler; plain (non-command) text is ignored.
  *
  * The route is exercised for real: `fetch` is stubbed and the webhook POST
  * handler is imported directly, so the assertions run against the same code
@@ -277,28 +280,38 @@ const callback = await run({
 });
 check("callback queries are still acknowledged silently", callback.calls.length === 1 && callback.calls[0].url.endsWith("/answerCallbackQuery"));
 
-const help = await run(startUpdate("Prakash", "/help"));
-check("other commands keep working (/help)", help.calls.length === 1 && String(help.calls[0]?.body?.text).includes("Ludzo Help Center"));
-check("/help still documents the support contact", String(help.calls[0]?.body?.text).includes("@LudzosupportBot"));
-
-const profile = await run({
-  update_id: 4,
-  message: {
-    message_id: 12,
-    chat: { id: 555, type: "private" },
-    from: { id: 555, first_name: "Prakash", username: "handle" },
-    text: "/profile",
-  },
-});
-check("/profile still works", profile.calls.length === 1 && String(profile.calls[0]?.body?.text).includes("PROFILE"));
+// ── 4b. command restriction: /start is the ONLY supported command ──────────
+console.log("commands: /start is the only supported command");
+for (const text of [
+  "/help",
+  "/profile",
+  "/paidpromotion",
+  "/help@LudzoBot",
+  "/PROFILE",
+  "/paidpromotion more args",
+  "/totallyunknown",
+]) {
+  const r = await run(startUpdate("Prakash", text));
+  const reply = String(r.calls[0]?.body?.text ?? "");
+  check(`"${text}" → webhook still 200 + ok:true`, r.status === 200 && r.json?.ok === true);
+  check(`"${text}" → exactly ONE rejection message (no old handler)`, r.calls.length === 1 && r.calls[0]?.url.endsWith("/sendMessage"), `saw ${r.calls.length} call(s)`);
+  check(`"${text}" → rejection is plain text only (no keyboard / markup / URL)`, JSON.stringify(Object.keys(r.calls[0]?.body ?? {}).sort()) === JSON.stringify(["chat_id", "text"]) && !/https?:\/\//.test(reply), reply);
+  check(`"${text}" → no old handler content runs`, !/Help Center|PROFILE|Paid Promotion|LudzosupportBot|t\.me\//i.test(reply), reply);
+  check(`"${text}" → mentions only /start`, reply.includes("/start") && !/\/(help|profile|paidpromotion)/i.test(reply));
+}
 
 const ignored = await run({ update_id: 3, message: { message_id: 11, chat: { id: 555 }, text: "" } });
 check("non-command updates are ignored", ignored.calls.length === 0 && ignored.json?.ok === true);
 
+const plainText = await run(startUpdate("Prakash", "hello, any news?"));
+check("plain text is ignored (no reply, no feature)", plainText.calls.length === 0 && plainText.json?.ok === true);
+
 // ── 5. source contract: the old /start payload is really gone ───────────────
 console.log("source: the old /start response cannot come back");
 const routeCode = code(ROUTE);
-const startFn = routeCode.slice(routeCode.indexOf("async function handleStart"), routeCode.indexOf("async function handleProfile"));
+// handleStart is now the ONLY handler function in the route — slice it out of
+// the source so the per-function checks below keep working.
+const startFn = routeCode.slice(routeCode.indexOf("async function handleStart"), routeCode.indexOf("export async function POST"));
 check("the loader animation is gone", !/sleep\(|loader|█/.test(routeCode));
 check("handleStart sends exactly one message", (startFn.match(/sendMessage\(/g) ?? []).length === 1, startFn);
 check("handleStart builds the reply from the shared contract", /buildStartMessage\(/.test(startFn));
@@ -309,6 +322,14 @@ check("the route never edits or deletes messages", !/editMessageText|deleteMessa
 check("the old support / promotion buttons are gone from the route", !/LudzosupportBot/.test(startFn) && !/Open Ludzo/.test(routeCode));
 check("existing webhook auth + token guard untouched", /if \(!BOT_TOKEN\)/.test(routeCode) && /answerCallbackQuery/.test(routeCode));
 check("route still ignores non-text updates", /if \(!body\?\.message\?\.text\)/.test(routeCode));
+
+console.log("source: removed command handlers cannot come back");
+check("/help handler is removed from the route", !/handleHelp|Ludzo Help Center/.test(routeCode));
+check("/profile handler is removed from the route", !/handleProfile|User ID/.test(routeCode));
+check("/paidpromotion handler is removed from the route", !/handlePaidPromotion|Paid Promotion/.test(routeCode));
+check("no switch/case branch for a removed command remains", !/case\s*["']\/(help|profile|paidpromotion)\b/.test(routeCode));
+check("the route carries no support-bot reference at all", !/LudzosupportBot|ludzo_support/.test(routeCode));
+check("unknown slash commands still get one static rejection reply", /UNKNOWN_COMMAND_REPLY/.test(routeCode) && /startsWith\("\/"\)/.test(routeCode));
 
 const helperCode = code(HELPER);
 check("the shared contract builds exactly one one-button keyboard", (helperCode.match(/inline_keyboard: \[\[/g) ?? []).length === 1);

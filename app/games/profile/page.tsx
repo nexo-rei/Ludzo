@@ -22,6 +22,7 @@ import { showToast } from "@/components/ui/Toast";
 import Sheet from "@/components/ui/Sheet";
 import { BattleLogIcon, DiceIcon, TokenIcon, LudoIcon } from "@/components/gaming/GamingIcons";
 import ConvertWonCoinsCard from "@/components/cards/ConvertWonCoinsCard";
+import { SUPPORT_TELEGRAM_URL } from "@/lib/support";
 
 interface Stats {
   wins: number;
@@ -103,7 +104,7 @@ export default function GamingProfilePage() {
     if (item.action === "rules") { setRulesOpen(true); return; }
     if (item.action === "support") {
       showToast("Opening Ludzo support…", "info");
-      window.open("https://t.me/ludzo_support", "_blank");
+      window.open(SUPPORT_TELEGRAM_URL, "_blank");
       return;
     }
     if (item.action === "exit") { router.push("/home"); return; }

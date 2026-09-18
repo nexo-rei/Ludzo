@@ -18,8 +18,10 @@
  * Everything the old reply used to carry is gone from /start: the animated
  * loader, the second "welcome" message, the contact block, the support /
  * promotion buttons, quick-command lists, referral text and long instructions.
- * Support still exists in the rest of the app (support tickets, /help,
- * /paidpromotion, the Support page) — it is only removed from the welcome reply.
+ * /start is the ONLY command the bot answers — the former /help, /profile and
+ * /paidpromotion handlers were removed from the webhook entirely. Support
+ * still exists inside the Mini App (Support page, Support & Disputes page);
+ * every direct-support action there opens the @LudzosupportBot chat.
  *
  * Kept deliberately dependency-free and pure so the webhook can reuse it and
  * `scripts/verify-bot-start.mjs` can unit-test it directly.
