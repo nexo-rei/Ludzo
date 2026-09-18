@@ -41,7 +41,8 @@ COMMENT ON COLUMN public.wallets.won_coins_balance IS
 -- gross USDT amount for compatibility with the existing admin/reporting UI.
 ALTER TABLE IF EXISTS public.withdrawals
   ADD COLUMN IF NOT EXISTS coin_amount integer,
-  ADD COLUMN IF NOT EXISTS source text DEFAULT 'legacy';
+  ADD COLUMN IF NOT EXISTS source text DEFAULT 'legacy',
+  ADD COLUMN IF NOT EXISTS network text;
 
 CREATE INDEX IF NOT EXISTS withdrawals_source_idx
   ON public.withdrawals (source, created_at DESC);
@@ -50,6 +51,8 @@ COMMENT ON COLUMN public.withdrawals.coin_amount IS
   'Won Coins debited from wallets.won_coins_balance for a Ludo-prize conversion.';
 COMMENT ON COLUMN public.withdrawals.source IS
   'ludo_won for new eligible conversions; legacy for pre-economy records.';
+COMMENT ON COLUMN public.withdrawals.network IS
+  'Payout network selected by the user (TRC20 or BEP20). NULL on legacy records.';
 
 -- ── 2. Persist the fixed public conversion rate ─────────────────────────────
 DO $$
@@ -315,7 +318,8 @@ CREATE OR REPLACE FUNCTION public.create_ludo_won_withdrawal(
   p_user_id        uuid,
   p_coin_amount    integer,
   p_wallet_address text,
-  p_fee_pct        numeric DEFAULT 5
+  p_fee_pct        numeric DEFAULT 5,
+  p_network        text DEFAULT 'TRC20'
 )
 RETURNS uuid
 LANGUAGE plpgsql
@@ -327,6 +331,7 @@ DECLARE
   v_amount     numeric(20, 2);
   v_fee        numeric(20, 2);
   v_net        numeric(20, 2);
+  v_network    text;
   v_withdrawal uuid;
 BEGIN
   IF p_user_id IS NULL
@@ -336,12 +341,16 @@ BEGIN
     RAISE EXCEPTION 'Minimum conversion is 1000 Won Coins and amounts must use 200-Coin steps';
   END IF;
 
+  v_network := upper(btrim(COALESCE(p_network, 'TRC20')));
+  IF v_network NOT IN ('TRC20', 'BEP20') THEN
+    RAISE EXCEPTION 'Unsupported withdrawal network %', v_network;
+  END IF;
+
+  -- The address format must match the selected payout network.
   IF p_wallet_address IS NULL
-     OR NOT (
-       btrim(p_wallet_address) ~ '^T[1-9A-HJ-NP-Za-km-z]{33}$'
-       OR btrim(p_wallet_address) ~ '^0x[a-fA-F0-9]{40}$'
-     ) THEN
-    RAISE EXCEPTION 'Enter a valid TRC20 or BEP20 USDT wallet address';
+     OR (v_network = 'TRC20' AND btrim(p_wallet_address) !~ '^T[1-9A-HJ-NP-Za-km-z]{33}$')
+     OR (v_network = 'BEP20' AND btrim(p_wallet_address) !~ '^0x[a-fA-F0-9]{40}$') THEN
+    RAISE EXCEPTION 'Enter a valid % USDT wallet address', v_network;
   END IF;
 
   IF p_fee_pct IS NULL OR p_fee_pct < 0 OR p_fee_pct >= 100 THEN
@@ -368,9 +377,9 @@ BEGIN
    WHERE user_id = p_user_id;
 
   INSERT INTO public.withdrawals
-    (user_id, amount, coin_amount, fee_amount, net_amount, wallet_address, status, source, created_at, updated_at)
+    (user_id, amount, coin_amount, fee_amount, net_amount, wallet_address, network, status, source, created_at, updated_at)
   VALUES
-    (p_user_id, v_amount, p_coin_amount, v_fee, v_net, btrim(p_wallet_address), 'pending', 'ludo_won', now(), now())
+    (p_user_id, v_amount, p_coin_amount, v_fee, v_net, btrim(p_wallet_address), v_network, 'pending', 'ludo_won', now(), now())
   RETURNING id INTO v_withdrawal;
 
   BEGIN
@@ -392,22 +401,24 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.create_ludo_won_withdrawal(uuid, integer, text, numeric);
+
 REVOKE ALL ON FUNCTION public.credit_playable_coins_for_deposit(uuid, uuid, integer, text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.settle_referral_playable_coins(uuid, integer, numeric) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.credit_won_coins(uuid, numeric, text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.debit_won_coins(uuid, numeric, text) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.create_ludo_won_withdrawal(uuid, integer, text, numeric) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.create_ludo_won_withdrawal(uuid, integer, text, numeric, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.credit_playable_coins_for_deposit(uuid, uuid, integer, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.settle_referral_playable_coins(uuid, integer, numeric) TO service_role;
 GRANT EXECUTE ON FUNCTION public.credit_won_coins(uuid, numeric, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.debit_won_coins(uuid, numeric, text) TO service_role;
-GRANT EXECUTE ON FUNCTION public.create_ludo_won_withdrawal(uuid, integer, text, numeric) TO service_role;
+GRANT EXECUTE ON FUNCTION public.create_ludo_won_withdrawal(uuid, integer, text, numeric, text) TO service_role;
 
 ALTER FUNCTION public.credit_playable_coins_for_deposit(uuid, uuid, integer, text) SET search_path = public;
 ALTER FUNCTION public.settle_referral_playable_coins(uuid, integer, numeric) SET search_path = public;
 ALTER FUNCTION public.credit_won_coins(uuid, numeric, text) SET search_path = public;
 ALTER FUNCTION public.debit_won_coins(uuid, numeric, text) SET search_path = public;
-ALTER FUNCTION public.create_ludo_won_withdrawal(uuid, integer, text, numeric) SET search_path = public;
+ALTER FUNCTION public.create_ludo_won_withdrawal(uuid, integer, text, numeric, text) SET search_path = public;
 
 COMMIT;
 

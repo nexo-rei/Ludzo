@@ -14,6 +14,7 @@ interface WithdrawalItem {
   amount: number;
   coin_amount?: number;
   source?: string;
+  network?: string | null;
   fee_amount: number;
   net_amount: number;
   wallet_address: string;
@@ -169,6 +170,7 @@ export default function AdminWithdrawalsPage() {
                 ["Amount", `$${formatUSDT(Number(selected.amount))} USDT gross`],
                 ["Fee", `-$${formatUSDT(Number(selected.fee_amount))}`],
                 ["Net Amount", `$${formatUSDT(Number(selected.net_amount))} USDT`],
+                ["Network", selected.network ?? "—"],
                 ["Wallet", selected.wallet_address],
                 ["Status", selected.status],
                 ["Date", formatDateTime(selected.created_at)],

@@ -110,6 +110,7 @@ CREATE TABLE IF NOT EXISTS public.withdrawals (
   fee_amount numeric NOT NULL DEFAULT 0,
   net_amount numeric NOT NULL DEFAULT 0,
   wallet_address text NOT NULL,
+  network text,
   status text NOT NULL DEFAULT 'pending',
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now(),
@@ -374,22 +375,35 @@ const expect = (cond, m) => cond ? ok(m) : fail(m);
   await q(`SELECT credit_won_coins('${u2.id}', 1004, 'ludo_prize')`);
   let invalidWithdrawal = false;
   try {
-    await q(`SELECT create_ludo_won_withdrawal('${u2.id}', 800, 'T${"x".repeat(33)}', 5)`);
+    await q(`SELECT create_ludo_won_withdrawal('${u2.id}', 800, 'T${"x".repeat(33)}', 5, 'TRC20')`);
   } catch (e) {
     invalidWithdrawal = /minimum|200-Coin/i.test(e.message);
   }
   expect(invalidWithdrawal, "withdrawal RPC rejects amounts below the exact 1,000-Coin minimum");
   const [{ create_ludo_won_withdrawal: withdrawalId }] = await q(
-    `SELECT create_ludo_won_withdrawal('${u2.id}', 1000, 'T${"x".repeat(33)}', 5)`);
+    `SELECT create_ludo_won_withdrawal('${u2.id}', 1000, 'T${"x".repeat(33)}', 5, 'TRC20')`);
   const [afterWithdrawal] = await q(`SELECT coin_balance, won_coins_balance FROM wallets WHERE user_id='${u2.id}'`);
-  const [withdrawal] = await q(`SELECT coin_amount, amount, fee_amount, net_amount, source
+  const [withdrawal] = await q(`SELECT coin_amount, amount, fee_amount, net_amount, source, network
                                 FROM withdrawals WHERE id='${withdrawalId}'`);
   expect(afterWithdrawal.coin_balance === afterDeposit.coin_balance && afterWithdrawal.won_coins_balance === 200,
          "conversion debits only the locked Won-Coin ledger");
   expect(withdrawal.coin_amount === 1000 && withdrawal.amount === "5.00" &&
          withdrawal.fee_amount === "0.25" && withdrawal.net_amount === "4.75" &&
-         withdrawal.source === "ludo_won",
-         "1,000 Won Coins settle to $5 gross, $0.25 fee, and $4.75 net");
+         withdrawal.source === "ludo_won" && withdrawal.network === "TRC20",
+         "1,000 Won Coins settle to $5 gross, $0.25 fee, and $4.75 net on the selected network");
+
+  // A TRC20 request must reject an EVM address (network-aware validation).
+  let mismatchedNetwork = false;
+  try {
+    await q(`SELECT create_ludo_won_withdrawal('${u2.id}', 1000, '0x${"a".repeat(40)}', 5, 'TRC20')`);
+  } catch (e) {
+    mismatchedNetwork = /valid TRC20/i.test(e.message);
+  }
+  expect(mismatchedNetwork, "withdrawal RPC validates the address against the selected network");
+
+  // The protected USDT ledger is never touched by a conversion.
+  const [protectedAfter] = await q(`SELECT usdt_balance FROM wallets WHERE user_id='${u2.id}'`);
+  expect(Number(protectedAfter.usdt_balance) === 0, "conversion never debits the protected usdt_balance");
 
   // ── Arena opponent after a random 20–28 s ────────────────────────────────
   step = "arena window (20–28 s)";
