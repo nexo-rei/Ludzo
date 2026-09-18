@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/layout/PageHeader";
 import Button from "@/components/ui/Button";
+import LanguageFlag from "@/components/ui/LanguageFlag";
 import { showToast } from "@/components/ui/Toast";
 import { useApp } from "@/hooks/useApp";
+import { SUPPORTED_LANGUAGES, type LanguageCode } from "@/lib/i18n";
 
 const THEMES = [
   {
@@ -23,27 +25,22 @@ const THEMES = [
   },
 ];
 
-const LANGUAGES = [
-  { code: "en", name: "English",    flag: "EN" },
-  { code: "ru", name: "Русский",    flag: "RU" },
-  { code: "uk", name: "Українська", flag: "UK" },
-  { code: "es", name: "Español",    flag: "ES" },
-  { code: "pt", name: "Português",  flag: "PT" },
-  { code: "fr", name: "Français",   flag: "FR" },
-  { code: "de", name: "Deutsch",    flag: "DE" },
-  { code: "it", name: "Italiano",   flag: "IT" },
-  { code: "tr", name: "Türkçe",     flag: "TR" },
-  { code: "hi", name: "हिन्दी",     flag: "HI" },
-];
-
 export default function SettingsPage() {
   const { userId, prefs, setPrefs } = useApp();
   const [theme, setTheme] = useState<"dark" | "light" | "system">(prefs?.theme ?? "dark");
-  const [language, setLanguage] = useState(prefs?.language ?? "en");
+  const [language, setLanguage] = useState<LanguageCode>(
+    (prefs?.language as LanguageCode) ?? "en",
+  );
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (prefs) { setTheme(prefs.theme ?? "dark"); setLanguage(prefs.language ?? "en"); }
+    if (prefs) {
+      setTheme(prefs.theme ?? "dark");
+      const savedLanguage = SUPPORTED_LANGUAGES.some((item) => item.code === prefs.language)
+        ? (prefs.language as LanguageCode)
+        : "en";
+      setLanguage(savedLanguage);
+    }
   }, [prefs]);
 
   const handleSave = async () => {
@@ -56,13 +53,23 @@ export default function SettingsPage() {
         body: JSON.stringify({ theme, language }),
       });
       const data = await res.json();
-      if (data.success) {
-        setPrefs({ id: prefs?.id ?? "", user_id: prefs?.user_id ?? userId ?? "", notifications_enabled: prefs?.notifications_enabled ?? true, updated_at: prefs?.updated_at ?? "", theme, language });
-        localStorage.setItem("ludzo_lang", language);
-        showToast("Settings saved!", "success");
-      }
-    } catch { showToast("Failed to save settings", "error"); }
-    finally { setSaving(false); }
+      if (!res.ok || !data.success) throw new Error(data.error ?? "Unable to save preferences");
+
+      setPrefs({
+        id: prefs?.id ?? "",
+        user_id: prefs?.user_id ?? userId ?? "",
+        notifications_enabled: prefs?.notifications_enabled ?? true,
+        updated_at: prefs?.updated_at ?? "",
+        theme,
+        language,
+      });
+      localStorage.setItem("ludzo_lang", language);
+      showToast("Settings saved!", "success");
+    } catch {
+      showToast("Failed to save settings", "error");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -104,34 +111,37 @@ export default function SettingsPage() {
 
         {/* Language selector */}
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }}>
-          <h3 className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-3">Language</h3>
+          <div className="language-section-heading">
+            <div>
+              <h3 className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Language</h3>
+              <p className="language-section-subtitle">Choose how LUDZO speaks to you</p>
+            </div>
+            <span className="language-count">{SUPPORTED_LANGUAGES.length} available</span>
+          </div>
           <div className="grid grid-cols-2 gap-2">
-            {LANGUAGES.map((lang) => {
+            {SUPPORTED_LANGUAGES.map((lang) => {
               const active = language === lang.code;
               return (
                 <motion.button
                   key={lang.code}
                   onClick={() => setLanguage(lang.code)}
                   whileTap={{ scale: 0.98 }}
-                  className="flex items-center gap-3 p-3 rounded-xl transition-all duration-150"
-                  style={{
-                    background: active ? "rgba(35,133,108,0.1)" : "var(--card-bg)",
-                    border: active ? "1.5px solid rgba(35,133,108,0.4)" : "1px solid var(--border)",
-                  }}
+                  aria-pressed={active}
+                  title={`${lang.nativeName} — ${lang.country}`}
+                  className="language-choice"
                 >
-                  <span className="w-8 h-6 rounded text-[10px] font-black flex items-center justify-center shrink-0"
-                    style={{ background: active ? "rgba(35,133,108,0.2)" : "var(--bg-elevated)", color: active ? "#63D9B4" : "#64748B" }}>
-                    {lang.flag}
+                  <LanguageFlag code={lang.code} />
+                  <span className="language-choice-copy">
+                    <span className="language-choice-name">{lang.nativeName}</span>
+                    <span className="language-choice-meta">{lang.name} · {lang.countryCode}</span>
                   </span>
-                  <span className="flex-1 text-xs font-semibold text-left truncate"
-                    style={{ color: active ? "#63D9B4" : "var(--text-secondary)" }}>
-                    {lang.name}
+                  <span className="language-choice-check" aria-hidden="true">
+                    {active && (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
                   </span>
-                  {active && (
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#63D9B4" strokeWidth="2.5">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
                 </motion.button>
               );
             })}

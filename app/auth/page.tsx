@@ -9,6 +9,7 @@ import LudzoLogo from "@/components/layout/LudzoLogo";
 import { useTelegram } from "@/hooks/useTelegram";
 import { useApp } from "@/hooks/useApp";
 import { SkeletonCard } from "@/components/ui/Skeleton";
+import { isSupportedLanguage, normalizeLanguage } from "@/lib/i18n";
 
 function AuthContent() {
   const router = useRouter();
@@ -27,15 +28,26 @@ function AuthContent() {
       return;
     }
 
-    authenticate();
+    // The language screen is part of the first-run contract. Keeping this
+    // guard here also covers users who open /auth directly instead of coming
+    // through the splash screen.
+    const selectedLanguage = localStorage.getItem("ludzo_lang");
+    if (!isSupportedLanguage(selectedLanguage)) {
+      router.replace("/language");
+      return;
+    }
+
+    authenticate(selectedLanguage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    //redeploy
   }, [isReady, tgUser, startParam]);
 
-  const authenticate = async () => {
+  const authenticate = async (selectedLanguage?: string) => {
     try {
       const referralCode = startParam ?? searchParams.get("start") ?? undefined;
-      
+      const chosenLanguage = isSupportedLanguage(selectedLanguage)
+        ? selectedLanguage
+        : normalizeLanguage(tgUser?.language_code);
+
       console.log("START PARAM:", startParam);
       console.log("REFERRAL SENT:", referralCode);
       
@@ -47,6 +59,7 @@ function AuthContent() {
         body: JSON.stringify({
           initData,
           referralCode,
+          selectedLanguage: chosenLanguage,
         }),
       });
 
@@ -60,6 +73,8 @@ function AuthContent() {
 
       setUser(data.data.user);
 
+      const savedLanguage = data.data.prefs?.language ?? chosenLanguage;
+      localStorage.setItem("ludzo_lang", normalizeLanguage(savedLanguage));
       if (data.data.prefs) {
         setPrefs(data.data.prefs);
       }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isSupportedLanguage } from "@/lib/i18n";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth(req);
@@ -31,6 +32,10 @@ export async function PATCH(req: NextRequest) {
     const update: Record<string, unknown> = {};
     for (const key of allowed) {
       if (body[key] !== undefined) update[key] = body[key];
+    }
+
+    if (body.language !== undefined && !isSupportedLanguage(body.language)) {
+      return NextResponse.json({ success: false, error: "Unsupported language" }, { status: 400 });
     }
 
     const supabase = createAdminClient();
