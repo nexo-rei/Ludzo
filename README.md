@@ -271,7 +271,8 @@ Bot admin nahi hai? → verification unavailable (admin ko batana chahiye).
 | Bonus ads for streak | 3 (separate from normal) |
 | Streak rewards | Day 1–7: 2/3/4/5/6/8/10 Coins |
 | Referral commission | 10% of referee's first deposit in playable Coins |
-| Minimum deposit | 100 Coins = $0.50 |
+| Coin deposit rate | 100 Coins = $0.50 (200 Coins = $1) |
+| Minimum deposit | $3.00 = 600 Coins |
 | Minimum Won-Coin conversion | 1,000 Won Coins = $5 USDT |
 | Won-Coin conversion step | 200 Won Coins = $1 USDT |
 | Withdrawal fee | 5% |

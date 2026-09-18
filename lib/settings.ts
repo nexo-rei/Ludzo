@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AppSettings } from "@/types";
-import { COINS_PER_USDT } from "@/lib/economy";
+import { COINS_PER_USDT, MIN_DEPOSIT_USD } from "@/lib/economy";
 
 export const SETTING_DEFAULTS: AppSettings = {
   app_name: "LUDZO",
@@ -11,7 +11,9 @@ export const SETTING_DEFAULTS: AppSettings = {
   daily_ad_limit: 15,
   welcome_bonus_coins: 10,
   referral_commission_pct: 10,
-  min_deposit: 5,
+  // Fixed product rule — the smallest deposit is $3.00 (the Coin rate itself
+  // is unchanged at 100 Coins = $0.50).
+  min_deposit: MIN_DEPOSIT_USD,
   min_withdrawal: 5,
   withdrawal_fee_pct: 5,
   streak_day_1: 2,
@@ -45,6 +47,9 @@ export async function getSettings(supabase: SupabaseClient): Promise<AppSettings
     // it here as well as in the SQL migration.
     if (mapped === "coin_rate") result[mapped] = COINS_PER_USDT;
     else if (mapped === "min_withdrawal") result[mapped] = 5;
+    // The deposit floor is a product rule too — an old row holding 0.50 or 5
+    // must not reopen a sub-$3 deposit.
+    else if (mapped === "min_deposit") result[mapped] = MIN_DEPOSIT_USD;
     else if (typeof def === "number") result[mapped] = parseFloat(row.value) || 0;
     else if (typeof def === "boolean") result[mapped] = String(row.value) === "true";
     else if (def !== undefined) result[mapped] = row.value;

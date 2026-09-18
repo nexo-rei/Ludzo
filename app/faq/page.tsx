@@ -28,7 +28,7 @@ const FAQ_DATA = [
   {
     category: "Deposits",
     items: [
-      { q: "What is the minimum deposit?", a: "The minimum deposit is 100 Coins, equal to $0.50 at the current 200 Coins = $1 rate. Deposits are credited to the playable Coin ledger only." },
+      { q: "What is the minimum deposit?", a: "The minimum deposit is $3.00, which is 600 Coins. The Coin rate itself is unchanged — 100 Coins still equals $0.50 (200 Coins = $1). Deposits are credited to the playable Coin ledger only." },
       { q: "How do I deposit USDT?", a: "Go to the Deposit page, enter an amount, and tap 'Pay with Binance Pay'. You'll be redirected to complete payment. USDT is credited after confirmation." },
       { q: "How long does a deposit take?", a: "Deposits via Binance Pay are usually credited within a few minutes after payment confirmation." },
     ],

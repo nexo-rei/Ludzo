@@ -172,6 +172,42 @@ const expect = (cond, m) => cond ? ok(m) : fail(m);
   await exec(read("sql/08_coin_economy_and_won_withdrawals.sql"));
   ok("08 applied twice (two ledgers, fixed rate, and atomic conversion are idempotent)");
 
+  step = "09_min_deposit_three_usd.sql";
+  await exec(read("sql/09_min_deposit_three_usd.sql"));
+  await exec(read("sql/09_min_deposit_three_usd.sql"));
+  ok("09 applied twice ($3 deposit floor is idempotent)");
+
+  step = "deposit floor";
+  {
+    const rows = await q(
+      `SELECT key, value FROM settings
+        WHERE key IN ('coin_rate','min_deposit','min_deposit_usdt') ORDER BY key`);
+    const map = Object.fromEntries(rows.map(r => [r.key, r.value]));
+    expect(map.coin_rate === "200", "coin_rate is still 200 Coins per $1 (rate unchanged)");
+    expect(map.min_deposit === "3.00" && map.min_deposit_usdt === "3.00",
+           `minimum deposit pinned to $3.00 (got ${map.min_deposit} / ${map.min_deposit_usdt})`);
+
+    const [floor] = await q(`SELECT public.min_deposit_coins() AS coins`);
+    expect(floor.coins === 600, `min_deposit_coins() is 600 Coins = $3.00 (got ${floor.coins})`);
+
+    const [rate] = await q(`SELECT (100 / 200.0)::text AS half`);
+    expect(Number(rate.half) === 0.5, "100 Coins still equals $0.50");
+
+    // The DB guard must reject a sub-$3 deposit but accept one at the floor.
+    const [{ id: floorUser }] = await q(
+      `INSERT INTO users (telegram_id, first_name) VALUES ('900001', 'FloorTest') RETURNING id`);
+    let rejected = false;
+    try {
+      await q(`INSERT INTO deposits (user_id, coin_amount, status)
+               VALUES ('${floorUser}', 100, 'pending')`);
+    } catch { rejected = true; }
+    expect(rejected, "a 100-Coin ($0.50) deposit is rejected by deposits_min_coin_amount");
+
+    const [accepted] = await q(`INSERT INTO deposits (user_id, coin_amount, status)
+                                VALUES ('${floorUser}', 600, 'pending') RETURNING coin_amount`);
+    expect(accepted.coin_amount === 600, "a 600-Coin ($3.00) deposit is accepted");
+  }
+
   step = "arena roster";
   {
     const [roster] = await q(`SELECT
@@ -350,25 +386,26 @@ const expect = (cond, m) => cond ? ok(m) : fail(m);
   expect(rate.value === "200", "coin_rate is fixed at 200 Coins per $1");
   const [beforeEconomy] = await q(`SELECT coin_balance, won_coins_balance FROM wallets WHERE user_id='${u2.id}'`);
   await q(`INSERT INTO referrals (referrer_id, referee_id) VALUES ('${u1.id}', '${u2.id}')`);
+  // 600 Coins = $3.00 — the smallest deposit the platform now accepts.
   const [{ id: depositId }] = await q(`INSERT INTO deposits (user_id, coin_amount, status, payment_id)
-      VALUES ('${u2.id}', 400, 'pending', 'economy-test') RETURNING id`);
+      VALUES ('${u2.id}', 600, 'pending', 'economy-test') RETURNING id`);
   const [{ credit_playable_coins_for_deposit: deposited }] = await q(
-    `SELECT credit_playable_coins_for_deposit('${depositId}', '${u2.id}', 400, 'economy-test')`);
+    `SELECT credit_playable_coins_for_deposit('${depositId}', '${u2.id}', 600, 'economy-test')`);
   const [{ credit_playable_coins_for_deposit: duplicateDeposit }] = await q(
-    `SELECT credit_playable_coins_for_deposit('${depositId}', '${u2.id}', 400, 'economy-test')`);
+    `SELECT credit_playable_coins_for_deposit('${depositId}', '${u2.id}', 600, 'economy-test')`);
   const [beforeReferrer] = await q(`SELECT coin_balance, won_coins_balance FROM wallets WHERE user_id='${u1.id}'`);
   const [{ settle_referral_playable_coins: referralCoins }] = await q(
-    `SELECT settle_referral_playable_coins('${u2.id}', 400, 10)`);
+    `SELECT settle_referral_playable_coins('${u2.id}', 600, 10)`);
   const [{ settle_referral_playable_coins: duplicateReferral }] = await q(
-    `SELECT settle_referral_playable_coins('${u2.id}', 400, 10)`);
+    `SELECT settle_referral_playable_coins('${u2.id}', 600, 10)`);
   const [afterReferrer] = await q(`SELECT coin_balance, won_coins_balance FROM wallets WHERE user_id='${u1.id}'`);
   const [afterDeposit] = await q(`SELECT coin_balance, won_coins_balance FROM wallets WHERE user_id='${u2.id}'`);
   expect(deposited === true && duplicateDeposit === false &&
-         afterDeposit.coin_balance === beforeEconomy.coin_balance + 400 &&
+         afterDeposit.coin_balance === beforeEconomy.coin_balance + 600 &&
          afterDeposit.won_coins_balance === beforeEconomy.won_coins_balance,
          "deposits credit playable Coins exactly once and never Won Coins");
-  expect(referralCoins === 40 && duplicateReferral === 0 &&
-         afterReferrer.coin_balance === beforeReferrer.coin_balance + 40 &&
+  expect(referralCoins === 60 && duplicateReferral === 0 &&
+         afterReferrer.coin_balance === beforeReferrer.coin_balance + 60 &&
          afterReferrer.won_coins_balance === beforeReferrer.won_coins_balance,
          "referral reward is playable Coins, never Won Coins, and settles once");
 

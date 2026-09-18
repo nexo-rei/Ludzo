@@ -74,6 +74,25 @@ check(
   /\.workspace-content\.workspace-standalone\s*\{[^}]*max-width:\s*760px;[^}]*margin:\s*0 auto/.test(css)
 );
 
+console.log("economy: $3 deposit floor, unchanged Coin rate");
+const economy = read("lib/economy.ts");
+const createApi = read("app/api/deposits/create/route.ts");
+const migration = read("sql/09_min_deposit_three_usd.sql");
+check("rate is still 200 Coins per $1", /COINS_PER_USDT\s*=\s*200\b/.test(economy));
+check("100 Coins still equals $0.50", /COINS_PER_HALF_USD\s*=\s*100\b/.test(economy));
+check("minimum deposit is $3", /MIN_DEPOSIT_USD\s*=\s*3\b/.test(economy));
+check(
+  "the floor is derived from the rate (600 Coins), not hard-coded",
+  /MIN_DEPOSIT_COINS\s*=\s*MIN_DEPOSIT_USD\s*\*\s*COINS_PER_USDT/.test(economy)
+);
+check("deposit page uses the shared floor, not a literal", /MIN_COINS\s*=\s*MIN_DEPOSIT_COINS/.test(deposit));
+check("deposit page no longer allows a 100-Coin minimum", !/MIN_COINS\s*=\s*100\b/.test(deposit));
+check("create API validates through isValidDepositCoinAmount", /isValidDepositCoinAmount\(coinAmount\)/.test(createApi));
+check("create API dropped the old 100-Coin literal bound", !/coinAmount\s*<\s*100\b/.test(createApi));
+check("SQL migration pins min_deposit to 3.00", /'min_deposit'.*|min_deposit/.test(migration) && /'3\.00'/.test(migration));
+check("SQL migration keeps coin_rate at 200", /'coin_rate'/.test(migration) && /'200'/.test(migration));
+check("SQL migration guards the deposits table", /deposits_min_coin_amount/.test(migration));
+
 console.log("payment invariants (logic untouched)");
 check("5-second status polling retained", /setInterval\(\s*\(\)\s*=>\s*pollStatus\(pid\),\s*5000\s*\)/.test(deposit));
 check("40-minute session window retained", /SESSION_SECONDS\s*=\s*40\s*\*\s*60/.test(deposit));
