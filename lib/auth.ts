@@ -43,6 +43,7 @@ export async function requireAuth(req: NextRequest): Promise<AuthResult> {
 interface AdminAuthResult {
   ok: boolean;
   adminId?: string;
+  username?: string;
   role?: string;
   error?: string;
 }
@@ -69,11 +70,32 @@ export async function requireAdminAuth(req: NextRequest): Promise<AdminAuthResul
   const token = authHeader.slice(7).trim();
   try {
     const { payload } = await jwtVerify(token, getJwtSecret());
-    return {
-      ok: true,
-      adminId: payload.adminId as string,
-      role: payload.role as string,
-    };
+    const adminId = payload.adminId as string;
+    let role = payload.role as string;
+    const username = payload.username as string | undefined;
+
+    // Liveness check — moderator ko admin panel se deactivate karte hi uska
+    // 24h token turant mar jaye. DB lookup fail ho (table missing etc.) to
+    // JWT claim pe fallback, taaki purana setup kabhi lock-out na ho.
+    try {
+      const { createAdminClient } = await import("@/lib/supabase/admin");
+      const { data: row } = await createAdminClient()
+        .from("admin_users")
+        .select("role, is_active, username")
+        .eq("id", adminId)
+        .maybeSingle();
+      if (row) {
+        if (row.is_active === false) {
+          return { ok: false, error: "This account has been deactivated" };
+        }
+        // DB wali role authoritative hai (token 24h purana ho sakta hai)
+        role = (row.role as string) ?? role;
+      }
+    } catch {
+      /* DB check best-effort */
+    }
+
+    return { ok: true, adminId, username, role };
   } catch {
     return { ok: false, error: "Invalid or expired admin token" };
   }

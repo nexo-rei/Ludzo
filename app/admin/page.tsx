@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import LudzoLogo from "@/components/layout/LudzoLogo";
+import { saveAdminSession } from "@/hooks/useAdminUser";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -24,7 +25,14 @@ export default function AdminLoginPage() {
       });
       const data = await res.json();
       if (data.success) {
-        localStorage.setItem("ludzo_admin_token", data.data.token);
+        // Role yahin decide ho jata hai: admin → full panel, moderator → limited panel.
+        // Dono ke liye login page aur route same hai; AdminShell role ke hisaab
+        // se nav/badge dikha deta hai.
+        saveAdminSession(data.data.token, {
+          id: data.data.admin?.id ?? "",
+          username: data.data.admin?.username ?? username,
+          role: data.data.admin?.role ?? "admin",
+        });
         router.push("/admin/dashboard");
       } else {
         setError(data.error ?? "Invalid credentials");

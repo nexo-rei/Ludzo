@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/auth";
+import { isSuperAdmin, moderatorForbidden } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logAdminAction } from "@/lib/admin-log";
 import { updateById } from "@/lib/db-write";
@@ -8,6 +9,7 @@ import { creditUsdt } from "@/lib/coins";
 export async function GET(req: NextRequest) {
   const auth = await requireAdminAuth(req);
   if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: 401 });
+  if (!isSuperAdmin(auth.role)) return moderatorForbidden();
 
   try {
     const url = new URL(req.url);
@@ -47,6 +49,7 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const auth = await requireAdminAuth(req);
   if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: 401 });
+  if (!isSuperAdmin(auth.role)) return moderatorForbidden();
 
   try {
     const body = await req.json();

@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/auth";
+import { isModerator, isSuperAdmin, moderatorForbidden } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logAdminAction } from "@/lib/admin-log";
 import { updateById } from "@/lib/db-write";
 import { creditUsdt, creditWonCoins } from "@/lib/coins";
+
+/** Moderator ko pura wallet address nahi dikhate — sirf last 6 chars. */
+const maskWallet = (addr: string | null | undefined) => {
+  const a = String(addr ?? "");
+  if (!a) return a;
+  return a.length <= 6 ? "••••" : `••••${a.slice(-6)}`;
+};
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdminAuth(req);
@@ -36,8 +44,10 @@ export async function GET(req: NextRequest) {
       userMap = Object.fromEntries((users ?? []).map((u) => [u.id, u]));
     }
 
+    const maskForModerator = isModerator(auth.role);
     const items = (withdrawals ?? []).map((w) => ({
       ...w,
+      wallet_address: maskForModerator ? maskWallet(w.wallet_address) : w.wallet_address,
       user: userMap[w.user_id] ?? { first_name: "Unknown", telegram_id: "" },
     }));
     return NextResponse.json({ success: true, data: { items, total: count ?? 0, page, limit } });
@@ -50,6 +60,8 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const auth = await requireAdminAuth(req);
   if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: 401 });
+  // Money movement (approve / reject / mark paid) — sirf full admin.
+  if (!isSuperAdmin(auth.role)) return moderatorForbidden();
 
   try {
     const body = await req.json();

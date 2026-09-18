@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { ReactNode } from "react";
+import { motion } from "framer-motion";
 import LudzoLogo from "@/components/layout/LudzoLogo";
 import { ToastContainer } from "@/components/ui/Toast";
+import { useAdminUser, isModeratorUser } from "@/hooks/useAdminUser";
 import {
   ArrowDownCircleIcon,
   ArrowUpCircleIcon,
@@ -17,6 +19,7 @@ import {
   OverviewIcon,
   ScrollIcon,
   SettingsNavIcon,
+  ShieldIcon,
   UsersIcon,
 } from "@/components/ui/DuotoneIcons";
 import { cn } from "@/lib/utils";
@@ -34,17 +37,39 @@ const NAV_ITEMS = [
   { label: "Deposits", href: "/admin/deposits", icon: ArrowDownCircleIcon },
   { label: "Withdrawals", href: "/admin/withdrawals", icon: ArrowUpCircleIcon },
   { label: "Announcements", href: "/admin/announcements", icon: MegaphoneIcon },
+  { label: "Moderators", href: "/admin/moderators", icon: ShieldIcon },
   { label: "Settings", href: "/admin/settings", icon: SettingsNavIcon },
   { label: "Logs", href: "/admin/logs", icon: ScrollIcon },
 ];
+
+/** Moderator ko sirf ye sections — baqi sab server-side bhi 403 hain. */
+const MODERATOR_ALLOWED = new Set([
+  "/admin/dashboard",
+  "/admin/users",
+  "/admin/support",
+  "/admin/withdrawals",
+]);
 
 export default function AdminShell({ children, title }: AdminShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user, loading: meLoading, logout } = useAdminUser();
+  const isMod = isModeratorUser(user);
+
+  const navItems = isMod ? NAV_ITEMS.filter((i) => MODERATOR_ALLOWED.has(i.href)) : NAV_ITEMS;
+
+  // Moderator URL se allowed section ke bahar jaaye to dashboard pe wapas.
+  // (Asli protection API me 403 hai — ye sirf UX.)
+  const section = "/" + pathname.split("/").filter(Boolean).slice(0, 2).join("/");
+  useEffect(() => {
+    if (!meLoading && isMod && !MODERATOR_ALLOWED.has(section)) {
+      router.replace("/admin/dashboard");
+    }
+  }, [meLoading, isMod, section, router]);
 
   const handleLogout = () => {
-    localStorage.removeItem("ludzo_admin_token");
+    logout();
     router.push("/admin");
   };
 
@@ -55,13 +80,15 @@ export default function AdminShell({ children, title }: AdminShellProps) {
         <LudzoLogo size={32} />
         <div>
           <div className="text-sm font-black text-white tracking-tight">LUDZO</div>
-          <div className="text-[10px] text-gray-500 font-medium">Admin Panel</div>
+          <div className={cn("text-[10px] font-medium", isMod ? "text-sky-400" : "text-gray-500")}>
+            {isMod ? "Moderator Panel" : "Admin Panel"}
+          </div>
         </div>
       </div>
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
+        {navItems.map(({ label, href, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <button
@@ -135,9 +162,21 @@ export default function AdminShell({ children, title }: AdminShellProps) {
           </button>
           <h1 className="text-sm font-bold text-white">{title ?? "Admin"}</h1>
           <div className="ml-auto flex items-center gap-2">
-            <div className="text-[10px] px-2 py-1 rounded-full bg-[#23856C]/20 text-[#63D9B4] font-semibold">
-              Admin
-            </div>
+            {user?.username && (
+              <span className="hidden sm:inline text-[10px] text-gray-500 font-medium">@{user.username}</span>
+            )}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className={cn(
+                "text-[10px] px-2 py-1 rounded-full font-semibold",
+                isMod
+                  ? "bg-sky-500/20 text-sky-300"
+                  : "bg-[#23856C]/20 text-[#63D9B4]"
+              )}
+            >
+              {isMod ? "Moderator" : "Admin"}
+            </motion.div>
           </div>
         </header>
 

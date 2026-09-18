@@ -14,7 +14,8 @@ Files ko **number order** me chalao. Har file **idempotent** hai — galti se do
 | 7 | `07_arena_players.sql` | ✅ **NAYA — ye chalao.** Display Profiles feature hata deta hai (table bhi DROP), purane `Bot …` profiles delete karke **20 real-naam arena players (5 ladkiyan + 15 ladke)** seed karta hai, aur matchmaking fix karta hai: real opponent na mile to **20–28 second ke beech random** time pe arena opponent seat leta hai (pehle 20 s fix tha, aur sab bots inactive hone ki wajah se match hi nahi lagta tha). | Rakho |
 | 8 | `08_coin_economy_and_won_withdrawals.sql` | **Zaroor chalao.** Fixed rate 100 Coins = $0.50, playable-vs-won ledgers, 1,000 Won Coins ($5) minimum and atomic Won-Coin-only withdrawal conversion. | Rakho |
 | 9 | `09_min_deposit_three_usd.sql` | ✅ **NAYA — ye chalao.** Sirf **minimum deposit $3.00** karta hai (600 Coins). Coin rate bilkul wahi rehta hai — **100 Coins = $0.50**. `settings.min_deposit` / `min_deposit_usdt` ko `3.00` pe pin karta hai, `coin_rate` ko 200 pe confirm karta hai, aur `deposits` table pe 600–50,000 Coins ka CHECK lagata hai (purane rows exempt). | Rakho |
-| 10 | `99_verify.sql` | Optional. Read-only check — batata hai ki sab RPC/column install ho gaye ya nahi. | Delete kar sakte ho |
+| 10 | `10_moderators.sql` | ✅ **NAYA — ye chalao.** Moderator role add karta hai: `admin_users` me `role` (`admin`/`moderator`), `is_active`, `created_by`, `updated_at` columns + role CHECK + index. Moderator admin panel se bante hain (`/admin/moderators`) — limited access: sirf tickets, withdrawal requests (read-only), users list. | Rakho |
+| 11 | `99_verify.sql` | Optional. Read-only check — batata hai ki sab RPC/column install ho gaye ya nahi. | Delete kar sakte ho |
 
 ## Display Profiles
 
@@ -29,7 +30,7 @@ Uske rows sirf leaderboard pe extra naam dikhate the, game me kuch nahi karte th
 
 ## Order matter karta hai?
 
-Haan. `02` → `03` → `04` → `05` → `06` → `07` → `08` → `09` → `99`. `01` sirf fresh DB pe.
+Haan. `02` → `03` → `04` → `05` → `06` → `07` → `08` → `09` → `10` → `99`. `01` sirf fresh DB pe.
 `07` ko `04` ke **baad** hi chalana — `04` match_ludo_queue ka 2-token version install karta hai, aur `07` uska final (20–28 s) version likhta hai.
 
 ## Kuch galat ho jaye?
