@@ -9,6 +9,14 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? "";
 const TG = (method: string) =>
   `https://api.telegram.org/bot${BOT_TOKEN}/${method}`;
 
+// /start is the ONLY command this bot answers. The former /help, /profile and
+// /paidpromotion handlers were removed entirely — no handler, menu, response
+// or feature for them exists anywhere in this route. Any other slash command
+// (typed manually or arriving as a stale suggestion) must not execute anything;
+// the user gets exactly this one short, static rejection reply and nothing else.
+const UNKNOWN_COMMAND_REPLY =
+  "❓ Unknown command.\n\nThe only available command is /start.";
+
 /**
  * One POST to the Bot API. Never throws and never retries: a retry — or a 5xx
  * webhook response, which makes Telegram redeliver the whole update — would show
@@ -87,78 +95,6 @@ async function handleStart(
 }
 
 // ---------------------------------------------------------------------------
-// /profile — real Telegram user data
-// ---------------------------------------------------------------------------
-
-async function handleProfile(
-  chatId: number,
-  user: { id: number; first_name?: string; username?: string }
-): Promise<void> {
-  const name = user.first_name ?? "N/A";
-  const username = user.username ? `@${user.username}` : "N/A";
-
-  await sendMessage({
-    chat_id: chatId,
-    text: `👤 <b>PROFILE</b>
-━━━━━━━━━━━━━━
-🆔 <b>User ID:</b> <code>${user.id}</code>
-👤 <b>Name:</b> ${name}
-📛 <b>Username:</b> ${username}
-━━━━━━━━━━━━━━
-🛟 Support: @LudzosupportBot`,
-    parse_mode: "HTML",
-  });
-}
-
-// ---------------------------------------------------------------------------
-// /help
-// ---------------------------------------------------------------------------
-
-async function handleHelp(chatId: number): Promise<void> {
-  await sendMessage({
-    chat_id: chatId,
-    text: `🛟 <b>Ludzo Help Center</b>
-
-<b>Available Commands:</b>
-
-/start - Welcome message
-/help - Help &amp; Support
-/profile - View your profile
-/paidpromotion - Promotion services
-
-Need help?
-
-Contact:
-@LudzosupportBot`,
-    parse_mode: "HTML",
-  });
-}
-
-// ---------------------------------------------------------------------------
-// /paidpromotion
-// ---------------------------------------------------------------------------
-
-async function handlePaidPromotion(chatId: number): Promise<void> {
-  await sendMessage({
-    chat_id: chatId,
-    text: `📢 <b>Ludzo Paid Promotion</b>
-
-We offer promotion opportunities for:
-
-• Telegram Channels
-• Telegram Groups
-• Bots
-• Mini Apps
-• Sponsored Campaigns
-
-For pricing and partnership inquiries:
-
-🛟 @LudzosupportBot`,
-    parse_mode: "HTML",
-  });
-}
-
-// ---------------------------------------------------------------------------
 // Webhook POST handler
 // ---------------------------------------------------------------------------
 
@@ -198,25 +134,16 @@ export async function POST(req: NextRequest) {
     // Extract base command, strip @BotUsername suffix and any arguments
     const command = message.text.split("@")[0].split(" ")[0].toLowerCase();
 
-    switch (command) {
-      case "/start":
-        // Exactly one sendMessage call — the deep-link payload (if any) is
-        // processed internally and never rendered in the welcome message.
-        await handleStart(chatId, tgUser, extractStartPayload(message.text));
-        break;
-      case "/help":
-        await handleHelp(chatId);
-        break;
-      case "/profile":
-        await handleProfile(chatId, tgUser);
-        break;
-      case "/paidpromotion":
-        await handlePaidPromotion(chatId);
-        break;
-      default:
-        // Unknown command — ignore silently
-        break;
+    if (command === "/start") {
+      // Exactly one sendMessage call — the deep-link payload (if any) is
+      // processed internally and never rendered in the welcome message.
+      await handleStart(chatId, tgUser, extractStartPayload(message.text));
+    } else if (command.startsWith("/")) {
+      // Unknown / removed command (e.g. /help, /profile, /paidpromotion):
+      // nothing is executed — one static rejection reply, no feature access.
+      await sendMessage({ chat_id: chatId, text: UNKNOWN_COMMAND_REPLY });
     }
+    // Plain (non-command) text is ignored, exactly as before.
 
     return NextResponse.json({ ok: true });
   } catch (err) {

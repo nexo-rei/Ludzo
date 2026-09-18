@@ -12,6 +12,7 @@ import Badge from "@/components/ui/Badge";
 import { showToast } from "@/components/ui/Toast";
 import { useApp } from "@/hooks/useApp";
 import { timeAgo } from "@/lib/utils";
+import { SUPPORT_TELEGRAM_URL } from "@/lib/support";
 import {
   WithdrawalIcon,
   DepositIcon,
@@ -20,8 +21,6 @@ import {
   FaqIcon,
   SupportDisputesIcon,
 } from "@/components/ui/Icons";
-
-const SUPPORT_USERNAME = process.env.NEXT_PUBLIC_SUPPORT_USERNAME ?? "LudzoSupport";
 
 const CATEGORIES = [
   { label: "Withdrawals", href: "/withdraw", color: "#10B981", bg: "rgba(16,185,129,0.12)", icon: <WithdrawalIcon size={18} /> },
@@ -180,11 +179,10 @@ export default function SupportPage() {
   };
 
   const openTelegram = () => {
-    const tgUrl = `https://t.me/${SUPPORT_USERNAME}`;
     if (typeof window !== "undefined" && (window as Window & { Telegram?: { WebApp?: { openTelegramLink?: (url: string) => void } } }).Telegram?.WebApp?.openTelegramLink) {
-      (window as Window & { Telegram?: { WebApp?: { openTelegramLink?: (url: string) => void } } }).Telegram?.WebApp?.openTelegramLink?.(tgUrl);
+      (window as Window & { Telegram?: { WebApp?: { openTelegramLink?: (url: string) => void } } }).Telegram?.WebApp?.openTelegramLink?.(SUPPORT_TELEGRAM_URL);
     } else {
-      window.open(tgUrl, "_blank");
+      window.open(SUPPORT_TELEGRAM_URL, "_blank");
     }
   };
 
