@@ -1,122 +1,89 @@
 import { NextRequest, NextResponse } from "next/server";
+import { buildStartMessage, extractStartPayload, type StartPayload } from "@/lib/telegram-bot";
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Telegram Bot API helpers
 // ---------------------------------------------------------------------------
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? "";
 const TG = (method: string) =>
   `https://api.telegram.org/bot${BOT_TOKEN}/${method}`;
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
+/**
+ * One POST to the Bot API. Never throws and never retries: a retry — or a 5xx
+ * webhook response, which makes Telegram redeliver the whole update — would show
+ * the user the same message twice. Failures are logged and dropped instead.
+ */
 async function sendMessage(payload: object): Promise<number | null> {
-  const res = await fetch(TG("sendMessage"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const data = await res.json();
-  return data?.result?.message_id ?? null;
-}
+  try {
+    const res = await fetch(TG("sendMessage"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => null);
 
-async function editMessageText(
-  chatId: number,
-  messageId: number,
-  text: string
-): Promise<void> {
-  await fetch(TG("editMessageText"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, message_id: messageId, text }),
-  });
-}
+    if (!data?.ok) {
+      console.error(
+        "[bot] sendMessage failed:",
+        data?.description ?? `HTTP ${res.status}`
+      );
+      return null;
+    }
 
-async function deleteMessage(
-  chatId: number,
-  messageId: number
-): Promise<void> {
-  await fetch(TG("deleteMessage"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, message_id: messageId }),
-  });
-}
-
-// ---------------------------------------------------------------------------
-// /start — animated loader → delete → send fresh welcome with keyboard
-// ---------------------------------------------------------------------------
-
-async function handleStart(chatId: number): Promise<void> {
-  const loaderSteps = [
-    "⚡ Initializing Ludzo Core...\n█░░░░░░░░░ 10%",
-    "⚡ Loading Rewards Engine...\n███░░░░░░░ 40%",
-    "⚡ Syncing Wallet...\n███████░░░ 70%",
-    "⚡ Launch Complete\n██████████ 100%",
-  ];
-
-  // Send the first loader frame
-  const loadingMsgId = await sendMessage({
-    chat_id: chatId,
-    text: loaderSteps[0],
-  });
-
-  if (!loadingMsgId) return;
-
-  // Edit through the remaining loader frames
-  for (let i = 1; i < loaderSteps.length; i++) {
-    await sleep(700);
-    await editMessageText(chatId, loadingMsgId, loaderSteps[i]);
+    return data?.result?.message_id ?? null;
+  } catch (err) {
+    console.error("[bot] sendMessage error:", err);
+    return null;
   }
+}
 
-  // Wait, then delete the loader message entirely
-  await sleep(500);
-  await deleteMessage(chatId, loadingMsgId);
+// ---------------------------------------------------------------------------
+// /start — exactly ONE message, exactly ONE button
+// ---------------------------------------------------------------------------
+//
+// The reply body comes from lib/telegram-bot.ts (single source of truth):
+//
+//   Hey {first_name}! 🎲
+//
+//   Welcome to LUDZO.
+//
+//   Play Ludo, collect Coins, and climb the leaderboard.
+//   Your arena is ready.
+//
+//   Tap below to start 👇
+//
+//   [ 🚀 Start Playing ]
+//
+// There is intentionally no loader animation, no second welcome message, no
+// image/video, no contact/support/FAQ/social block, no referral code, no
+// deposit/withdrawal or legal text and no extra inline buttons. Deep-link
+// payloads (t.me/<bot>?start=<payload>) are still consumed here and handed to
+// the existing referral pipeline internally — they are never shown to the user.
 
-  // Send a brand-new message with inline keyboard
-  await sendMessage({
-    chat_id: chatId,
-    text: `🎮 <b>WELCOME TO LUDZO</b>
-━━━━━━━━━━━━━━
-💰 Daily Rewards
-👥 Referral Earnings
-🚀 Tasks &amp; Missions
-🏆 Leaderboards
-💵 USDT Withdrawals
-━━━━━━━━━━━━━━
-📌 <b>Quick Commands</b>
-/help - Help Center
-/profile - Your Profile
-/paidpromotion - Promotion Services
-━━━━━━━━━━━━━━
-🛟 Support
-@LudzosupportBot
+async function handleStart(
+  chatId: number,
+  from: { first_name?: string },
+  payload: StartPayload | null
+): Promise<void> {
+  try {
+    if (payload) {
+      // Silent processing: the token only feeds the existing referral / deep-link
+      // flow (the Mini App reads the same value through initData.start_param).
+      console.log(
+        "[bot] /start deep-link payload processed" +
+          (payload.referralCode ? " (referral)" : "") +
+          ":",
+        payload.raw
+      );
+    }
 
-🚀 Start earning today!`,
-    parse_mode: "HTML",
-    reply_markup: {
-      inline_keyboard: [
-        [
-          {
-            text: "🎮 Open Ludzo",
-            url: "https://t.me/LudzoBot/Play",
-          },
-        ],
-        [
-          {
-            text: "🛟 Support",
-            url: "https://t.me/LudzosupportBot",
-          },
-          {
-            text: "📢 Promotion",
-            url: "https://t.me/LudzosupportBot",
-          },
-        ],
-      ],
-    },
-  });
+    await sendMessage({ chat_id: chatId, ...buildStartMessage(from) });
+  } catch (err) {
+    // Never bubble up: a 5xx makes Telegram redeliver the update and the user
+    // would receive a duplicate welcome message.
+    console.error("[bot] /start handler error:", err);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -233,7 +200,9 @@ export async function POST(req: NextRequest) {
 
     switch (command) {
       case "/start":
-        await handleStart(chatId);
+        // Exactly one sendMessage call — the deep-link payload (if any) is
+        // processed internally and never rendered in the welcome message.
+        await handleStart(chatId, tgUser, extractStartPayload(message.text));
         break;
       case "/help":
         await handleHelp(chatId);

@@ -17,7 +17,8 @@
     "verify:support": "npx -y -p @electric-sql/pglite@0.2.17 node scripts/verify-support-sql.js",
     "verify:i18n": "node --experimental-strip-types scripts/verify-i18n.mjs",
     "verify:ui": "node --experimental-strip-types scripts/verify-ui-fixes.mjs",
-    "verify": "npm run verify:i18n && npm run verify:ui"
+    "verify:bot": "node --experimental-strip-types scripts/verify-bot-start.mjs",
+    "verify": "npm run verify:i18n && npm run verify:ui && npm run verify:bot"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.47.0",
