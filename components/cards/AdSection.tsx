@@ -24,6 +24,8 @@ declare global {
 
 export default function AdSection({ adsWatchedToday, dailyLimit, adReward, onAdWatched }: AdSectionProps) {
   const [loading, setLoading] = useState(false);
+  const [adStartedAt, setAdStartedAt] = useState<number | null>(null);
+  const MIN_VIEW_SECONDS = 10;
   const { userId, refreshWallet } = useApp();
   const { t } = useI18n();
   const limitReached = adsWatchedToday >= dailyLimit;
@@ -33,6 +35,8 @@ export default function AdSection({ adsWatchedToday, dailyLimit, adReward, onAdW
   const handleWatchAd = async () => {
     if (limitReached || loading || !userId) return;
     setLoading(true);
+    const startedAt = Date.now();
+    setAdStartedAt(startedAt);
     try {
       if (typeof window.show_11113056 !== "function") {
         showToast("Ads unavailable. Please try again later.", "error");
@@ -42,7 +46,7 @@ export default function AdSection({ adsWatchedToday, dailyLimit, adReward, onAdW
       const res = await fetch("/api/ads/reward", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-user-id": userId },
-        body: JSON.stringify({ ad_type: "normal" }),
+        body: JSON.stringify({ ad_type: "normal", started_at: startedAt }),
       });
       const data = await res.json();
       if (data.success) {

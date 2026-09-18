@@ -29,6 +29,7 @@ interface AdminShellProps {
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/admin/dashboard", icon: OverviewIcon },
   { label: "Users", href: "/admin/users", icon: UsersIcon },
+  { label: "Display Profiles", href: "/admin/display-profiles", icon: UsersIcon },
   { label: "Tasks", href: "/admin/tasks", icon: CheckSquareIcon },
   { label: "Support", href: "/admin/support", icon: LifeBuoyIcon },
   { label: "Deposits", href: "/admin/deposits", icon: ArrowDownCircleIcon },
