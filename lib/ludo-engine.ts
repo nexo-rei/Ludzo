@@ -366,7 +366,7 @@ export function botChoosePiece(
 
   const blockedByOpp = getBlockedAbsCells(oppPieces, !amPlayer1);
 
-  /** Cells the opponent could reach next turn with a roll of 1..6. */
+  // ── Danger map: cells the opponent can reach next turn (rolls 1..6) ────
   const dangerAbs = new Set<number>();
   for (const oPos of oppPieces) {
     if (oPos < 1 || oPos > 51) continue;
@@ -378,42 +378,132 @@ export function botChoosePiece(
     }
   }
 
-  let best     = movable[0];
+  // ── Bot board analysis ─────────────────────────────────────────────────
+  const piecesOnTrack = botPieces.filter(p => p >= 1 && p < 52).length;
+  const piecesInYard  = botPieces.filter(p => p === 0).length;
+  const piecesInLane  = botPieces.filter(p => p >= 52 && p < 57).length;
+  const piecesHome    = botPieces.filter(p => p === 57).length;
+  const oppOnTrack    = oppPieces.filter(p => p >= 1 && p < 52).length;
+  const totalProgress = botPieces.reduce((s, p) => s + (p === 0 ? 0 : p), 0);
+  const oppProgress   = oppPieces.reduce((s, p) => s + (p === 0 ? 0 : p), 0);
+  const isBehind      = totalProgress < oppProgress * 0.8;
+
+  // ── Score each movable candidate ───────────────────────────────────────
+  let best      = movable[0];
   let bestScore = -Infinity;
 
   for (const idx of movable) {
     const pos     = botPieces[idx];
     const nextPos = pos === 0 ? 1 : pos + roll;
-    let score     = nextPos;
+    let score     = 0;
 
-    // Progress goals
-    if (nextPos === 57)      score += 10_000;   // piece home
-    else if (nextPos >= 52)  score += 5_000;    // entered the immune home lane
+    const absCell = (nextPos >= 1 && nextPos <= 51)
+      ? toAbsTrack(nextPos, amPlayer1)
+      : null;
+    const isDangerous = absCell !== null && dangerAbs.has(absCell) && !isSafeCell(absCell);
+    const isSafe      = absCell !== null && isSafeCell(absCell);
+    const isBlocked   = absCell !== null && blockedByOpp.has(absCell);
 
-    const absCell = nextPos >= 1 && nextPos <= 51 ? toAbsTrack(nextPos, amPlayer1) : null;
+    // ─── Tier 1: Game-winning / home-lane moves ──────────────────────────
+    if (nextPos === 57) {
+      // Piece reaches HOME
+      score += 30_000;
+      // If this is the LAST piece to finish → massive bonus (instant win)
+      const remaining = botPieces.filter((p, i) => i !== idx && p !== 57).length;
+      if (remaining === 0) score += 100_000;
+    } else if (nextPos >= 52) {
+      // Home lane: immune from capture, push hard
+      score += 15_000 + (nextPos - 52) * 1_500;
+    } else if (pos === 0) {
+      // ─── Tier 2: Yard release ──────────────────────────────────────────
+      // Getting pieces onto the board is critical.
+      score += 5_000;
+      // Extra urgency when the bot has very few pieces on the track
+      if (piecesOnTrack === 0) score += 8_000;   // no active pieces → MUST get out
+      if (piecesOnTrack <= 1 && piecesHome === 0) score += 4_000;
+      // When behind, yard release is more important
+      if (isBehind) score += 3_000;
+      // Check if the destination cell is safe
+      if (isSafe) score += 1_200;
+      else if (isDangerous) score -= 600;  // risky first move, mild penalty
+    } else {
+      // ─── Tier 3: Normal track advancement ──────────────────────────────
 
-    // Capture: only legal when the target cell holds exactly one opponent piece
-    // and is not a safe cell. (applyMove rejects barrier captures.)
-    if (absCell !== null && !isSafeCell(absCell) && !blockedByOpp.has(absCell)) {
-      let victims = 0;
-      for (const oPos of oppPieces) {
-        if (oPos < 1 || oPos > 51) continue;
-        if (toAbsTrack(oPos, !amPlayer1) === absCell) victims++;
+      // Base: progress toward home
+      score += nextPos;
+
+      // Capture bonus — very valuable
+      if (absCell !== null && !isSafeCell(absCell) && !isBlocked) {
+        let victims = 0;
+        for (const oPos of oppPieces) {
+          if (oPos < 1 || oPos > 51) continue;
+          if (toAbsTrack(oPos, !amPlayer1) === absCell) victims++;
+        }
+        if (victims === 1) {
+          score += 6_000;
+          // Extra bonus if the opponent's piece was far along
+          for (const oPos of oppPieces) {
+            if (oPos >= 1 && oPos <= 51 && toAbsTrack(oPos, !amPlayer1) === absCell) {
+              score += oPos * 15; // capturing an advanced piece is better
+            }
+          }
+        }
       }
-      if (victims === 1) score += 2_000;
+
+      // ── Safety assessment ──────────────────────────────────────────────
+      if (isSafe) {
+        // Safe cells: always good
+        score += 1_500;
+      } else if (isDangerous) {
+        // Piece value: losing a piece at pos 40 is worse than at pos 5
+        const pieceValue = pos;
+        if (pieceValue >= 40) {
+          // Very advanced piece → avoid danger at all costs
+          score -= 12_000;
+        } else if (pieceValue >= 25) {
+          // Moderately advanced → significant penalty
+          score -= 6_000;
+        } else if (pieceValue >= 10) {
+          // Early game → moderate penalty
+          score -= 2_500;
+        } else {
+          // Just left yard → acceptable risk, keep moving
+          score -= 800;
+        }
+      }
+
+      // ── Strategic depth ────────────────────────────────────────────────
+
+      // Prefer spreading pieces: if another bot piece is already far ahead,
+      // advance the laggard instead (avoid putting all eggs in one basket)
+      const otherPiecesOnTrack = botPieces
+        .filter((p, i) => i !== idx && p >= 1 && p < 52);
+      const maxOther = otherPiecesOnTrack.length > 0
+        ? Math.max(...otherPiecesOnTrack)
+        : 0;
+      if (maxOther > 0 && pos < maxOther - 10) {
+        // This piece is significantly behind → bonus for catching up
+        score += 1_500;
+      }
+
+      // Extra turn for reaching home or capture → already handled in tier bonuses
     }
 
-    // Safety: landing on a safe cell is good, landing on a cell the opponent
-    // can reach next turn is bad — unless we just captured or went home.
-    if (absCell !== null) {
-      if (isSafeCell(absCell)) score += 600;
-      else if (dangerAbs.has(absCell)) score -= 900;
+    // ── Over-path-blocking guard ─────────────────────────────────────────
+    if (pos > 0 && pos < 52 && nextPos > pos && nextPos <= 51) {
+      for (let p = pos + 1; p <= nextPos; p++) {
+        const checkAbs = toAbsTrack(p, amPlayer1);
+        if (checkAbs !== null && blockedByOpp.has(checkAbs)) {
+          score -= 20_000; // path crosses opponent block → heavily penalize
+          break;
+        }
+      }
     }
 
-    // Leaving the yard is worth a bonus — it gets a piece into play.
-    if (pos === 0 && nextPos === 1) score += 400;
-
-    if (score > bestScore) { bestScore = score; best = idx; }
+    if (score > bestScore) {
+      bestScore = score;
+      best = idx;
+    }
   }
 
   return best;

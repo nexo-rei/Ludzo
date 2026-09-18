@@ -311,7 +311,7 @@ export default function LudoLobby() {
       {/* Ambient arena light */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <motion.div
-          className="absolute -top-16 -left-10 h-56 w-56 rounded-full bg-purple-600/20 blur-3xl"
+          className="absolute -top-16 -left-10 h-56 w-56 rounded-full bg-emerald-600/20 blur-3xl"
           animate={{ opacity: [0.35, 0.7, 0.35] }}
           transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
         />
@@ -332,7 +332,7 @@ export default function LudoLobby() {
           className="flex items-center justify-between gap-3"
         >
           <div className="flex items-center gap-3 min-w-0">
-            <div className="relative h-11 w-11 flex-none overflow-hidden rounded-2xl border border-purple-500/50 bg-slate-900 shadow-[0_0_16px_rgba(99,217,180,0.4)]">
+            <div className="relative h-11 w-11 flex-none overflow-hidden rounded-2xl border border-emerald-500/50 bg-slate-900 shadow-[0_0_16px_rgba(34,197,94,0.4)]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={user?.photo_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${userId ?? "me"}`}
@@ -340,7 +340,7 @@ export default function LudoLobby() {
                 className="h-full w-full object-cover"
                 onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${userId ?? "me"}`; }}
               />
-              <span className="absolute -bottom-px left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-indigo-500" />
+              <span className="absolute -bottom-px left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-green-500" />
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-[15px] font-black leading-tight tracking-tight text-slate-50">
@@ -357,7 +357,7 @@ export default function LudoLobby() {
           <motion.button
             whileTap={{ scale: 0.94 }}
             onClick={() => router.push("/games/home")}
-            className="flex flex-none items-center gap-1.5 rounded-xl border border-purple-500/35 bg-slate-900/70 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-purple-300 transition-colors hover:border-purple-400/60 hover:text-white"
+            className="flex flex-none items-center gap-1.5 rounded-xl border border-emerald-500/35 bg-slate-900/70 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-300 transition-colors hover:border-emerald-400/60 hover:text-white"
           >
             <ArenaHomeIcon size={13} />
             Arena
@@ -379,10 +379,10 @@ export default function LudoLobby() {
             </div>
           </div>
           <div className="surface-glass rounded-2xl px-4 py-3">
-            <span className="text-[9px] font-black uppercase tracking-widest text-purple-300">Won Coins</span>
+            <span className="text-[9px] font-black uppercase tracking-widest text-emerald-300">Won Coins</span>
             <div className="mt-1 flex items-center gap-1.5">
-              <TokenIcon size={16} className="text-purple-300" />
-              <span className="text-lg font-black tabular-nums text-purple-300">{wonCoins.toLocaleString()}</span>
+              <TokenIcon size={16} className="text-emerald-300" />
+              <span className="text-lg font-black tabular-nums text-emerald-300">{wonCoins.toLocaleString()}</span>
             </div>
           </div>
         </motion.div>
@@ -392,11 +392,11 @@ export default function LudoLobby() {
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.4 }}
-          className="arena-glow relative overflow-hidden rounded-3xl border border-purple-500/40 bg-gradient-to-b from-purple-950/80 via-slate-950 to-slate-950 shadow-[0_18px_50px_-24px_rgba(99,217,180,0.8)]"
+          className="arena-glow relative overflow-hidden rounded-3xl border border-emerald-500/40 bg-gradient-to-b from-emerald-950/80 via-slate-950 to-slate-950 shadow-[0_18px_50px_-24px_rgba(34,197,94,0.8)]"
         >
           {/* board watermark */}
           <div className="pointer-events-none absolute -right-6 -top-4 opacity-[0.16]">
-            <LudoIcon size={148} className="text-purple-300" />
+            <LudoIcon size={148} className="text-emerald-300" />
           </div>
 
           <div className="relative z-10 p-5">
@@ -405,7 +405,7 @@ export default function LudoLobby() {
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
                 Live
               </span>
-              <span className="text-[10px] font-black uppercase tracking-widest text-purple-300">Ludo 1v1</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-300">Ludo 1v1</span>
             </div>
 
             <h2 className="mt-2 text-2xl font-black leading-none tracking-tight text-white">LUDO CLASH</h2>
@@ -428,7 +428,7 @@ export default function LudoLobby() {
               whileTap={{ scale: 0.975 }}
               whileHover={{ scale: 1.01 }}
               onClick={handlePlayTap}
-              className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-purple-400/40 bg-gradient-to-r from-purple-600 to-indigo-600 text-xs font-black uppercase tracking-widest text-white shadow-[0_10px_30px_-10px_rgba(99,217,180,0.9)]"
+              className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-emerald-400/40 bg-gradient-to-r from-emerald-600 to-green-600 text-xs font-black uppercase tracking-widest text-white shadow-[0_10px_30px_-10px_rgba(34,197,94,0.9)]"
             >
               <DiceIcon size={17} />
               {selectedStake ? `Play for ${selectedStake} Coins` : "Play Ludo Now"}
@@ -440,7 +440,7 @@ export default function LudoLobby() {
         <div ref={stakesRef} className="space-y-2.5 scroll-mt-4">
           <div className="flex items-end justify-between px-0.5">
             <div>
-              <h3 className="text-[11px] font-black uppercase tracking-widest text-purple-300">Choose your stake</h3>
+              <h3 className="text-[11px] font-black uppercase tracking-widest text-emerald-300">Choose your stake</h3>
               <p className="mt-0.5 text-[10px] font-semibold text-slate-500">Winner receives 98% of the pool</p>
             </div>
             <AnimatePresence>
@@ -474,15 +474,15 @@ export default function LudoLobby() {
                   className={[
                     "relative overflow-hidden rounded-2xl border px-3.5 py-3 text-left transition-all",
                     affordable
-                      ? "border-slate-800 bg-slate-900/50 hover:border-purple-500/50 hover:bg-purple-950/25"
+                      ? "border-slate-800 bg-slate-900/50 hover:border-emerald-500/50 hover:bg-emerald-950/25"
                       : "cursor-not-allowed border-slate-900 bg-slate-950/50 opacity-45",
-                    isPicked ? "ring-1 ring-purple-400/70" : "",
+                    isPicked ? "ring-1 ring-emerald-400/70" : "",
                     highlight && affordable && !isPicked ? "ring-1 ring-amber-400/50" : "",
                   ].join(" ")}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <span className="block text-[9px] font-black uppercase tracking-widest text-purple-400">Stake</span>
+                      <span className="block text-[9px] font-black uppercase tracking-widest text-emerald-400">Stake</span>
                       <span className="mt-0.5 block text-base font-black leading-none tabular-nums text-white">
                         {stake.toLocaleString()}
                       </span>
@@ -502,7 +502,7 @@ export default function LudoLobby() {
                   {isPicked && (
                     <motion.span
                       layoutId="stake-picked"
-                      className="pointer-events-none absolute inset-0 rounded-2xl border border-purple-400/60 bg-purple-500/10"
+                      className="pointer-events-none absolute inset-0 rounded-2xl border border-emerald-400/60 bg-emerald-500/10"
                       transition={{ type: "spring", stiffness: 420, damping: 32 }}
                     />
                   )}
@@ -538,7 +538,7 @@ export default function LudoLobby() {
           className="surface-glass rounded-2xl p-4"
         >
           <div className="flex items-center justify-between">
-            <h3 className="text-[11px] font-black uppercase tracking-widest text-purple-300">How to play</h3>
+            <h3 className="text-[11px] font-black uppercase tracking-widest text-emerald-300">How to play</h3>
             <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">2 tokens · 1v1</span>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
