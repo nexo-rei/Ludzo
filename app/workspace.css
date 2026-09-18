@@ -230,3 +230,109 @@ input, textarea, select, [contenteditable="true"],
   .onboarding-panel {padding:28px 18px;}
   .language-option {padding:9px;gap:7px;font-size:12px;}
 }
+
+/* ── Deposit flow: SaaS-grade surfaces, one accent, restrained motion ─────── */
+/* Only presentation lives here. The payment contract (amount → network →
+   address, 5 s polling, 40-minute session) is untouched in app/deposit/page.tsx. */
+.deposit-page {padding:16px 16px 34px;display:flex;flex-direction:column;gap:20px;}
+.deposit-steps {position:relative;display:flex;align-items:flex-start;justify-content:space-between;padding:4px 6px 0;}
+.deposit-steps-rail {position:absolute;top:18px;left:28px;right:28px;height:2px;border-radius:999px;background:var(--border);overflow:hidden;}
+.deposit-steps-rail-fill {display:block;height:100%;border-radius:999px;background:var(--accent);}
+.deposit-step {position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:7px;min-width:64px;}
+.deposit-step-dot {position:relative;width:32px;height:32px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;}
+.deposit-step-halo {position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--accent);pointer-events:none;}
+.deposit-step-label {font-size:10px;font-weight:600;letter-spacing:.2px;white-space:nowrap;transition:color .2s;}
+
+.deposit-hero {position:relative;overflow:hidden;border:1px solid var(--border);border-radius:16px;padding:20px;background:linear-gradient(135deg,var(--accent-soft) 0%,var(--card-bg) 72%);}
+.deposit-hero-sheen {position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,color-mix(in srgb,var(--accent) 12%,transparent) 48%,transparent 66%);transform:translateX(-120%);animation:deposit-sheen 6.5s ease-in-out infinite;pointer-events:none;}
+@keyframes deposit-sheen {0%,72% {transform:translateX(-120%);} 100% {transform:translateX(120%);}}
+.deposit-hero-label {font-size:10px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-muted);}
+.deposit-hero-value {font-size:32px;font-weight:650;letter-spacing:-1.2px;margin-top:8px;color:var(--text-primary);font-variant-numeric:tabular-nums;}
+.deposit-hero-value span {font-size:12px;font-weight:500;letter-spacing:0;color:var(--text-muted);margin-left:7px;}
+.deposit-hero-sub {font-size:11px;color:var(--text-muted);margin-top:4px;}
+.deposit-hero-chip {display:inline-flex;align-items:center;gap:6px;flex-shrink:0;font-size:10px;font-weight:600;color:var(--accent);background:var(--card-bg);border:1px solid color-mix(in srgb,var(--accent) 26%,transparent);border-radius:999px;padding:6px 10px;white-space:nowrap;}
+
+.deposit-card {border:1px solid var(--border);border-radius:16px;background:var(--card-bg);padding:18px;display:flex;flex-direction:column;gap:16px;}
+.deposit-card-head {display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+.deposit-card-title {font-size:14px;font-weight:650;letter-spacing:-.2px;color:var(--text-primary);}
+.deposit-card-sub {font-size:11px;color:var(--text-muted);margin-top:3px;}
+.deposit-card-eyebrow {font-size:10px;font-weight:650;letter-spacing:1.3px;text-transform:uppercase;color:var(--text-secondary);}
+.deposit-amount-pill {display:inline-flex;align-items:center;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--accent);background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 24%,transparent);border-radius:999px;padding:5px 11px;white-space:nowrap;}
+
+.deposit-presets {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;}
+.deposit-preset {position:relative;overflow:hidden;border:1px solid var(--border);border-radius:13px;background:var(--bg);padding:13px 8px 12px;text-align:center;min-height:70px;transition:border-color .2s,background .2s;}
+.deposit-preset:hover {border-color:color-mix(in srgb,var(--accent) 45%,var(--border));}
+.deposit-preset.is-selected {background:var(--accent-soft);border-color:transparent;}
+.deposit-preset-ring {position:absolute;inset:0;border-radius:13px;border:1.5px solid var(--accent);pointer-events:none;}
+.deposit-preset-usd {display:block;font-size:16px;font-weight:700;letter-spacing:-.5px;font-variant-numeric:tabular-nums;color:var(--text-primary);}
+.deposit-preset.is-selected .deposit-preset-usd {color:var(--accent);}
+.deposit-preset-coins {display:block;font-size:10px;color:var(--text-muted);margin-top:2px;}
+.deposit-preset-tag {position:absolute;top:0;right:0;font-size:8px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--accent-contrast);background:var(--accent);border-bottom-left-radius:8px;padding:2px 6px;}
+
+.deposit-custom {display:flex;flex-direction:column;gap:9px;}
+.deposit-field-label {display:block;font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:7px;}
+.deposit-custom .deposit-field-label {margin-bottom:0;}
+.deposit-input-wrap {display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:12px;background:var(--bg);padding:0 14px;transition:border-color .2s,box-shadow .2s;}
+.deposit-input-wrap.is-active {border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent);}
+.deposit-input-wrap.is-error {border-color:#EF4444;box-shadow:0 0 0 3px rgba(239,68,68,.14);}
+.deposit-input {flex:1;min-width:0;background:transparent;border:0;outline:0;padding:13px 0;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--text-primary);}
+.deposit-input::-webkit-outer-spin-button,.deposit-input::-webkit-inner-spin-button {-webkit-appearance:none;margin:0;}
+.deposit-input[type=number] {-moz-appearance:textfield;appearance:textfield;}
+.deposit-input-suffix {font-size:11px;font-weight:600;color:var(--text-muted);flex-shrink:0;}
+.deposit-meter {height:5px;border-radius:999px;background:var(--bg-elevated);overflow:hidden;}
+.deposit-meter-fill {display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--accent),color-mix(in srgb,var(--accent) 55%,#FFFFFF));}
+.deposit-meter-scale {display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);font-variant-numeric:tabular-nums;}
+.deposit-field-hint {font-size:10px;color:var(--text-muted);}
+
+.deposit-summary {border:1px solid color-mix(in srgb,var(--accent) 20%,transparent);border-radius:13px;background:var(--accent-soft);padding:13px 15px;display:flex;flex-direction:column;gap:9px;}
+.deposit-summary-row {display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;color:var(--text-secondary);}
+.deposit-summary-row strong {font-weight:700;font-variant-numeric:tabular-nums;color:var(--text-primary);}
+.deposit-summary-row.is-total strong {font-size:15px;color:var(--accent);}
+.deposit-summary-divider {height:1px;background:color-mix(in srgb,var(--accent) 18%,transparent);}
+
+.deposit-cta {position:relative;overflow:hidden;width:100%;min-height:52px;display:flex;align-items:center;justify-content:center;border-radius:14px;background:var(--accent);color:var(--accent-contrast);font-size:14px;font-weight:700;letter-spacing:-.1px;box-shadow:0 14px 28px -20px color-mix(in srgb,var(--accent) 85%,transparent);transition:opacity .18s,box-shadow .18s,transform .18s;}
+.deposit-cta:disabled {opacity:.42;box-shadow:none;}
+.deposit-cta-shine {position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.22) 50%,transparent 65%);transform:translateX(-120%);pointer-events:none;}
+.deposit-cta:not(:disabled):hover .deposit-cta-shine {animation:deposit-cta-shine .75s ease-out;}
+@keyframes deposit-cta-shine {to {transform:translateX(120%);}}
+
+.deposit-trust {display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
+.deposit-trust-item {display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:600;color:var(--text-muted);background:var(--card-bg);border:1px solid var(--border);border-radius:999px;padding:6px 11px;}
+
+.deposit-recap {display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--border);border-radius:14px;background:var(--card-bg);padding:15px 16px;}
+.deposit-recap-label {font-size:10px;font-weight:600;letter-spacing:.9px;text-transform:uppercase;color:var(--text-muted);}
+.deposit-recap-value {font-size:17px;font-weight:700;letter-spacing:-.5px;font-variant-numeric:tabular-nums;color:var(--accent);margin-top:3px;}
+.deposit-recap-arrow {flex-shrink:0;color:var(--text-muted);font-size:15px;}
+.deposit-section-title {font-size:13px;font-weight:650;color:var(--text-primary);padding:0 2px;}
+.deposit-network-meta {display:flex;flex-wrap:wrap;gap:10px;margin-top:7px;font-size:10px;color:var(--text-muted);}
+.deposit-network-meta span {display:inline-flex;align-items:center;gap:4px;}
+
+.deposit-kv {border:1px solid var(--border);border-radius:12px;background:var(--bg);padding:10px 12px;}
+.deposit-kv-label {font-size:9px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;color:var(--text-muted);}
+.deposit-kv-value {font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--text-primary);margin-top:3px;}
+
+.deposit-qr {position:relative;overflow:hidden;background:#FFFFFF;padding:12px;border-radius:16px;box-shadow:0 18px 40px -26px rgba(0,0,0,.55);}
+.deposit-qr-scan {position:absolute;left:12px;right:12px;height:2px;border-radius:999px;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:deposit-qr-scan 2.6s ease-in-out infinite;pointer-events:none;}
+@keyframes deposit-qr-scan {0%,100% {top:14px;opacity:.15;} 50% {top:calc(100% - 16px);opacity:.75;}}
+
+.deposit-copy-row {display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:12px;background:var(--bg);padding:11px 12px;transition:border-color .2s;}
+.deposit-copy-row:hover {border-color:color-mix(in srgb,var(--accent) 40%,var(--border));}
+.deposit-copy-btn {flex-shrink:0;display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:9px;transition:background .18s,transform .18s;}
+.deposit-copy-btn:hover {background:var(--accent-soft);}
+.deposit-copy-btn:active {transform:scale(.92);}
+
+.deposit-history-row {display:flex;align-items:center;gap:12px;border:1px solid var(--border);border-radius:13px;background:var(--card-bg);padding:12px;transition:border-color .2s;}
+.deposit-history-row:hover {border-color:color-mix(in srgb,var(--accent) 40%,var(--border));}
+.deposit-history-icon {display:flex;align-items:center;justify-content:center;width:34px;height:34px;flex-shrink:0;border-radius:10px;background:var(--accent-soft);color:var(--accent);}
+
+@media(min-width:640px) {
+  .deposit-page {padding:22px 24px 42px;gap:22px;}
+  .deposit-hero {padding:24px;}
+  .deposit-hero-value {font-size:38px;}
+  .deposit-presets {gap:11px;}
+}
+@media(max-width:360px) {
+  .deposit-presets {grid-template-columns:repeat(2,minmax(0,1fr));}
+  .deposit-step {min-width:54px;}
+  .deposit-step-label {font-size:9px;}
+}

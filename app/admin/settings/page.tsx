@@ -29,7 +29,7 @@ interface AppSettings {
 
 const DEFAULT_SETTINGS: AppSettings = {
   coin_rate: 200, ad_reward_coins: 2, daily_ad_limit: 15, welcome_bonus_coins: 10,
-  referral_commission_pct: 10, min_deposit_usdt: 5, min_withdrawal_usdt: 5, withdrawal_fee_pct: 5,
+  referral_commission_pct: 10, min_deposit_usdt: 3, min_withdrawal_usdt: 5, withdrawal_fee_pct: 5,
   streak_day_1: 2, streak_day_2: 3, streak_day_3: 4, streak_day_4: 5, streak_day_5: 6, streak_day_6: 8, streak_day_7: 10,
   site_name: "LUDZO", support_username: "LudzoSupport", maintenance_mode: false, maintenance_message: "We'll be back shortly!",
 };
@@ -115,7 +115,7 @@ export default function AdminSettingsPage() {
               <NumberInput label="Daily Ad Limit" field="daily_ad_limit" />
               <NumberInput label="Welcome Bonus (Coins)" field="welcome_bonus_coins" />
               <NumberInput label="Referral Commission (%)" field="referral_commission_pct" />
-              <NumberInput label="Min Deposit (USDT)" field="min_deposit_usdt" />
+              <NumberInput label="Min Deposit ($3 · fixed)" field="min_deposit_usdt" disabled />
               <NumberInput label="Min Won-Coin Conversion ($5 · fixed)" field="min_withdrawal_usdt" disabled />
               <NumberInput label="Withdrawal Fee (%)" field="withdrawal_fee_pct" />
             </div>

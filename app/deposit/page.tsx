@@ -1,7 +1,7 @@
 "use client";
 import SymbolIcon from "@/components/ui/SymbolIcon";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
@@ -11,7 +11,14 @@ import { SkeletonCard } from "@/components/ui/Skeleton";
 import { showToast } from "@/components/ui/Toast";
 import EmptyState from "@/components/ui/EmptyState";
 import { useApp } from "@/hooks/useApp";
-import { COINS_PER_HALF_USD, COINS_PER_USDT } from "@/lib/economy";
+import {
+  COINS_PER_HALF_USD,
+  COINS_PER_USDT,
+  MAX_DEPOSIT_COINS,
+  MAX_DEPOSIT_USD,
+  MIN_DEPOSIT_COINS,
+  MIN_DEPOSIT_USD,
+} from "@/lib/economy";
 import {
   AlertCircleIcon,
   AlertTriangleIcon,
@@ -23,6 +30,7 @@ import {
   NetworkIcon,
   ShieldIcon,
   TimerIcon,
+  ZapIcon,
 } from "@/components/ui/DuotoneIcons";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -53,31 +61,46 @@ interface DepositHistoryItem {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const MIN_COINS = 100;
-const MAX_COINS = 50_000;
+// The Coin rate itself is unchanged — 100 Coins = $0.50. Only the smallest
+// purchase moved to $3.00, which is MIN_DEPOSIT_COINS at that same rate.
+const MIN_COINS = MIN_DEPOSIT_COINS;
+const MAX_COINS = MAX_DEPOSIT_COINS;
 const SESSION_SECONDS = 40 * 60; // 40 minutes
 
-// 100 Coins = $0.50, so deposit presets stay aligned with the public rate.
-const PRESET_COINS = [100, 200, 500, 1000, 2000, 5000];
+// Presets start at the $3 floor and climb in clean USD steps.
+const PRESET_COINS: { coins: number; tag?: string }[] = [
+  { coins: MIN_COINS, tag: "Minimum" },
+  { coins: 1_000 },
+  { coins: 2_000,  tag: "Popular" },
+  { coins: 4_000 },
+  { coins: 10_000 },
+  { coins: 20_000, tag: "Best value" },
+];
 
-const NETWORKS: { id: Network; label: string; desc: string; badge: string; badgeColor: string; color: string; bg: string; border: string }[] = [
+const NETWORKS: {
+  id: Network; label: string; desc: string; badge: string; badgeColor: string;
+  color: string; bg: string; border: string; speed: string; fee: string;
+}[] = [
   {
     id: "TON", label: "USDT TON", desc: "TON Blockchain",
     badge: "Lowest Fee",
     badgeColor: "text-emerald-400 bg-emerald-400/10 border-emerald-400/30",
     color: "#0098EA", bg: "rgba(0,152,234,0.08)", border: "rgba(0,152,234,0.35)",
+    speed: "~10 sec", fee: "Very low",
   },
   {
     id: "TRC20", label: "USDT TRC20", desc: "Tron Network",
     badge: "Fast",
     badgeColor: "text-red-400 bg-red-400/10 border-red-400/30",
     color: "#E50914", bg: "rgba(229,9,20,0.08)", border: "rgba(229,9,20,0.35)",
+    speed: "~1 min", fee: "Low",
   },
   {
     id: "BEP20", label: "USDT BEP20", desc: "BNB Smart Chain",
     badge: "Recommended",
     badgeColor: "text-yellow-400 bg-yellow-400/10 border-yellow-400/30",
     color: "#F3BA2F", bg: "rgba(243,186,47,0.08)", border: "rgba(243,186,47,0.35)",
+    speed: "~1 min", fee: "Low",
   },
 ];
 
@@ -103,45 +126,61 @@ function coinsToUsdt(coins: number): number {
 function fmtCoins(n: number): string {
   return n.toLocaleString();
 }
+function fmtUsd(n: number): string {
+  return n.toFixed(2);
+}
 function fmtDt(dt: string): string {
   return new Date(dt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-// ─── Step Indicator (theme-aware) ────────────────────────────────────────────
+// ─── Step Indicator (theme-aware, animated rail) ─────────────────────────────
 function StepBar({ step }: { step: Step }) {
-  const steps = ["Select Coins", "Network", "Payment"];
+  const steps = ["Amount", "Network", "Payment"];
   return (
-    <div className="flex items-center mb-6" aria-label={`Step ${step} of ${steps.length}: ${steps[step - 1]}`}>
+    <div className="deposit-steps" aria-label={`Step ${step} of ${steps.length}: ${steps[step - 1]}`}>
+      <div className="deposit-steps-rail" aria-hidden>
+        <motion.span
+          className="deposit-steps-rail-fill"
+          initial={false}
+          animate={{ width: `${((step - 1) / (steps.length - 1)) * 100}%` }}
+          transition={{ type: "spring", stiffness: 220, damping: 30 }}
+        />
+      </div>
       {steps.map((label, i) => {
         const num = (i + 1) as Step;
         const active = num === step;
         const done   = num < step;
         return (
-          <div key={num} className="flex items-center" style={{ flex: i < steps.length - 1 ? "1" : "none" }}>
-            <div className="flex flex-col items-center gap-1.5">
-              <motion.div
-                animate={{
-                  background:   done ? "var(--success-strong)" : "transparent",
-                  borderColor:  done ? "var(--success-strong)" : active ? "var(--accent)" : "var(--border)",
-                  boxShadow:    active ? "0 0 0 4px var(--accent-soft)" : "0 0 0 0 rgba(0,0,0,0)",
-                  scale:        active ? 1.06 : 1,
-                }}
-                transition={{ type: "spring", stiffness: 380, damping: 26 }}
-                className="w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold"
-                style={{ color: done ? "var(--accent-contrast)" : active ? "var(--accent)" : "var(--text-muted)" }}
-              >
+          <div key={num} className="deposit-step">
+            <motion.div
+              initial={false}
+              animate={{
+                background:  done ? "var(--success-strong)" : active ? "var(--accent)" : "var(--card-bg)",
+                borderColor: done ? "var(--success-strong)" : active ? "var(--accent)" : "var(--border)",
+                color:       done || active ? "var(--accent-contrast)" : "var(--text-muted)",
+                scale:       active ? 1.08 : 1,
+              }}
+              transition={{ type: "spring", stiffness: 380, damping: 26 }}
+              className="deposit-step-dot"
+            >
+              {active && (
+                <motion.span
+                  className="deposit-step-halo"
+                  animate={{ opacity: [0.55, 0, 0.55], scale: [1, 1.75, 1] }}
+                  transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                  aria-hidden
+                />
+              )}
+              <span className="relative z-[1] flex items-center justify-center">
                 {done ? <CheckIcon size={14} /> : num}
-              </motion.div>
-              <span
-                className="text-[10px] font-semibold whitespace-nowrap transition-colors duration-200"
-                style={{ color: active ? "var(--accent)" : done ? "var(--success-strong)" : "var(--text-muted)" }}
-              >
-                {label}
               </span>
-            </div>
-            {i < steps.length - 1 && (
-              <div className="flex-1 h-px mx-2 mb-5" style={{ background: done ? "var(--success-strong)" : "var(--border)" }} />
-            )}
+            </motion.div>
+            <span
+              className="deposit-step-label"
+              style={{ color: active ? "var(--accent)" : done ? "var(--success-strong)" : "var(--text-muted)" }}
+            >
+              {label}
+            </span>
           </div>
         );
       })}
@@ -170,15 +209,18 @@ function CountdownBadge({ expiresAt, expired }: { expiresAt: number | null; expi
   const mm = String(Math.floor(secs / 60)).padStart(2, "0");
   const ss = String(secs % 60).padStart(2, "0");
   const urgent = secs < 300 && !expired;
+  const pct = Math.min(1, Math.max(0, secs / SESSION_SECONDS));
+  const R = 13;
+  const C = 2 * Math.PI * R;
 
   if (expired) {
     return (
       <motion.div
         initial={{ scale: 0.9 }} animate={{ scale: 1 }}
-        className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/30 bg-red-500/10"
+        className="flex items-center gap-2 px-3 py-2 rounded-xl border border-red-500/30 bg-red-500/10"
       >
         <CloseCircleIcon size={14} className="text-red-400" />
-        <span className="text-red-400 text-sm font-bold">Payment Session Expired</span>
+        <span className="text-red-400 text-xs font-bold">Expired</span>
       </motion.div>
     );
   }
@@ -187,13 +229,23 @@ function CountdownBadge({ expiresAt, expired }: { expiresAt: number | null; expi
     <motion.div
       animate={urgent ? { scale: [1, 1.02, 1] } : { scale: 1 }}
       transition={urgent ? { repeat: Infinity, duration: 1, ease: "easeInOut" } : { duration: 0.2 }}
-      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border ${urgent ? "border-red-500/40 bg-red-500/10" : "border-[var(--border)] bg-[var(--card-bg)]"}`}
+      className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border ${
+        urgent ? "border-red-500/40 bg-red-500/10" : "border-[var(--border)] bg-[var(--bg)]"
+      }`}
     >
-      <TimerIcon size={14} className={urgent ? "text-red-400" : "text-yellow-400"} />
-      <span className={`text-sm font-mono font-bold tabular-nums ${urgent ? "text-red-400" : "text-yellow-400"}`}>
+      <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden className="shrink-0 -rotate-90">
+        <circle cx="15" cy="15" r={R} fill="none" stroke="var(--border)" strokeWidth="2.5" />
+        <circle
+          cx="15" cy="15" r={R} fill="none" strokeWidth="2.5" strokeLinecap="round"
+          stroke={urgent ? "#EF4444" : "var(--accent)"}
+          strokeDasharray={C}
+          strokeDashoffset={C * (1 - pct)}
+          style={{ transition: "stroke-dashoffset 1s linear" }}
+        />
+      </svg>
+      <span className={`text-sm font-mono font-bold tabular-nums ${urgent ? "text-red-400" : "text-[var(--text-primary)]"}`}>
         {mm}:{ss}
       </span>
-      <span className="text-xs text-[var(--text-muted)]">remaining</span>
     </motion.div>
   );
 }
@@ -211,13 +263,38 @@ function WarningBanner() {
   );
 }
 
+// ─── Trust strip ─────────────────────────────────────────────────────────────
+function TrustStrip() {
+  const items = [
+    { icon: <ShieldIcon size={14} />,       label: "Secure gateway" },
+    { icon: <ZapIcon size={14} />,          label: "Auto credit" },
+    { icon: <CheckCircleIcon size={14} />,  label: "On-chain proof" },
+  ];
+  return (
+    <div className="deposit-trust">
+      {items.map((it, i) => (
+        <motion.div
+          key={it.label}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 * i + 0.1, duration: 0.25 }}
+          className="deposit-trust-item"
+        >
+          <span className="text-[var(--accent)]">{it.icon}</span>
+          {it.label}
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function DepositPage() {
   const { userId } = useApp();
   const router = useRouter();
 
   const [step,        setStep]        = useState<Step>(1);
-  const [coinAmount,  setCoinAmount]  = useState<number>(500);
+  const [coinAmount,  setCoinAmount]  = useState<number>(1_000);
   const [customInput, setCustomInput] = useState("");
   const [useCustom,   setUseCustom]   = useState(false);
   const [network,     setNetwork]     = useState<Network | null>(null);
@@ -241,11 +318,21 @@ export default function DepositPage() {
 
   const validationMsg = (() => {
     if (!effectiveCoinAmount) return "";
-    if (effectiveCoinAmount < MIN_COINS) return `Minimum deposit is ${MIN_COINS.toLocaleString()} Coins ($${coinsToUsdt(MIN_COINS)})`;
-    if (effectiveCoinAmount > MAX_COINS) return `Maximum deposit is ${MAX_COINS.toLocaleString()} Coins ($${coinsToUsdt(MAX_COINS)})`;
+    if (effectiveCoinAmount < MIN_COINS)
+      return `Minimum deposit is ${fmtCoins(MIN_COINS)} Coins ($${fmtUsd(MIN_DEPOSIT_USD)})`;
+    if (effectiveCoinAmount > MAX_COINS)
+      return `Maximum deposit is ${fmtCoins(MAX_COINS)} Coins ($${fmtUsd(MAX_DEPOSIT_USD)})`;
+    if (!Number.isInteger(effectiveCoinAmount)) return "Enter a whole number of Coins.";
     return "";
   })();
   const isValidAmount = !validationMsg && effectiveCoinAmount >= MIN_COINS;
+
+  // Progress of the chosen amount against the allowed range — drives the meter.
+  const amountProgress = useMemo(() => {
+    if (!effectiveCoinAmount) return 0;
+    const clamped = Math.min(Math.max(effectiveCoinAmount, MIN_COINS), MAX_COINS);
+    return ((clamped - MIN_COINS) / (MAX_COINS - MIN_COINS)) * 100;
+  }, [effectiveCoinAmount]);
 
   // ── Load data ──────────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
@@ -363,87 +450,151 @@ export default function DepositPage() {
 
   // ── STEP 1 — Select Coins ─────────────────────────────────────────────────
   const Step1 = (
-    <motion.div key="step1" initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ type: "spring", stiffness: 320, damping: 30 }} className="space-y-5">
-      {/* Balance */}
-      <div className="glass rounded-2xl p-5 text-center">
-        <p className="text-xs text-[var(--text-muted)] mb-1">Current Balance</p>
-        <p className="text-3xl font-black font-numeric text-[var(--accent)]">
-          {fmtCoins(coinBalance)}{" "}
-          <span className="text-base text-[var(--text-muted)] font-semibold">Coins</span>
-        </p>
-      </div>
+    <motion.div
+      key="step1"
+      initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }}
+      transition={{ type: "spring", stiffness: 320, damping: 30 }}
+      className="space-y-5"
+    >
+      {/* Balance hero */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="deposit-hero"
+      >
+        <span className="deposit-hero-sheen" aria-hidden />
+        <div className="relative z-[1] flex items-start justify-between gap-3">
+          <div>
+            <p className="deposit-hero-label">Current balance</p>
+            <p className="deposit-hero-value">
+              {fmtCoins(coinBalance)}<span>Coins</span>
+            </p>
+            <p className="deposit-hero-sub">≈ ${fmtUsd(coinsToUsdt(coinBalance))} in play value</p>
+          </div>
+          <div className="deposit-hero-chip">
+            <SymbolIcon name="coins" size={14} />
+            {COINS_PER_HALF_USD} Coins = $0.50
+          </div>
+        </div>
+      </motion.div>
 
-      {/* Coin selector card */}
-      <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 space-y-4">
-        <div>
-          <p className="text-sm font-bold text-[var(--text-primary)] mb-0.5">Select Amount</p>
-          <p className="text-[11px] text-[var(--text-muted)]">{COINS_PER_HALF_USD} Coins = $0.50 · Min {MIN_COINS.toLocaleString()} · Max {MAX_COINS.toLocaleString()}</p>
+      {/* Amount selector */}
+      <div className="deposit-card">
+        <div className="deposit-card-head">
+          <div>
+            <p className="deposit-card-title">Select amount</p>
+            <p className="deposit-card-sub">
+              Min ${fmtUsd(MIN_DEPOSIT_USD)} · Max ${fmtUsd(MAX_DEPOSIT_USD)} · fixed rate
+            </p>
+          </div>
+          <AnimatePresence mode="popLayout">
+            {isValidAmount && (
+              <motion.span
+                key={effectiveCoinAmount}
+                initial={{ opacity: 0, y: -6, scale: 0.94 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 6, scale: 0.94 }}
+                transition={{ type: "spring", stiffness: 420, damping: 28 }}
+                className="deposit-amount-pill"
+              >
+                ${fmtUsd(usdtAmount)}
+              </motion.span>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Presets */}
-        <div className="grid grid-cols-3 gap-2" role="group" aria-label="Preset deposit amounts">
-          {PRESET_COINS.map((v, i) => (
-            <motion.button
-              key={v}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.04 * i, duration: 0.18 }}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => { setUseCustom(false); setCoinAmount(v); setError(""); }}
-              aria-pressed={!useCustom && coinAmount === v}
-              className={`py-3 rounded-xl text-sm border transition-all duration-150 ${
-                !useCustom && coinAmount === v
-                  ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
-                  : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--accent)]/40 hover:text-[var(--text-primary)]"
-              }`}
-            >
-              <span className="block font-bold font-numeric">{fmtCoins(v)}</span>
-              <span className="block text-[10px] opacity-70">${coinsToUsdt(v).toFixed(2)}</span>
-            </motion.button>
-          ))}
+        <div className="deposit-presets" role="group" aria-label="Preset deposit amounts">
+          {PRESET_COINS.map(({ coins, tag }, i) => {
+            const selected = !useCustom && coinAmount === coins;
+            return (
+              <motion.button
+                key={coins}
+                type="button"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.035 * i, duration: 0.2 }}
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => { setUseCustom(false); setCoinAmount(coins); setError(""); }}
+                aria-pressed={selected}
+                className={`deposit-preset ${selected ? "is-selected" : ""}`}
+              >
+                {selected && (
+                  <motion.span
+                    layoutId="deposit-preset-ring"
+                    className="deposit-preset-ring"
+                    transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                    aria-hidden
+                  />
+                )}
+                <span className="relative z-[1] block">
+                  <span className="deposit-preset-usd">${fmtUsd(coinsToUsdt(coins))}</span>
+                  <span className="deposit-preset-coins">{fmtCoins(coins)} Coins</span>
+                </span>
+                {tag && <span className="deposit-preset-tag">{tag}</span>}
+              </motion.button>
+            );
+          })}
         </div>
 
         {/* Custom input */}
-        <div>
-          <label htmlFor="deposit-custom-amount" className="text-xs text-[var(--text-muted)] font-medium block mb-1.5">
-            Custom amount ({MIN_COINS.toLocaleString()}–{MAX_COINS.toLocaleString()})
+        <div className="deposit-custom">
+          <label htmlFor="deposit-custom-amount" className="deposit-field-label">
+            Custom amount ({fmtCoins(MIN_COINS)}–{fmtCoins(MAX_COINS)} Coins)
           </label>
-          <input
-            id="deposit-custom-amount"
-            type="number" min={MIN_COINS} max={MAX_COINS} step={1}
-            value={customInput}
-            onFocus={() => setUseCustom(true)}
-            onChange={(e) => { setCustomInput(e.target.value); setUseCustom(true); setError(""); }}
-            placeholder="e.g. 2500"
-            aria-invalid={useCustom && !!validationMsg}
-            aria-describedby="deposit-amount-hint"
-            className={`w-full px-4 py-3 bg-[var(--bg)] border rounded-xl text-[var(--text-primary)] font-numeric text-base outline-none transition-colors ${
-              useCustom
-                ? validationMsg
-                  ? "border-red-400/70 focus:border-red-400"
-                  : "border-[var(--accent)]"
-                : "border-[var(--border)] focus:border-[var(--accent)]"
-            }`}
-          />
-          <p id="deposit-amount-hint" className="text-[10px] text-[var(--text-muted)] mt-1.5">
-            {useCustom && validationMsg
-              ? ""
-              : "Enter the exact number of Coins you want to receive."}
+          <div className={`deposit-input-wrap ${useCustom ? (validationMsg ? "is-error" : "is-active") : ""}`}>
+            <input
+              id="deposit-custom-amount"
+              type="number" min={MIN_COINS} max={MAX_COINS} step={1}
+              value={customInput}
+              onFocus={() => setUseCustom(true)}
+              onChange={(e) => { setCustomInput(e.target.value); setUseCustom(true); setError(""); }}
+              placeholder={`e.g. ${fmtCoins(MIN_COINS)}`}
+              aria-invalid={useCustom && !!validationMsg}
+              aria-describedby="deposit-amount-hint"
+              className="deposit-input"
+            />
+            <span className="deposit-input-suffix">Coins</span>
+          </div>
+
+          {/* Range meter */}
+          <div className="deposit-meter" aria-hidden>
+            <motion.span
+              className="deposit-meter-fill"
+              initial={false}
+              animate={{ width: `${isValidAmount ? Math.max(4, amountProgress) : 0}%` }}
+              transition={{ type: "spring", stiffness: 180, damping: 28 }}
+            />
+          </div>
+          <div className="deposit-meter-scale" aria-hidden>
+            <span>${fmtUsd(MIN_DEPOSIT_USD)}</span>
+            <span>${fmtUsd(MAX_DEPOSIT_USD)}</span>
+          </div>
+
+          <p id="deposit-amount-hint" className="deposit-field-hint">
+            {useCustom && validationMsg ? "" : "Enter the exact number of Coins you want to receive."}
           </p>
         </div>
 
         {/* Live conversion */}
-        <AnimatePresence>
+        <AnimatePresence initial={false}>
           {isValidAmount && (
             <motion.div
               initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
+              transition={{ duration: 0.22 }}
               className="overflow-hidden"
             >
-              <div className="flex items-center justify-between px-4 py-3 bg-[var(--accent-soft)] border border-[var(--accent)]/20 rounded-xl">
-                <span className="text-sm text-[var(--text-muted)]">You pay</span>
-                <span className="text-sm font-bold font-numeric text-[var(--accent)]">${usdtAmount.toFixed(2)} USDT</span>
+              <div className="deposit-summary">
+                <div className="deposit-summary-row">
+                  <span>You receive</span>
+                  <strong>{fmtCoins(effectiveCoinAmount)} Coins</strong>
+                </div>
+                <div className="deposit-summary-divider" />
+                <div className="deposit-summary-row is-total">
+                  <span>You pay</span>
+                  <strong>${fmtUsd(usdtAmount)} USDT</strong>
+                </div>
               </div>
             </motion.div>
           )}
@@ -465,33 +616,51 @@ export default function DepositPage() {
       </div>
 
       <motion.button
-        whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+        whileHover={{ y: isValidAmount ? -1 : 0 }} whileTap={{ scale: isValidAmount ? 0.985 : 1 }}
         onClick={() => { if (isValidAmount) setStep(2); }}
         disabled={!isValidAmount}
-        className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-white font-bold text-sm
-                   transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
-        style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
+        className="deposit-cta"
       >
-        Continue — {isValidAmount ? `${fmtCoins(effectiveCoinAmount)} Coins ($${usdtAmount.toFixed(2)})` : "Select amount"}
+        <span className="deposit-cta-shine" aria-hidden />
+        <span className="relative z-[1]">
+          {isValidAmount
+            ? `Continue — ${fmtCoins(effectiveCoinAmount)} Coins ($${fmtUsd(usdtAmount)})`
+            : `Minimum deposit $${fmtUsd(MIN_DEPOSIT_USD)}`}
+        </span>
       </motion.button>
+
+      <TrustStrip />
     </motion.div>
   );
 
   // ── STEP 2 — Select Network ───────────────────────────────────────────────
   const Step2 = (
-    <motion.div key="step2" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ type: "spring", stiffness: 320, damping: 30 }} className="space-y-4">
-      <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-4 flex items-center justify-between">
+    <motion.div
+      key="step2"
+      initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }}
+      transition={{ type: "spring", stiffness: 320, damping: 30 }}
+      className="space-y-4"
+    >
+      <div className="deposit-recap">
         <div>
-          <p className="text-xs text-[var(--text-muted)]">You will receive</p>
-          <p className="text-lg font-black font-numeric text-[var(--accent)]">{fmtCoins(effectiveCoinAmount)} Coins</p>
+          <p className="deposit-recap-label">You will receive</p>
+          <p className="deposit-recap-value">{fmtCoins(effectiveCoinAmount)} Coins</p>
+        </div>
+        <div className="deposit-recap-arrow" aria-hidden>
+          <motion.span
+            animate={{ x: [0, 4, 0] }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+          >
+            →
+          </motion.span>
         </div>
         <div className="text-right">
-          <p className="text-xs text-[var(--text-muted)]">You pay</p>
-          <p className="text-lg font-bold font-numeric text-[var(--accent)]">${usdtAmount.toFixed(2)} USDT</p>
+          <p className="deposit-recap-label">You pay</p>
+          <p className="deposit-recap-value">${fmtUsd(usdtAmount)} USDT</p>
         </div>
       </div>
 
-      <p className="text-sm font-bold text-[var(--text-primary)] px-1">Choose payment network</p>
+      <p className="deposit-section-title">Choose payment network</p>
 
       <div className="space-y-3" role="radiogroup" aria-label="Payment network">
         {NETWORKS.map((n, i) => {
@@ -502,8 +671,8 @@ export default function DepositPage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.05 * i, duration: 0.2 }}
-              whileHover={{ scale: 1.02, y: -1 }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.985 }}
               onClick={() => setNetwork(n.id)}
               role="radio"
               aria-checked={selected}
@@ -513,7 +682,7 @@ export default function DepositPage() {
                 animate={{
                   borderColor: selected ? n.border : "var(--border)",
                   background:  selected ? n.bg : "var(--card-bg)",
-                  boxShadow:   selected ? `0 0 0 1px ${n.border}, 0 6px 20px -8px ${n.border}` : "0 1px 3px rgba(0,0,0,0.04)",
+                  boxShadow:   selected ? `0 0 0 1px ${n.border}, 0 12px 28px -18px ${n.border}` : "0 1px 3px rgba(0,0,0,0.04)",
                 }}
                 className="rounded-2xl border p-4 transition-colors"
               >
@@ -532,6 +701,10 @@ export default function DepositPage() {
                       </span>
                     </div>
                     <p className="text-xs text-[var(--text-muted)] mt-0.5">{n.desc}</p>
+                    <div className="deposit-network-meta">
+                      <span><TimerIcon size={11} /> {n.speed}</span>
+                      <span><SymbolIcon name="coins" size={11} /> {n.fee} fee</span>
+                    </div>
                   </div>
                   <motion.div
                     animate={{ scale: selected ? 1 : 0.5, opacity: selected ? 1 : 0 }}
@@ -548,27 +721,33 @@ export default function DepositPage() {
       </div>
 
       <motion.button
-        whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+        whileHover={{ y: network ? -1 : 0 }} whileTap={{ scale: network ? 0.985 : 1 }}
         onClick={() => { if (network) setStep(3); }}
         disabled={!network}
-        className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-white font-bold text-sm
-                   transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
-        style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
+        className="deposit-cta"
       >
-        {network ? `Continue with ${NETWORKS.find(n => n.id === network)?.label}` : "Select a network"}
+        <span className="deposit-cta-shine" aria-hidden />
+        <span className="relative z-[1]">
+          {network ? `Continue with ${NETWORKS.find(n => n.id === network)?.label}` : "Select a network"}
+        </span>
       </motion.button>
     </motion.div>
   );
 
   // ── STEP 3 — Payment Confirmation ─────────────────────────────────────────
   const Step3 = (
-    <motion.div key="step3" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ type: "spring", stiffness: 320, damping: 30 }} className="space-y-4">
+    <motion.div
+      key="step3"
+      initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }}
+      transition={{ type: "spring", stiffness: 320, damping: 30 }}
+      className="space-y-4"
+    >
 
       {payment ? (
         // ── Active payment ──
         <>
           {/* Status bar */}
-          <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl border ${
             payment.status === "finished"
               ? "border-emerald-500/30 bg-emerald-500/10"
               : sessionExpired || payment.status === "expired" || payment.status === "failed"
@@ -583,7 +762,14 @@ export default function DepositPage() {
                 {sessionExpired && payment.status !== "finished" ? "Payment Session Expired" : STATUS_META[payment.status]?.label}
               </div>
               {!TERMINAL.has(payment.status) && !sessionExpired && (
-                <div className="text-[10px] text-[var(--text-muted)]">Checking every 5 seconds…</div>
+                <div className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)]">
+                  <motion.span
+                    className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--accent)]"
+                    animate={{ opacity: [1, 0.25, 1], scale: [1, 0.85, 1] }}
+                    transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+                  />
+                  Checking every 5 seconds…
+                </div>
               )}
             </div>
             {!TERMINAL.has(payment.status) && !sessionExpired && (
@@ -601,7 +787,7 @@ export default function DepositPage() {
               <p className="text-red-400 font-bold text-base">Session expired after 40 minutes</p>
               <p className="text-xs text-[var(--text-muted)]">Please create a new payment to continue.</p>
               <motion.button
-                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}
                 onClick={resetAll}
                 className="mt-2 px-6 py-3 rounded-xl font-bold text-sm"
                 style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
@@ -626,7 +812,7 @@ export default function DepositPage() {
               <div className="text-2xl font-black font-numeric text-emerald-400">+{fmtCoins(payment.coin_amount)} Coins</div>
               <p className="text-xs text-[var(--text-muted)]">Credited to your wallet</p>
               <motion.button
-                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}
                 onClick={resetAll}
                 className="mt-3 px-6 py-3 rounded-xl font-bold text-sm"
                 style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
@@ -642,19 +828,25 @@ export default function DepositPage() {
               <WarningBanner />
 
               {/* Info card */}
-              <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-4 space-y-3">
-                <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wide">Payment Information</p>
+              <div className="deposit-card">
+                <p className="deposit-card-eyebrow">Payment information</p>
                 <div className="grid grid-cols-2 gap-2">
                   {[
                     { label: "Network",    value: NETWORKS.find(n => n.id === payment.network)?.label ?? payment.network },
-                    { label: "Amount",     value: `${payment.usdt_amount.toFixed(2)} USDT` },
+                    { label: "Amount",     value: `${fmtUsd(payment.usdt_amount)} USDT` },
                     { label: "Coins",      value: `+${fmtCoins(payment.coin_amount)}` },
                     { label: "Expiration", value: "40 Minutes" },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="bg-[var(--bg)] rounded-xl px-3 py-2.5">
-                      <div className="text-[10px] text-[var(--text-muted)] mb-0.5">{label}</div>
-                      <div className="text-sm font-bold font-numeric text-[var(--text-primary)]">{value}</div>
-                    </div>
+                  ].map(({ label, value }, i) => (
+                    <motion.div
+                      key={label}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.04 * i, duration: 0.2 }}
+                      className="deposit-kv"
+                    >
+                      <div className="deposit-kv-label">{label}</div>
+                      <div className="deposit-kv-value">{value}</div>
+                    </motion.div>
                   ))}
                 </div>
               </div>
@@ -668,26 +860,27 @@ export default function DepositPage() {
                   // The QR is the one place a long press is still useful (save the
                   // code for a hardware wallet), so it opts out of the global
                   // callout suppression — see app/workspace.css.
-                  className="allow-longpress bg-white p-3 rounded-2xl shadow-[0_8px_30px_-12px_rgba(0,0,0,0.35)]"
+                  className="allow-longpress deposit-qr"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(payment.payment_address)}&margin=8`}
                     alt="Payment QR" width={180} height={180} className="rounded-lg"
                   />
+                  <span className="deposit-qr-scan" aria-hidden />
                 </motion.div>
                 <p className="text-[10px] text-[var(--text-muted)]">Scan to pay</p>
               </div>
 
               {/* Payment address */}
               <div>
-                <div className="text-xs text-[var(--text-muted)] font-medium mb-1.5">Payment Address</div>
-                <div className="flex items-center gap-2 bg-[var(--bg)] border border-[var(--border)] rounded-xl px-3 py-2.5">
+                <div className="deposit-field-label">Payment address</div>
+                <div className="deposit-copy-row">
                   <span className="flex-1 text-xs font-mono text-[var(--text-primary)] truncate">{payment.payment_address}</span>
                   <button
                     onClick={() => copyText(payment.payment_address, "addr")}
                     aria-label="Copy payment address"
-                    className="shrink-0 p-1.5 rounded-lg hover:bg-[var(--border)] transition-colors"
+                    className="deposit-copy-btn"
                   >
                     {copiedAddr ? <CheckCircleIcon size={14} className="text-emerald-400" /> : <CopyIcon size={14} className="text-[var(--text-muted)]" />}
                   </button>
@@ -696,13 +889,13 @@ export default function DepositPage() {
 
               {/* Amount */}
               <div>
-                <div className="text-xs text-[var(--text-muted)] font-medium mb-1.5">Exact Amount to Send</div>
-                <div className="flex items-center gap-2 bg-[var(--bg)] border border-[var(--border)] rounded-xl px-3 py-2.5">
-                  <span className="flex-1 text-sm font-bold font-mono text-emerald-400">{payment.usdt_amount.toFixed(2)} USDT</span>
+                <div className="deposit-field-label">Exact amount to send</div>
+                <div className="deposit-copy-row">
+                  <span className="flex-1 text-sm font-bold font-mono text-emerald-400">{fmtUsd(payment.usdt_amount)} USDT</span>
                   <button
-                    onClick={() => copyText(String(payment.usdt_amount.toFixed(2)), "amt")}
+                    onClick={() => copyText(String(fmtUsd(payment.usdt_amount)), "amt")}
                     aria-label="Copy payment amount"
-                    className="shrink-0 p-1.5 rounded-lg hover:bg-[var(--border)] transition-colors"
+                    className="deposit-copy-btn"
                   >
                     {copiedAmt ? <CheckCircleIcon size={14} className="text-emerald-400" /> : <CopyIcon size={14} className="text-[var(--text-muted)]" />}
                   </button>
@@ -710,7 +903,7 @@ export default function DepositPage() {
               </div>
 
               <p className="text-[10px] text-[var(--text-muted)] text-center leading-relaxed px-2">
-                Send exactly <strong className="text-[var(--text-primary)]">{payment.usdt_amount.toFixed(2)} USDT</strong> on {NETWORKS.find(n => n.id === payment.network)?.desc}. Coins credited automatically after confirmation.
+                Send exactly <strong className="text-[var(--text-primary)]">{fmtUsd(payment.usdt_amount)} USDT</strong> on {NETWORKS.find(n => n.id === payment.network)?.desc}. Coins credited automatically after confirmation.
               </p>
             </>
           )}
@@ -718,13 +911,13 @@ export default function DepositPage() {
       ) : (
         // ── Pre-payment: Notice + checkbox ──
         <>
-          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-4 flex items-center justify-between">
+          <div className="deposit-recap">
             <div>
-              <p className="text-xs text-[var(--text-muted)]">You will receive</p>
-              <p className="text-lg font-black font-numeric text-[var(--accent)]">{fmtCoins(effectiveCoinAmount)} Coins</p>
+              <p className="deposit-recap-label">You will receive</p>
+              <p className="deposit-recap-value">{fmtCoins(effectiveCoinAmount)} Coins</p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-[var(--text-muted)]">Network</p>
+              <p className="deposit-recap-label">Network</p>
               <div className="flex items-center gap-1.5 justify-end mt-0.5">
                 <NetworkIcon id={network!} size={18} />
                 <p className="text-sm font-bold text-[var(--text-primary)]">{network}</p>
@@ -758,9 +951,9 @@ export default function DepositPage() {
 
           {/* Agreement checkbox */}
           <motion.label
-            whileHover={{ scale: 1.01 }}
+            whileHover={{ y: -1 }}
             htmlFor="agree-checkbox"
-            className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all duration-150 ${
+            className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all duration-150 ${
               agreed
                 ? "border-[var(--accent)]/50 bg-[var(--accent-soft)]"
                 : "border-[var(--border)] bg-[var(--card-bg)]"
@@ -802,16 +995,17 @@ export default function DepositPage() {
           )}
 
           <motion.button
-            whileHover={{ scale: agreed ? 1.01 : 1 }} whileTap={{ scale: agreed ? 0.98 : 1 }}
+            whileHover={{ y: agreed ? -1 : 0 }} whileTap={{ scale: agreed ? 0.985 : 1 }}
             onClick={handleCreatePayment}
             disabled={!agreed || submitting}
-            className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-sm
-                       transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
+            className="deposit-cta"
           >
-            {submitting
-              ? <><LoaderIcon size={16} className="animate-spin" /> Creating Payment…</>
-              : "Generate Payment Address"}
+            <span className="deposit-cta-shine" aria-hidden />
+            <span className="relative z-[1] flex items-center justify-center gap-2">
+              {submitting
+                ? <><LoaderIcon size={16} className="animate-spin" /> Creating Payment…</>
+                : "Generate Payment Address"}
+            </span>
           </motion.button>
         </>
       )}
@@ -821,7 +1015,7 @@ export default function DepositPage() {
   // ── Deposit History ────────────────────────────────────────────────────────
   const HistorySection = (
     <div>
-      <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wide mb-3">Deposit History</h3>
+      <h3 className="deposit-card-eyebrow mb-3">Deposit history</h3>
       {histLoading ? <SkeletonCard /> : history.length === 0 ? (
         <EmptyState emoji="💸" title="No deposits yet" description="Make your first deposit above." />
       ) : (
@@ -836,13 +1030,13 @@ export default function DepositPage() {
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(i * 0.04, 0.3) }}
-                className="flex items-center gap-3 p-3 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl"
+                className="deposit-history-row"
               >
-                <SymbolIcon name="coins" />
+                <span className="deposit-history-icon"><SymbolIcon name="coins" /></span>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-bold font-numeric text-[var(--accent)]">+{fmtCoins(coins)} Coins</div>
                   <div className="text-[10px] text-[var(--text-muted)] flex items-center gap-1.5 flex-wrap">
-                    <span>${usdt.toFixed(2)} USDT</span>
+                    <span>${fmtUsd(usdt)} USDT</span>
                     {d.network && <><span className="opacity-40">·</span><span>{d.network}</span></>}
                     <span className="opacity-40">·</span>
                     <span>{fmtDt(d.created_at)}</span>
@@ -865,7 +1059,7 @@ export default function DepositPage() {
         onBack={handleStepBack}
         backLabel={step === 1 ? "Back to home" : step === 2 ? "Back to amount" : "Back to network"}
       />
-      <div className="px-4 py-4 pb-8 space-y-5">
+      <div className="deposit-page">
         <StepBar step={step} />
 
         <AnimatePresence mode="wait">

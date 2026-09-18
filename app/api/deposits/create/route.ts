@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { COINS_PER_USDT } from "@/lib/economy";
+import {
+  COINS_PER_USDT,
+  MAX_DEPOSIT_COINS,
+  MIN_DEPOSIT_COINS,
+  MIN_DEPOSIT_USD,
+  isValidDepositCoinAmount,
+} from "@/lib/economy";
 
 // Network currency mapping for NOWPayments API
 const NETWORK_CURRENCY: Record<string, string> = {
@@ -43,10 +49,16 @@ export async function POST(req: NextRequest) {
     const coinAmount = Number(body.coin_amount);
     const network    = String(body.network ?? "").toUpperCase();
 
-    // Validate coin amount
-    if (!Number.isInteger(coinAmount) || coinAmount < 100 || coinAmount > 50000) {
+    // Validate coin amount. The rate is untouched (100 Coins = $0.50); only the
+    // minimum purchase is now $3.00, i.e. MIN_DEPOSIT_COINS at that same rate.
+    if (!isValidDepositCoinAmount(coinAmount)) {
       return NextResponse.json(
-        { success: false, error: "Coin amount must be between 100 and 50000." },
+        {
+          success: false,
+          error:
+            `Coin amount must be between ${MIN_DEPOSIT_COINS} and ${MAX_DEPOSIT_COINS} ` +
+            `(minimum deposit is $${MIN_DEPOSIT_USD.toFixed(2)}).`,
+        },
         { status: 400 }
       );
     }
