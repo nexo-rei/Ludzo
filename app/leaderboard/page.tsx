@@ -193,9 +193,11 @@ function PodiumSlot({
       </span>
 
       <span style={{ color: tone.amount }}>
-        <Amount value={entry.usdt_earned} className="mt-0.5 block text-[12px] font-semibold" />
+        <Amount value={entry.usdt_earned} className="mt-0.5 block text-center text-[12px] font-semibold" />
       </span>
-      <span className="mt-1 text-[9px] font-medium uppercase tracking-wider text-[var(--text-muted)]">USDT</span>
+      <span className="mt-1 block w-full text-center text-[9px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+        USDT
+      </span>
 
       <span
         className="relative mt-2.5 flex w-full items-start justify-center overflow-hidden rounded-t-xl border-x border-t"
