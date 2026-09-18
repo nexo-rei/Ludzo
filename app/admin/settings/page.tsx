@@ -28,7 +28,7 @@ interface AppSettings {
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
-  coin_rate: 100, ad_reward_coins: 2, daily_ad_limit: 15, welcome_bonus_coins: 10,
+  coin_rate: 200, ad_reward_coins: 2, daily_ad_limit: 15, welcome_bonus_coins: 10,
   referral_commission_pct: 10, min_deposit_usdt: 5, min_withdrawal_usdt: 5, withdrawal_fee_pct: 5,
   streak_day_1: 2, streak_day_2: 3, streak_day_3: 4, streak_day_4: 5, streak_day_5: 6, streak_day_6: 8, streak_day_7: 10,
   site_name: "LUDZO", support_username: "LudzoSupport", maintenance_mode: false, maintenance_message: "We'll be back shortly!",
@@ -87,14 +87,15 @@ export default function AdminSettingsPage() {
   const set = (key: keyof AppSettings, value: string | number | boolean) =>
     setSettings((s) => ({ ...s, [key]: value }));
 
-  const NumberInput = ({ label, field }: { label: string; field: keyof AppSettings }) => (
+  const NumberInput = ({ label, field, disabled = false }: { label: string; field: keyof AppSettings; disabled?: boolean }) => (
     <div>
       <label className="text-xs text-gray-400 font-medium">{label}</label>
       <input
         type="number"
         value={settings[field] as number}
         onChange={(e) => set(field, Number(e.target.value))}
-        className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#23856C]"
+        disabled={disabled}
+        className="w-full mt-1 px-3 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm outline-none focus:border-[#23856C] disabled:cursor-not-allowed disabled:opacity-60"
       />
     </div>
   );
@@ -109,13 +110,13 @@ export default function AdminSettingsPage() {
           <section>
             <h2 className="text-sm font-bold text-[#23856C] uppercase tracking-wide mb-4">Economy</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <NumberInput label="Coin Display Rate (X coins = $1)" field="coin_rate" />
+              <NumberInput label="Coin Display Rate (200 coins = $1 · fixed)" field="coin_rate" disabled />
               <NumberInput label="Coins Per Ad" field="ad_reward_coins" />
               <NumberInput label="Daily Ad Limit" field="daily_ad_limit" />
               <NumberInput label="Welcome Bonus (Coins)" field="welcome_bonus_coins" />
               <NumberInput label="Referral Commission (%)" field="referral_commission_pct" />
               <NumberInput label="Min Deposit (USDT)" field="min_deposit_usdt" />
-              <NumberInput label="Min Withdrawal (USDT)" field="min_withdrawal_usdt" />
+              <NumberInput label="Min Won-Coin Conversion ($5 · fixed)" field="min_withdrawal_usdt" disabled />
               <NumberInput label="Withdrawal Fee (%)" field="withdrawal_fee_pct" />
             </div>
           </section>

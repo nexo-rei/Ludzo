@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
 
     let query = supabase
       .from("referrals")
-      .select("id, commission_amount, commission_status, created_at, referee_id", { count: "exact" })
+      .select("id, commission_amount, commission_coins, commission_status, created_at, referee_id", { count: "exact" })
       .eq("referrer_id", user.id)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
       name: refereeMap[r.referee_id]?.first_name ?? "User",
       username: refereeMap[r.referee_id]?.username,
       commission_amount: r.commission_amount,
+      commission_coins: Number(r.commission_coins ?? r.commission_amount ?? 0),
       commission_status: r.commission_status,
       joined_at: r.created_at,
     }));

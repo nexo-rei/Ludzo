@@ -14,7 +14,7 @@ import { useApp } from "@/hooks/useApp";
 
 interface ProfileData {
   user: { first_name: string; last_name?: string; username?: string; telegram_id: string; photo_url?: string };
-  wallet: { coin_balance: number; usdt_balance: number };
+  wallet: { coin_balance: number; usdt_balance: number; won_coins_balance?: number };
   stats: { total_tasks_completed: number; total_referrals: number; current_streak_day: number; total_streaks_claimed: number };
 }
 
@@ -126,7 +126,7 @@ export default function ProfilePage() {
             transition={{ delay: 0.05 }}
             className="p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] space-y-1"
           >
-            <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block">{t("cash_wallet")}</span>
+            <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block">Protected funds</span>
             <span className="text-xl font-black font-numeric text-emerald-500 block">
               ${profile?.wallet.usdt_balance.toFixed(2)}
             </span>
@@ -160,10 +160,18 @@ export default function ProfilePage() {
               {(wallet?.won_coins_balance ?? wonCoinsBalance).toLocaleString()}
             </motion.span>
             <span className="text-[10px] font-bold" style={{ color: "#64748B" }}>
-              100 {t("won_coins")} = $1
+              100 {t("won_coins")} = $0.50 · 1,000 = $5 minimum
             </span>
           </div>
         </motion.div>
+
+        <Link
+          href="/withdraw"
+          className="flex items-center justify-between rounded-2xl border border-[#63D9B4]/25 bg-[#63D9B4]/[0.06] px-4 py-3 text-xs font-bold text-[#63D9B4]"
+        >
+          <span>Convert Ludo Won Coins</span>
+          <span>Open converter →</span>
+        </Link>
 
         {/* Menu Items */}
         <div className="rounded-2xl border border-[var(--border)] overflow-hidden bg-[var(--card-bg)]">

@@ -36,8 +36,9 @@ const SECTIONS = [
   {
     title: "5. The Coin System — Virtual Currency Disclaimer",
     paragraphs: [
-      "Coins are a virtual, in-app currency used within LUDZO. Coins have no real-world monetary value, are not legal tender, cannot be exchanged for cash, and cannot be transferred to other users, withdrawn, or converted into USDT or any other currency.",
-      "Coins may be earned through watching rewarded ads, completing tasks, claiming daily streaks, referrals, and — in the future — through games and optional purchases. LUDZO reserves the right to adjust Coin earning rates, values, costs, and availability at any time, including reducing or removing ways to earn Coins.",
+      "Playable Coins are a virtual, in-app currency used within LUDZO. They have no real-world monetary value, cannot be transferred to other users, and cannot be withdrawn or converted into USDT. Playable Coins earned from ads, tasks, streaks, referrals, deposits, welcome bonuses, or admin adjustments remain in the gameplay ledger.",
+      "Won Coins are a separate locked ledger credited only after a settled Ludo match. Won Coins cannot be used to enter a match; they may be converted only through the in-app converter at 200 Won Coins = $1 USDT, subject to the exact 1,000 Won Coin ($5) minimum and the applicable review fee.",
+      "LUDZO reserves the right to adjust Coin earning rates, costs, and availability, but the public Won-Coin conversion rate and minimum shown above apply to this economy version unless the App clearly announces a change.",
     ],
   },
   {
@@ -49,20 +50,21 @@ const SECTIONS = [
   {
     title: "7. USDT Wallet & Withdrawals",
     paragraphs: [
-      "USDT held in your LUDZO wallet represents real value associated with your account. You may request withdrawals of your USDT balance to an external wallet address that you provide, subject to the following conditions:",
+      "Only Won Coins from settled Ludo matches are eligible for conversion. Playable Coins and protected USDT associated with deposits or admin adjustments are not withdrawable through this converter. A conversion creates a USDT payout request to the external wallet address you provide, subject to the following conditions:",
     ],
     bullets: [
-      "A minimum withdrawal amount applies, currently $5 USDT, which may be adjusted by LUDZO at any time.",
-      "A processing fee, currently 5% of the withdrawal amount, is deducted before the net amount is sent.",
-      "Withdrawal requests are subject to manual review, typically completed within 48 hours, and may be delayed for additional verification under our AML & Anti-Fraud Policy.",
-      "LUDZO reserves the right to decline or reverse a withdrawal that is suspected to be fraudulent, erroneous, or in violation of these Terms, our Fair Play Policy, or our AML & Anti-Fraud Policy.",
-      "You are solely responsible for providing an accurate and compatible withdrawal address. LUDZO is not responsible for funds sent to an incorrect address provided by you.",
+      "The minimum is exactly 1,000 Won Coins, equal to $5 USDT at the fixed rate of 200 Won Coins = $1. Requests must use 200-Coin steps.",
+      "A processing fee, currently 5% of the gross conversion amount, is deducted before the net amount is sent.",
+      "Won Coins are locked and cannot be used as a Ludo match stake.",
+      "Conversion requests are subject to manual review, typically completed within 48 hours, and may be delayed for additional verification under our AML & Anti-Fraud Policy.",
+      "LUDZO reserves the right to decline or reverse a conversion that is suspected to be fraudulent, erroneous, or in violation of these Terms, our Fair Play Policy, or our AML & Anti-Fraud Policy. A rejected request returns the reserved Won Coins to the locked ledger.",
+      "You are solely responsible for providing an accurate and compatible TRC20 or BEP20 USDT address. LUDZO is not responsible for funds sent to an incorrect address provided by you.",
     ],
   },
   {
     title: "8. Future Deposits",
     paragraphs: [
-      "LUDZO plans to introduce optional USDT deposits in future releases, which would allow users to add funds to their wallet for use on the platform. Deposit features, minimum amounts, and supported payment methods will be described in-app and governed by these Terms, our Refund Policy, and any additional terms presented at the time of the deposit feature's launch.",
+      "Optional USDT deposits are available where shown in the App. A deposit is converted at 200 Coins = $1 and credits the playable Coin ledger only; it does not create Won Coins and cannot be withdrawn through the Won-Coin converter. Deposit minimums, payment status, and supported networks are shown in-app and governed by these Terms and our Refund Policy.",
     ],
   },
   {
@@ -74,7 +76,7 @@ const SECTIONS = [
   {
     title: "10. Referral Program",
     paragraphs: [
-      "LUDZO's referral program allows users to share a unique referral link. Where applicable, a referral commission (currently 10% of a referred user's first qualifying deposit, once deposits are available) may be credited to the referring user's USDT balance, subject to validation.",
+      "LUDZO's referral program allows users to share a unique referral link. Where applicable, a referral commission (currently 10% of a referred user's first qualifying deposit, once deposits are available) is credited as playable Coins to the referring user's coin ledger, subject to validation. Referral Coins are not Won Coins and cannot be withdrawn or converted.",
     ],
     bullets: [
       "Referrals must represent genuine, independent individuals. Self-referrals, fake accounts, and coordinated referral schemes are prohibited.",

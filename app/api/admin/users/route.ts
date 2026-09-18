@@ -33,16 +33,16 @@ export async function GET(req: NextRequest) {
 
     // Fetch wallet data for user list
     const userIds = (users ?? []).map((u) => u.id);
-    let walletMap: Record<string, { coin_balance: number; usdt_balance: number }> = {};
+    let walletMap: Record<string, { coin_balance: number; usdt_balance: number; won_coins_balance: number }> = {};
     if (userIds.length > 0) {
       const { data: wallets } = await supabase
-        .from("wallets").select("user_id, coin_balance, usdt_balance").in("user_id", userIds);
+        .from("wallets").select("user_id, coin_balance, usdt_balance, won_coins_balance").in("user_id", userIds);
       walletMap = Object.fromEntries((wallets ?? []).map((w) => [w.user_id, w]));
     }
 
     const items = (users ?? []).map((u) => ({
       ...u,
-      wallet: walletMap[u.id] ?? { coin_balance: 0, usdt_balance: 0 },
+      wallet: walletMap[u.id] ?? { coin_balance: 0, usdt_balance: 0, won_coins_balance: 0 },
     }));
 
     return NextResponse.json({ success: true, data: { items, total: count ?? 0, page, limit } });

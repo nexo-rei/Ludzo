@@ -16,7 +16,7 @@ interface AdminUser {
   username?: string;
   status: string;
   created_at: string;
-  wallet: { coin_balance: number; usdt_balance: number };
+  wallet: { coin_balance: number; usdt_balance: number; won_coins_balance?: number };
 }
 
 export default function AdminUsersPage() {
@@ -102,16 +102,16 @@ export default function AdminUsersPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#222]">
-                {["User", "Telegram ID", "Coins", "USDT", "Status", "Joined", "Actions"].map((h) => (
+                {["User", "Telegram ID", "Playable Coins", "Won Coins", "Protected USDT", "Status", "Joined", "Actions"].map((h) => (
                   <th key={h} className="text-left text-xs text-gray-500 font-semibold uppercase tracking-wide px-4 py-3">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="text-center py-8 text-gray-500">Loading…</td></tr>
+                <tr><td colSpan={8} className="text-center py-8 text-gray-500">Loading…</td></tr>
               ) : users.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-8 text-gray-500">No users found</td></tr>
+                <tr><td colSpan={8} className="text-center py-8 text-gray-500">No users found</td></tr>
               ) : users.map((user) => (
                 <tr key={user.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
                   <td className="px-4 py-3">
@@ -120,7 +120,8 @@ export default function AdminUsersPage() {
                   </td>
                   <td className="px-4 py-3 text-gray-400 font-mono text-xs">{user.telegram_id}</td>
                   <td className="px-4 py-3 text-yellow-400 font-numeric">{formatCoins(user.wallet?.coin_balance ?? 0)}</td>
-                  <td className="px-4 py-3 text-green-400 font-numeric">${formatUSDT(user.wallet?.usdt_balance ?? 0)}</td>
+                  <td className="px-4 py-3 text-purple-300 font-numeric">{formatCoins(user.wallet?.won_coins_balance ?? 0)}</td>
+                  <td className="px-4 py-3 text-green-400 font-numeric">${formatUSDT(user.wallet?.usdt_balance ?? 0)} <span className="text-[9px] text-gray-500">locked</span></td>
                   <td className="px-4 py-3">
                     <Badge variant={user.status === "active" ? "success" : "error"} size="sm">{user.status}</Badge>
                   </td>

@@ -379,11 +379,12 @@ export default function LudoLobby() {
             </div>
           </div>
           <div className="surface-glass rounded-2xl px-4 py-3">
-            <span className="text-[9px] font-black uppercase tracking-widest text-emerald-300">Won Coins</span>
+            <span className="text-[9px] font-black uppercase tracking-widest text-emerald-300">Won Coins · locked</span>
             <div className="mt-1 flex items-center gap-1.5">
               <TokenIcon size={16} className="text-emerald-300" />
               <span className="text-lg font-black tabular-nums text-emerald-300">{wonCoins.toLocaleString()}</span>
             </div>
+            <span className="mt-1 block text-[9px] font-semibold text-slate-500">Ludo prizes only · not playable</span>
           </div>
         </motion.div>
 

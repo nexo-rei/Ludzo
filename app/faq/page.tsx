@@ -12,9 +12,9 @@ const FAQ_DATA = [
     category: "General",
     items: [
       { q: "What is LUDZO?", a: "LUDZO is a Telegram Mini App where you can earn Coins and USDT by watching ads, completing tasks, and referring friends." },
-      { q: "What are Coins?", a: "Coins are LUDZO's virtual in-app currency. They have no real-world cash value and cannot be withdrawn or transferred — they're used inside the app for games and rewards. USDT is separate and represents real value that can be withdrawn." },
+      { q: "What are Coins?", a: "Playable Coins are LUDZO's virtual in-app currency. Coins earned from ads, tasks, streaks, referrals, deposits, welcome bonuses, or admin adjustments stay playable and cannot be withdrawn. Won Coins are a separate locked balance awarded only for settled Ludo wins and can be converted under the withdrawal rules." },
       { q: "How do I start earning?", a: "Simply open the app, authenticate with Telegram, and start watching rewarded ads on the Home page to earn Coins instantly." },
-      { q: "Is LUDZO free to use?", a: "Yes, LUDZO is completely free. You can earn Coins without spending anything. USDT requires a deposit." },
+      { q: "Is LUDZO free to use?", a: "Yes, LUDZO is completely free. You can earn playable Coins and win locked Won Coins through Ludo without depositing. Deposits are separate playable funds and are not required for the Won-Coin converter." },
     ],
   },
   {
@@ -22,13 +22,13 @@ const FAQ_DATA = [
     items: [
       { q: "How many ads can I watch per day?", a: "You can watch up to 15 normal ads per day, earning 2 Coins per ad (max 30 Coins/day). The limit resets at midnight UTC." },
       { q: "What is the Daily Streak?", a: "Claim a daily streak reward by watching 3 bonus ads. Rewards increase from Day 1 (2 Coins) to Day 7 (10 Coins). Missing a day resets your streak." },
-      { q: "What is the difference between Coins and USDT?", a: "Coins are earned through app activities and cannot be withdrawn. USDT is real money that can be deposited and withdrawn to your crypto wallet." },
+      { q: "What is the difference between Coins and USDT?", a: "Playable Coins are for Ludo entry and rewards only. Won Coins are locked Ludo prize Coins and cannot be staked, but may be converted at 200 Won Coins = $1 USDT. Protected deposit/admin USDT is not eligible for the user withdrawal converter." },
     ],
   },
   {
     category: "Deposits",
     items: [
-      { q: "What is the minimum deposit?", a: "The minimum deposit amount is $5 USDT." },
+      { q: "What is the minimum deposit?", a: "The minimum deposit is 100 Coins, equal to $0.50 at the current 200 Coins = $1 rate. Deposits are credited to the playable Coin ledger only." },
       { q: "How do I deposit USDT?", a: "Go to the Deposit page, enter an amount, and tap 'Pay with Binance Pay'. You'll be redirected to complete payment. USDT is credited after confirmation." },
       { q: "How long does a deposit take?", a: "Deposits via Binance Pay are usually credited within a few minutes after payment confirmation." },
     ],
@@ -36,8 +36,8 @@ const FAQ_DATA = [
   {
     category: "Withdrawals",
     items: [
-      { q: "How do withdrawals work?", a: "Go to the Withdraw page, enter the amount you want to withdraw and your USDT wallet address, and submit the request. Your request is then queued for manual review before payment is sent." },
-      { q: "What is the minimum withdrawal?", a: "The minimum withdrawal amount is $5 USDT." },
+      { q: "How do withdrawals work?", a: "Go to the Convert Won Coins page, enter an eligible Won-Coin amount and your TRC20 or BEP20 USDT wallet address, and submit the request. Only Won Coins from settled Ludo matches are eligible; your request is queued for manual review before payment is sent." },
+      { q: "What is the minimum withdrawal?", a: "The minimum is exactly 1,000 Won Coins, equal to $5 USDT. Requests must use 200 Won-Coin steps. Playable Coins and protected deposit/admin funds are not eligible." },
       { q: "Is there a withdrawal fee?", a: "Yes, a 5% fee is deducted from your withdrawal amount. The net amount you receive is shown before you confirm." },
       { q: "How long do withdrawals take?", a: "Withdrawals are manually reviewed by our admin team within 48 hours. Once approved, payment is processed to your wallet address." },
       { q: "Why was my withdrawal reviewed?", a: "All withdrawals go through a manual review as part of our standard AML and anti-fraud checks — this isn't unique to your account. Some withdrawals may need extra verification, which can take a little longer. See our AML & Anti-Fraud Policy for details." },
@@ -46,7 +46,7 @@ const FAQ_DATA = [
   {
     category: "Referrals",
     items: [
-      { q: "How do referrals work?", a: "Share your unique referral link from the Refer & Earn page. When a new user joins through your link and makes their first deposit, you earn a 10% commission in USDT." },
+      { q: "How do referrals work?", a: "Share your unique referral link from the Refer & Earn page. When a new user joins through your link and makes their first deposit, you earn a 10% commission in playable Coins. Referral Coins stay in the gameplay ledger and cannot be withdrawn." },
       { q: "Do I earn commission on all deposits from my referral?", a: "No. Commission is only earned on your referred user's FIRST deposit. Subsequent deposits do not generate commission." },
     ],
   },

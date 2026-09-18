@@ -17,10 +17,12 @@ export async function GET(req: NextRequest) {
       .select("*", { count: "exact" })
       .eq("referrer_id", user.id);
 
-    const totalCommission = (referrals ?? []).reduce((s, r) => s + Number(r.commission_amount), 0);
+    const referralCoins = (row: { commission_coins?: number | null; commission_amount?: number | null }) =>
+      Number(row.commission_coins ?? row.commission_amount ?? 0);
+    const totalCommission = (referrals ?? []).reduce((s, r) => s + referralCoins(r), 0);
     const pendingCommission = (referrals ?? [])
       .filter((r) => r.commission_status === "pending")
-      .reduce((s, r) => s + Number(r.commission_amount), 0);
+      .reduce((s, r) => s + referralCoins(r), 0);
 
     const telegramUsername = process.env.TELEGRAM_BOT_USERNAME ?? "LudzoBot";
     const { data: userData } = await supabase
@@ -30,8 +32,11 @@ export async function GET(req: NextRequest) {
       success: true,
       data: {
         total_referrals: count ?? 0,
+        // Referral rewards are playable Coins, never the locked Won-Coin ledger.
         total_commission: totalCommission,
         pending_commission: pendingCommission,
+        total_commission_coins: totalCommission,
+        pending_commission_coins: pendingCommission,
         referral_link: `https://t.me/${telegramUsername}?startapp=${userData?.telegram_id}`,
       },
     });

@@ -233,10 +233,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return nextStats;
     });
 
-    if (isWin) {
-      updateWalletBalances(100, 0, 50);
-    }
-  }, [updateWalletBalances]);
+    // Match settlement is server-authoritative. Never manufacture Won Coins in
+    // localStorage or in the playable wallet; the room settlement RPC updates
+    // `won_coins_balance`, and the next wallet refresh reads that value.
+  }, []);
 
   const clearGamingData = useCallback(() => {
     localStorage.removeItem("ludzo_won_coins_balance");

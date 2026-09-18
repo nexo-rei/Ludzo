@@ -11,6 +11,7 @@ import { SkeletonCard } from "@/components/ui/Skeleton";
 import { showToast } from "@/components/ui/Toast";
 import EmptyState from "@/components/ui/EmptyState";
 import { useApp } from "@/hooks/useApp";
+import { COINS_PER_HALF_USD, COINS_PER_USDT } from "@/lib/economy";
 import {
   AlertCircleIcon,
   AlertTriangleIcon,
@@ -52,11 +53,12 @@ interface DepositHistoryItem {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const MIN_COINS = 300;
+const MIN_COINS = 100;
 const MAX_COINS = 50_000;
 const SESSION_SECONDS = 40 * 60; // 40 minutes
 
-const PRESET_COINS = [300, 500, 1000, 2000, 5000, 10000];
+// 100 Coins = $0.50, so deposit presets stay aligned with the public rate.
+const PRESET_COINS = [100, 200, 500, 1000, 2000, 5000];
 
 const NETWORKS: { id: Network; label: string; desc: string; badge: string; badgeColor: string; color: string; bg: string; border: string }[] = [
   {
@@ -96,7 +98,7 @@ const TERMINAL = new Set<PaymentStatus>(["finished", "failed", "expired"]);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function coinsToUsdt(coins: number): number {
-  return parseFloat((coins / 100).toFixed(2));
+  return parseFloat((coins / COINS_PER_USDT).toFixed(2));
 }
 function fmtCoins(n: number): string {
   return n.toLocaleString();
@@ -375,7 +377,7 @@ export default function DepositPage() {
       <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 space-y-4">
         <div>
           <p className="text-sm font-bold text-[var(--text-primary)] mb-0.5">Select Amount</p>
-          <p className="text-[11px] text-[var(--text-muted)]">100 Coins = 1 USDT · Min 300 · Max 50,000</p>
+          <p className="text-[11px] text-[var(--text-muted)]">{COINS_PER_HALF_USD} Coins = $0.50 · Min {MIN_COINS.toLocaleString()} · Max {MAX_COINS.toLocaleString()}</p>
         </div>
 
         {/* Presets */}
@@ -405,7 +407,7 @@ export default function DepositPage() {
         {/* Custom input */}
         <div>
           <label htmlFor="deposit-custom-amount" className="text-xs text-[var(--text-muted)] font-medium block mb-1.5">
-            Custom amount (300–50,000)
+            Custom amount ({MIN_COINS.toLocaleString()}–{MAX_COINS.toLocaleString()})
           </label>
           <input
             id="deposit-custom-amount"
@@ -825,7 +827,7 @@ export default function DepositPage() {
       ) : (
         <div className="space-y-2">
           {history.map((d, i) => {
-            const coins = d.coin_amount ?? Math.round((d.usdt_amount ?? d.amount) * 100);
+            const coins = d.coin_amount ?? Math.round((d.usdt_amount ?? d.amount) * COINS_PER_USDT);
             const usdt  = d.usdt_amount ?? d.amount;
             const st    = d.nowpayments_status ?? d.status;
             return (

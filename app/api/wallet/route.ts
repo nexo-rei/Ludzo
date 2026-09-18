@@ -38,9 +38,18 @@ export async function GET(req: NextRequest) {
       .eq("user_id", user.id)
       .maybeSingle();
 
+    const balances = wallet ?? { coin_balance: 0, usdt_balance: 0, won_coins_balance: 0, updated_at: null };
+
     return NextResponse.json({
       success: true,
-      data: wallet ?? { coin_balance: 0, usdt_balance: 0, won_coins_balance: 0, updated_at: null },
+      data: {
+        ...balances,
+        // Explicit aliases make the two ledgers difficult to confuse in new UI
+        // code while preserving the legacy `coin_balance` API contract.
+        playable_coins_balance: Number(balances.coin_balance ?? 0),
+        protected_usdt_balance: Number(balances.usdt_balance ?? 0),
+        withdrawable_won_coins: Number(balances.won_coins_balance ?? 0),
+      },
     });
   } catch (err) {
     console.error("[wallet]", err);

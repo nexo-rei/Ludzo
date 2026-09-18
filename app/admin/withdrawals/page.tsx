@@ -12,6 +12,8 @@ interface WithdrawalItem {
   id: string;
   user: { first_name: string; username?: string; telegram_id: string } | null;
   amount: number;
+  coin_amount?: number;
+  source?: string;
   fee_amount: number;
   net_amount: number;
   wallet_address: string;
@@ -96,7 +98,7 @@ export default function AdminWithdrawalsPage() {
           <table className="w-full text-sm min-w-[700px]">
             <thead>
               <tr className="border-b border-[#222]">
-                {["User", "Amount", "Fee", "Net", "Wallet", "Status", "Date", "Actions"].map((h) => (
+                {["User", "Won Coins / Amount", "Fee", "Net", "Wallet", "Status", "Date", "Actions"].map((h) => (
                   <th key={h} className="text-left text-xs text-gray-500 font-semibold uppercase tracking-wide px-4 py-3">{h}</th>
                 ))}
               </tr>
@@ -112,9 +114,12 @@ export default function AdminWithdrawalsPage() {
                     <div className="text-white font-medium">{w.user?.first_name ?? "Unknown"}</div>
                     {w.user?.username && <div className="text-xs text-gray-500">@{w.user.username}</div>}
                   </td>
-                  <td className="px-4 py-3 text-white font-numeric">${formatUSDT(w.amount)}</td>
-                  <td className="px-4 py-3 text-red-400 font-numeric text-xs">-${formatUSDT(w.fee_amount)}</td>
-                  <td className="px-4 py-3 text-green-400 font-bold font-numeric">${formatUSDT(w.net_amount)}</td>
+                  <td className="px-4 py-3 text-white font-numeric">
+                    {w.coin_amount ? <div>{Number(w.coin_amount).toLocaleString()} Won Coins</div> : null}
+                    <div className="text-xs text-gray-400">${formatUSDT(Number(w.amount))} gross</div>
+                  </td>
+                  <td className="px-4 py-3 text-red-400 font-numeric text-xs">-${formatUSDT(Number(w.fee_amount))}</td>
+                  <td className="px-4 py-3 text-green-400 font-bold font-numeric">${formatUSDT(Number(w.net_amount))}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs font-mono truncate max-w-[120px]">{w.wallet_address}</td>
                   <td className="px-4 py-3">
                     <Badge variant={STATUS_COLOR[w.status] ?? "default"} size="sm">{w.status}</Badge>
@@ -160,9 +165,10 @@ export default function AdminWithdrawalsPage() {
             <div className="space-y-2 text-sm">
               {[
                 ["User", `${selected.user?.first_name ?? "Unknown"} (@${selected.user?.username ?? selected.user?.telegram_id ?? "—"})`],
-                ["Amount", `$${formatUSDT(selected.amount)} USDT`],
-                ["Fee (5%)", `-$${formatUSDT(selected.fee_amount)}`],
-                ["Net Amount", `$${formatUSDT(selected.net_amount)} USDT`],
+                ["Won Coins", selected.coin_amount ? `${Number(selected.coin_amount).toLocaleString()} (Ludo prize ledger)` : "Legacy record"],
+                ["Amount", `$${formatUSDT(Number(selected.amount))} USDT gross`],
+                ["Fee", `-$${formatUSDT(Number(selected.fee_amount))}`],
+                ["Net Amount", `$${formatUSDT(Number(selected.net_amount))} USDT`],
                 ["Wallet", selected.wallet_address],
                 ["Status", selected.status],
                 ["Date", formatDateTime(selected.created_at)],

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { COINS_PER_USDT } from "@/lib/economy";
 
 // Network currency mapping for NOWPayments API
 const NETWORK_CURRENCY: Record<string, string> = {
@@ -43,9 +44,9 @@ export async function POST(req: NextRequest) {
     const network    = String(body.network ?? "").toUpperCase();
 
     // Validate coin amount
-    if (!coinAmount || coinAmount < 100 || coinAmount > 5000) {
+    if (!Number.isInteger(coinAmount) || coinAmount < 100 || coinAmount > 50000) {
       return NextResponse.json(
-        { success: false, error: "Coin amount must be between 100 and 5000." },
+        { success: false, error: "Coin amount must be between 100 and 50000." },
         { status: 400 }
       );
     }
@@ -58,7 +59,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const usdtAmount = parseFloat((coinAmount / 100).toFixed(2));
+    // Deposits fund the playable ledger only; they can never become
+    // withdrawable Won Coins. Keep the public rate at 100 Coins = $0.50.
+    const usdtAmount = parseFloat((coinAmount / COINS_PER_USDT).toFixed(2));
     const payCurrency = NETWORK_CURRENCY[network];
 
     const supabase = createAdminClient();

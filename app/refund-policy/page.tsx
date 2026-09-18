@@ -18,7 +18,7 @@ const SECTIONS = [
   {
     title: "3. USDT Deposits",
     paragraphs: [
-      "Deposits are not yet enabled on LUDZO but are planned for future releases. Once available, deposits will generally be final once successfully processed and credited to your wallet balance, as they represent a transfer of funds into your account for use on the platform.",
+      "Deposits, where enabled in the App, are generally final once successfully processed and credited to your playable Coin balance. They represent a transfer of funds into the account for gameplay and do not create withdrawable Won Coins.",
     ],
     bullets: [
       "A refund may be considered if a deposit was charged but never credited to your account due to a confirmed technical error.",
@@ -46,7 +46,7 @@ const SECTIONS = [
   {
     title: "7. Withdrawal Processing",
     paragraphs: [
-      "Withdrawal requests are not 'refunds' but are subject to review as described in our Terms & Conditions. If a withdrawal is rejected after review (for example, due to a failed verification check), the withdrawn amount — minus any non-recoverable network or processing fees already incurred — will be returned to your in-app USDT balance.",
+      "Conversion requests are not refunds but are subject to review as described in our Terms & Conditions. If a Won-Coin conversion is rejected after review (for example, due to a failed verification check), the same Won-Coin amount — minus any non-recoverable network or processing fees already incurred — will be returned to your locked Won-Coin balance. Playable Coins and protected deposit/admin USDT are not part of this converter."
     ],
   },
   {

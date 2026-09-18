@@ -1,8 +1,9 @@
 /**
  * LUDZO — SQL migration verification
  * ============================================================================
- * Applies sql/01 → 02 → 03 → 99 to a REAL PostgreSQL 16 (in-process WASM via
- * PGlite — nothing to install, no Docker), then drives the whole matchmaking →
+ * Applies the shipped schema/migrations (01 → 02 → 03 → 04 → 07 → 08 → 99)
+ * to a REAL PostgreSQL 16 (in-process WASM via PGlite — nothing to install, no
+ * Docker), then drives the whole matchmaking →
  * activate → turn-timeout → reactions → settle → bot fallback → janitor flow
  * and asserts wallets/history/stats line up.
  *
@@ -13,10 +14,30 @@
 const fs   = require("fs");
 const path = require("path");
 
-// Resolve PGlite from wherever it was installed (npx -p, local node_modules, or a global).
+// Resolve PGlite from wherever it was installed (local node_modules, npx -p,
+// or a global). Modern npx versions do not always add -p packages to
+// NODE_PATH, so explicitly inspect its cache as a fallback.
 let PGlite;
 try {
-  ({ PGlite } = require("@electric-sql/pglite"));
+  const lookupPaths = [process.cwd(), __dirname, ...(process.env.NODE_PATH ?? "").split(path.delimiter).filter(Boolean)];
+  const npxRoot = process.env.HOME ? path.join(process.env.HOME, ".npm", "_npx") : "";
+  if (npxRoot && fs.existsSync(npxRoot)) {
+    for (const entry of fs.readdirSync(npxRoot)) {
+      lookupPaths.push(path.join(npxRoot, entry, "node_modules"));
+    }
+  }
+
+  let resolved;
+  for (const lookupPath of lookupPaths) {
+    try {
+      resolved = require.resolve("@electric-sql/pglite", { paths: [lookupPath] });
+      break;
+    } catch {
+      // Try the next package location.
+    }
+  }
+  if (!resolved) throw new Error("module not found");
+  ({ PGlite } = require(resolved));
 } catch {
   console.error("PGlite not found. Run:\n  npx -y -p @electric-sql/pglite@0.2.17 node scripts/verify-ludo-sql.js");
   process.exit(2);
@@ -45,7 +66,54 @@ CREATE TABLE IF NOT EXISTS public.users (
 CREATE TABLE IF NOT EXISTS public.wallets (
   user_id uuid PRIMARY KEY REFERENCES public.users(id) ON DELETE CASCADE,
   coin_balance integer NOT NULL DEFAULT 0 CHECK (coin_balance >= 0),
+  usdt_balance numeric NOT NULL DEFAULT 0,
   updated_at timestamptz DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS public.referrals (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  referrer_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  referee_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  commission_amount integer NOT NULL DEFAULT 0,
+  commission_status text NOT NULL DEFAULT 'pending',
+  first_deposit_processed boolean NOT NULL DEFAULT false,
+  created_at timestamptz DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS public.settings (
+  key text PRIMARY KEY,
+  value text
+);
+CREATE TABLE IF NOT EXISTS public.deposits (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  coin_amount integer,
+  usdt_amount numeric,
+  payment_id text,
+  status text DEFAULT 'pending',
+  credited_at timestamptz,
+  created_at timestamptz DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS public.transactions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES public.users(id) ON DELETE SET NULL,
+  type text,
+  currency text,
+  amount numeric,
+  status text,
+  reference_id text,
+  description text,
+  created_at timestamptz DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS public.withdrawals (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  amount numeric NOT NULL,
+  fee_amount numeric NOT NULL DEFAULT 0,
+  net_amount numeric NOT NULL DEFAULT 0,
+  wallet_address text NOT NULL,
+  status text NOT NULL DEFAULT 'pending',
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  reviewed_at timestamptz
 );
 `;
 
@@ -97,6 +165,11 @@ const expect = (cond, m) => cond ? ok(m) : fail(m);
   step = "07_arena_players.sql (second run — idempotency)";
   await exec(read("sql/07_arena_players.sql"));
   ok("07 re-applied without error");
+
+  step = "08_coin_economy_and_won_withdrawals.sql";
+  await exec(read("sql/08_coin_economy_and_won_withdrawals.sql"));
+  await exec(read("sql/08_coin_economy_and_won_withdrawals.sql"));
+  ok("08 applied twice (two ledgers, fixed rate, and atomic conversion are idempotent)");
 
   step = "arena roster";
   {
@@ -269,6 +342,54 @@ const expect = (cond, m) => cond ? ok(m) : fail(m);
   expect(st2.wins === 1 && st2.total_matches === 1 && st2.win_rate === "100%" && st2.current_streak === 1, "winner stats updated");
   const settle = (await q(`SELECT * FROM ludo_settlements WHERE room_id='${roomId}'`))[0];
   expect(settle && settle.reward === 196 && settle.platform_fee === 4 && settle.bot_match === false, "settlement audit row written (fee 4)");
+
+  // ── Two-ledger economy + withdrawal guardrails ───────────────────────────
+  step = "two-ledger economy";
+  const [rate] = await q(`SELECT value FROM settings WHERE key='coin_rate'`);
+  expect(rate.value === "200", "coin_rate is fixed at 200 Coins per $1");
+  const [beforeEconomy] = await q(`SELECT coin_balance, won_coins_balance FROM wallets WHERE user_id='${u2.id}'`);
+  await q(`INSERT INTO referrals (referrer_id, referee_id) VALUES ('${u1.id}', '${u2.id}')`);
+  const [{ id: depositId }] = await q(`INSERT INTO deposits (user_id, coin_amount, status, payment_id)
+      VALUES ('${u2.id}', 400, 'pending', 'economy-test') RETURNING id`);
+  const [{ credit_playable_coins_for_deposit: deposited }] = await q(
+    `SELECT credit_playable_coins_for_deposit('${depositId}', '${u2.id}', 400, 'economy-test')`);
+  const [{ credit_playable_coins_for_deposit: duplicateDeposit }] = await q(
+    `SELECT credit_playable_coins_for_deposit('${depositId}', '${u2.id}', 400, 'economy-test')`);
+  const [beforeReferrer] = await q(`SELECT coin_balance, won_coins_balance FROM wallets WHERE user_id='${u1.id}'`);
+  const [{ settle_referral_playable_coins: referralCoins }] = await q(
+    `SELECT settle_referral_playable_coins('${u2.id}', 400, 10)`);
+  const [{ settle_referral_playable_coins: duplicateReferral }] = await q(
+    `SELECT settle_referral_playable_coins('${u2.id}', 400, 10)`);
+  const [afterReferrer] = await q(`SELECT coin_balance, won_coins_balance FROM wallets WHERE user_id='${u1.id}'`);
+  const [afterDeposit] = await q(`SELECT coin_balance, won_coins_balance FROM wallets WHERE user_id='${u2.id}'`);
+  expect(deposited === true && duplicateDeposit === false &&
+         afterDeposit.coin_balance === beforeEconomy.coin_balance + 400 &&
+         afterDeposit.won_coins_balance === beforeEconomy.won_coins_balance,
+         "deposits credit playable Coins exactly once and never Won Coins");
+  expect(referralCoins === 40 && duplicateReferral === 0 &&
+         afterReferrer.coin_balance === beforeReferrer.coin_balance + 40 &&
+         afterReferrer.won_coins_balance === beforeReferrer.won_coins_balance,
+         "referral reward is playable Coins, never Won Coins, and settles once");
+
+  await q(`SELECT credit_won_coins('${u2.id}', 1004, 'ludo_prize')`);
+  let invalidWithdrawal = false;
+  try {
+    await q(`SELECT create_ludo_won_withdrawal('${u2.id}', 800, 'T${"x".repeat(33)}', 5)`);
+  } catch (e) {
+    invalidWithdrawal = /minimum|200-Coin/i.test(e.message);
+  }
+  expect(invalidWithdrawal, "withdrawal RPC rejects amounts below the exact 1,000-Coin minimum");
+  const [{ create_ludo_won_withdrawal: withdrawalId }] = await q(
+    `SELECT create_ludo_won_withdrawal('${u2.id}', 1000, 'T${"x".repeat(33)}', 5)`);
+  const [afterWithdrawal] = await q(`SELECT coin_balance, won_coins_balance FROM wallets WHERE user_id='${u2.id}'`);
+  const [withdrawal] = await q(`SELECT coin_amount, amount, fee_amount, net_amount, source
+                                FROM withdrawals WHERE id='${withdrawalId}'`);
+  expect(afterWithdrawal.coin_balance === afterDeposit.coin_balance && afterWithdrawal.won_coins_balance === 200,
+         "conversion debits only the locked Won-Coin ledger");
+  expect(withdrawal.coin_amount === 1000 && withdrawal.amount === "5.00" &&
+         withdrawal.fee_amount === "0.25" && withdrawal.net_amount === "4.75" &&
+         withdrawal.source === "ludo_won",
+         "1,000 Won Coins settle to $5 gross, $0.25 fee, and $4.75 net");
 
   // ── Arena opponent after a random 20–28 s ────────────────────────────────
   step = "arena window (20–28 s)";
