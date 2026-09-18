@@ -12,7 +12,13 @@
  * Exit code 0 = sab pass. Exit code 1 = koi regression.
  */
 
+import { readFileSync } from "node:fs";
 import * as E from "../lib/ludo-engine.ts";
+
+const STATE_ROUTE_SOURCE = readFileSync(
+  new URL("../app/api/ludo/room/state/route.ts", import.meta.url),
+  "utf8"
+);
 
 // ─── Board geometry (MUST match app/games/game/[roomId]/page.tsx) ────────────
 const TRACK = [
@@ -238,7 +244,9 @@ ok("bot avoids stepping into danger when a safe alternative exists",
    // abs 19 dangerous. Neither destination holds a capturable piece, so the
    // only sane choice is the safe star at abs 35.
    (() => {
-     const botPieces = [44, 8, 0, 0];
+     // Other tokens are home; with yard tokens present, releasing on a 1 is a
+     // legal and intentionally high-priority third option.
+     const botPieces = [44, 8, 57, 57];
      const oppPieces = [15, 16, 17, 18];
      const movable   = E.calcMovablePieces(botPieces, 1, oppPieces, false);
      if (movable.length !== 2) return false;
@@ -261,10 +269,32 @@ ok("a barrier on a SAFE cell never forms (prevents the yard soft-lock)",
    // must NOT become a barrier — otherwise P2 could never leave the yard.
    E.getBlockedAbsCells([27, 27, 0, 0], true).size === 0 &&
    E.calcMovablePieces([0, 0, 0, 0], 6, [27, 27, 0, 0], false).length === 4);
+ok("a rolled bot turn can rebuild legal moves when saved movable_pieces is empty",
+   (() => {
+     // This is the production stuck-state regression: the bot has already
+     // released a token, dice_rolled=true and roll=2, but an interrupted/legacy
+     // write left movable_pieces=[]. Revalidation must recover piece 0 and move.
+     const botPieces = [1, 0];
+     const oppPieces = [0, 0];
+     const staleSavedMovable = [];
+     const rebuilt = E.calcMovablePieces(botPieces, 2, oppPieces, false);
+     const chosen = E.botChoosePiece(botPieces, oppPieces, rebuilt, 2, false);
+     const moved = E.applyMove(botPieces, oppPieces, chosen, 2, false);
+     return staleSavedMovable.length === 0 && rebuilt.includes(0) &&
+       !moved.illegal && moved.myPieces[0] === 3;
+   })());
 ok("botChoosePiece returns -1 when nothing is movable",
    E.botChoosePiece([0, 0, 0, 0], [0, 0, 0, 0], [], 3, false) === -1);
 ok("bot heuristic is seat-agnostic (amPlayer1 = true still picks the winner)",
    E.botChoosePiece([55, 10, 10, 10], [20, 20, 20, 20], [0, 1, 2, 3], 2, true) === 0);
+ok("state route has no dice_rolled + non-empty-movable absorbing condition",
+   STATE_ROUTE_SOURCE.includes("else if (diceRolled && botElapsed >= BOT_MOVE_DELAY_SECS)") &&
+   !STATE_ROUTE_SOURCE.includes("diceRolled && movablePieces.length > 0 && botElapsed"));
+ok("bot state writes use the original turn snapshot as a CAS guard",
+   STATE_ROUTE_SOURCE.includes('.eq("turn_player_id", expectedTurnPlayerId)') &&
+   STATE_ROUTE_SOURCE.includes('.eq("turn_start_at", expectedTurnStart)') &&
+   STATE_ROUTE_SOURCE.includes('.eq("dice_rolled", expectedDiceRolled)') &&
+   STATE_ROUTE_SOURCE.includes('.eq("last_roll", expectedLastRoll)'));
 
 // ════════════════════════════════════════════════════════════════════════════
 section("8. FUZZ — 300 full self-play matches");

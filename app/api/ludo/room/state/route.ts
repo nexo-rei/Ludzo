@@ -83,6 +83,15 @@ export async function GET(req: NextRequest) {
     const hasConsecutiveCol = "consecutive_sixes" in room;
     let consecutiveSixes    = hasConsecutiveCol ? (room.consecutive_sixes ?? 0) as number : 0;
     let stateModified       = false;
+    // Bot actions are driven by polling, so the same room can be evaluated by
+    // two requests (two tabs, a reconnect, or an old request finishing late).
+    // Keep the exact snapshot we read: bot writes use it as a compare-and-swap
+    // guard instead of blindly overwriting a newer turn.
+    let botActionModified   = false;
+    const expectedTurnPlayerId = String(room.turn_player_id);
+    const expectedTurnStart    = room.turn_start_at as string;
+    const expectedDiceRolled   = Boolean(room.dice_rolled);
+    const expectedLastRoll     = Number(room.last_roll ?? 0);
     let rowUpdatedAt = (room.updated_at as string | null) ?? new Date(now).toISOString();
 
     // ── Match start time ──────────────────────────────────────────────────────
@@ -309,12 +318,13 @@ export async function GET(req: NextRequest) {
       /** Hand the turn to the human with a fresh clock. */
       const passToHuman = (reason: string) => {
         turnPlayerId     = String(room.player_1_id);
-        turnStartMs      = now;          // ← the fix
+        turnStartMs      = now;
         consecutiveSixes = 0;
         diceRolled       = false;
         lastRoll         = 0;
         movablePieces    = [];
         stateModified    = true;
+        botActionModified = true;
         console.log(`[LUDO STATE] BOT ${reason} — turn to player_1 (clock reset)`);
       };
 
@@ -338,57 +348,72 @@ export async function GET(req: NextRequest) {
           consecutiveSixes = newConsec;
           turnStartMs      = now;          // give the bot a fresh clock for its move step
           stateModified    = true;
+          botActionModified = true;
         }
 
-      } else if (diceRolled && movablePieces.length > 0 && botElapsed >= BOT_MOVE_DELAY_SECS) {
-        // Bot moves a piece. botChoosePiece() can return -1, and applyMove() can
-        // now reject a move (barrier / overshoot) if movable_pieces went stale,
-        // so fall back through the candidate list instead of corrupting the board.
-        const preferred  = botChoosePiece(botPieces, botOppPieces, movablePieces, lastRoll, false);
-        const candidates = preferred >= 0
-          ? [preferred, ...movablePieces.filter(i => i !== preferred)]
-          : [...movablePieces];
-        const rollUsed   = lastRoll;
-
-        let moveResult = null as ReturnType<typeof applyMove> | null;
-        for (const idx of candidates) {
-          if (!Number.isInteger(idx) || idx < 0 || idx > 3) continue;
-          const attempt = applyMove(botPieces, botOppPieces, idx, rollUsed, false);
-          if (!attempt.illegal) { moveResult = attempt; console.log(`[LUDO STATE] BOT MOVE room=${roomId} piece=${idx}`); break; }
-          console.warn(`[LUDO STATE] BOT MOVE rejected piece=${idx}: ${attempt.reason}`);
-        }
-
-        if (!moveResult) {
-          // Nothing legal — treat exactly like a no-move roll.
-          passToHuman("had no executable move");
+      } else if (diceRolled && botElapsed >= BOT_MOVE_DELAY_SECS) {
+        // Never trust movable_pieces as the only way out of this state. Older
+        // deployments and interrupted writes can leave `dice_rolled=true` with
+        // an empty/stale array. The old `&& movablePieces.length > 0` condition
+        // then matched no branch forever: the bot owned the turn, bot turns do
+        // not use the human timeout handler, and the match was permanently stuck.
+        // Rebuild legal moves from the authoritative board + saved roll on every
+        // move step, making that formerly absorbing state self-healing.
+        const rollUsed = Number(lastRoll);
+        if (!Number.isInteger(rollUsed) || rollUsed < 1 || rollUsed > 6) {
+          passToHuman("had an invalid saved roll");
         } else {
-          boardState.pieces.player_2 = moveResult.myPieces;
-          boardState.pieces.player_1 = moveResult.oppPieces;
-          score2 = calcScore(moveResult.myPieces);
-          score1 = calcScore(moveResult.oppPieces);
+          const legalNow = calcMovablePieces(botPieces, rollUsed, botOppPieces, false);
+          movablePieces = legalNow;
 
-          if (moveResult.isWin) {
-            status = "completed"; winnerId = turnPlayerId;
-            loserId = String(room.player_1_id); winReason = "normal";
-            stateModified = true;
-            console.log(`[LUDO STATE] BOT WINS room=${roomId}`);
+          if (legalNow.length === 0) {
+            passToHuman("had no legal move after revalidation");
           } else {
-            // Same rule as the human move route.
-            const extraTurn = getsExtraTurn(rollUsed, moveResult.hasCapture, moveResult.reachedFinish);
-            if (!extraTurn) {
-              passToHuman("finished its move");
+            // botChoosePiece() can return -1, and applyMove() can reject a move
+            // if the board changed, so fall through every revalidated candidate.
+            const preferred  = botChoosePiece(botPieces, botOppPieces, legalNow, rollUsed, false);
+            const candidates = preferred >= 0
+              ? [preferred, ...legalNow.filter(i => i !== preferred)]
+              : [...legalNow];
+
+            let moveResult = null as ReturnType<typeof applyMove> | null;
+            for (const idx of candidates) {
+              if (!Number.isInteger(idx) || idx < 0 || idx >= botPieces.length) continue;
+              const attempt = applyMove(botPieces, botOppPieces, idx, rollUsed, false);
+              if (!attempt.illegal) { moveResult = attempt; console.log(`[LUDO STATE] BOT MOVE room=${roomId} piece=${idx}`); break; }
+              console.warn(`[LUDO STATE] BOT MOVE rejected piece=${idx}: ${attempt.reason}`);
+            }
+
+            if (!moveResult) {
+              passToHuman("had no executable move");
             } else {
-              // Bot keeps the turn — still refresh the clock so its next roll is
-              // measured from now, and so the human's turn timer shown in the UI
-              // never inherits a stale timestamp.
-              // NOTE: read rollUsed BEFORE zeroing lastRoll.
-              if (rollUsed !== 6) consecutiveSixes = 0;   // capture/finish extra turn resets the count
-              turnStartMs   = now;
-              diceRolled    = false;
-              lastRoll      = 0;
-              movablePieces = [];
-              stateModified = true;
-              console.log(`[LUDO STATE] Bot gets an extra turn (clock reset)`);
+              boardState.pieces.player_2 = moveResult.myPieces;
+              boardState.pieces.player_1 = moveResult.oppPieces;
+              score2 = calcScore(moveResult.myPieces);
+              score1 = calcScore(moveResult.oppPieces);
+              botActionModified = true;
+
+              if (moveResult.isWin) {
+                status = "completed"; winnerId = turnPlayerId;
+                loserId = String(room.player_1_id); winReason = "normal";
+                stateModified = true;
+                console.log(`[LUDO STATE] BOT WINS room=${roomId}`);
+              } else {
+                // Same rule as the human move route.
+                const extraTurn = getsExtraTurn(rollUsed, moveResult.hasCapture, moveResult.reachedFinish);
+                if (!extraTurn) {
+                  passToHuman("finished its move");
+                } else {
+                  // Bot keeps the turn — refresh the clock for its next roll.
+                  if (rollUsed !== 6) consecutiveSixes = 0;
+                  turnStartMs   = now;
+                  diceRolled    = false;
+                  lastRoll      = 0;
+                  movablePieces = [];
+                  stateModified = true;
+                  console.log(`[LUDO STATE] Bot gets an extra turn (clock reset)`);
+                }
+              }
             }
           }
         }
@@ -401,24 +426,47 @@ export async function GET(req: NextRequest) {
         const duration = Math.floor((now - matchStartMs) / 1000);
         console.log(`[LUDO STATE] Settling room=${roomId} winner=${winnerId} reason=${winReason}`);
 
-        await supabase
+        let finishQ = supabase
           .from("ludo_rooms")
           .update({ board_state: boardState, score_player_1: score1, score_player_2: score2, updated_at: new Date().toISOString() })
           .eq("id", roomId);
+        if (botActionModified) {
+          finishQ = finishQ
+            .eq("status", "active")
+            .eq("turn_player_id", expectedTurnPlayerId)
+            .eq("turn_start_at", expectedTurnStart)
+            .eq("dice_rolled", expectedDiceRolled)
+            .eq("last_roll", expectedLastRoll);
+        }
+        const { data: finishSaved, error: finishErr } = await finishQ.select("id").maybeSingle();
+        if (finishErr) console.error(`[LUDO STATE] finish board write failed room=${roomId}:`, finishErr.message);
 
-        const { data: settled } = await supabase.rpc("settle_ludo_match", {
-          p_room_id: roomId, p_winner_id: winnerId!, p_loser_id: loserId!,
-          p_win_reason: winReason!, p_duration: duration,
-        });
+        // A stale bot request must never settle its imaginary board. The CAS
+        // winner (or a later poll) is the only request allowed to settle.
+        let settled: unknown = null;
+        if (!botActionModified || finishSaved) {
+          const settleResult = await supabase.rpc("settle_ludo_match", {
+            p_room_id: roomId, p_winner_id: winnerId!, p_loser_id: loserId!,
+            p_win_reason: winReason!, p_duration: duration,
+          });
+          settled = settleResult.data;
+        }
 
         if (!settled) {
-          // Already settled by another concurrent poll — re-read actual result
+          // Already settled, or this bot transition lost its CAS — re-read truth.
           const { data: sr } = await supabase
             .from("ludo_rooms")
-            .select("winner_id, loser_id, win_reason, status")
+            .select("winner_id, loser_id, win_reason, status, board_state, score_player_1, score_player_2, updated_at")
             .eq("id", roomId)
             .maybeSingle();
-          if (sr) { winnerId = sr.winner_id; loserId = sr.loser_id; winReason = sr.win_reason; status = sr.status; }
+          if (sr) {
+            winnerId = sr.winner_id; loserId = sr.loser_id;
+            winReason = sr.win_reason; status = sr.status;
+            boardState = sr.board_state ?? boardState;
+            score1 = sr.score_player_1 ?? score1;
+            score2 = sr.score_player_2 ?? score2;
+            rowUpdatedAt = sr.updated_at ?? rowUpdatedAt;
+          }
         }
       } else {
         const writeIso = new Date().toISOString();
@@ -436,15 +484,24 @@ export async function GET(req: NextRequest) {
           board_state:      boardState,
           updated_at:       writeIso,
         };
-                if (hasConsecutiveCol) {
+        if (hasConsecutiveCol) {
           payload.consecutive_sixes = Math.min(MAX_CONSECUTIVE_SIXES, Math.max(0, consecutiveSixes));
         }
 
-                const guardAgainstHumanRoll =
-          !diceRolled && !turnPlayerId.startsWith("bot_");
-
         let q = supabase.from("ludo_rooms").update(payload).eq("id", roomId);
-        if (guardAgainstHumanRoll) {
+        if (botActionModified) {
+          // Full snapshot CAS: only the request that evaluated this exact bot
+          // state may advance it. Previously this update filtered by id only,
+          // so a late bot-roll response could overwrite a newer bot move (or
+          // even the human handoff) and resurrect the stuck bot turn.
+          q = q
+            .eq("status", "active")
+            .eq("turn_player_id", expectedTurnPlayerId)
+            .eq("turn_start_at", expectedTurnStart)
+            .eq("dice_rolled", expectedDiceRolled)
+            .eq("last_roll", expectedLastRoll);
+        } else if (!diceRolled && !turnPlayerId.startsWith("bot_")) {
+          // Do not overwrite a human /roll that landed while this GET ran.
           q = q.eq("dice_rolled", false);
         }
 
@@ -457,10 +514,10 @@ export async function GET(req: NextRequest) {
         }
         if (written) rowUpdatedAt = (written.updated_at as string) ?? writeIso;
 
-        if (!written && guardAgainstHumanRoll) {
-          // A /roll landed first — its state is authoritative. Re-read so this
-          // response reports the player's actual roll instead of reverting it.
-          console.log(`[LUDO STATE] write skipped, /roll won room=${roomId}`);
+        if (!written) {
+          // A concurrent poll or /roll won. Return the authoritative row rather
+          // than the stale in-memory transition attempted by this request.
+          console.log(`[LUDO STATE] stale transition skipped; re-syncing room=${roomId}`);
           const { data: cur } = await supabase
             .from("ludo_rooms")
             .select("*")
@@ -479,10 +536,13 @@ export async function GET(req: NextRequest) {
             score1        = c.score_player_1       ?? score1;
             score2        = c.score_player_2       ?? score2;
             boardState    = c.board_state          ?? boardState;
+            winnerId      = c.winner_id            ?? winnerId;
+            loserId       = c.loser_id             ?? loserId;
+            winReason     = c.win_reason           ?? winReason;
             rowUpdatedAt  = (c.updated_at as string) ?? rowUpdatedAt;
             if (hasConsecutiveCol) consecutiveSixes = c.consecutive_sixes ?? consecutiveSixes;
           }
-        }  
+        }
       }
     }
 
