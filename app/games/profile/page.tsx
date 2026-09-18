@@ -19,7 +19,7 @@ import SymbolIcon from "@/components/ui/SymbolIcon";
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import Link from "next/link";
 import {
   BookIcon,
@@ -35,6 +35,7 @@ import {
 import { useApp } from "@/hooks/useApp";
 import { CoinIcon } from "@/components/ui/Icons";
 import { showToast } from "@/components/ui/Toast";
+import Sheet from "@/components/ui/Sheet";
 import { BattleLogIcon, DiceIcon, TokenIcon, LudoIcon } from "@/components/gaming/GamingIcons";
 
 interface Stats {
@@ -398,57 +399,43 @@ export default function GamingProfilePage() {
       </div>
 
       {/* ── RULES SHEET ────────────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {rulesOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setRulesOpen(false)}
-            className="fixed inset-0 z-[100] flex items-end justify-center bg-black/80 p-4 backdrop-blur-sm sm:items-center"
-            style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+      {/* Shared <Sheet>: capped to the visible viewport with a pinned close row,
+          so the "Enter the arena" action is always on screen. */}
+      <Sheet
+        open={rulesOpen}
+        onClose={() => setRulesOpen(false)}
+        title="How to play"
+        subtitle="Two tokens, one roll at a time — first to bring both home wins the pool."
+        footer={
+          <button
+            type="button"
+            onClick={() => { setRulesOpen(false); router.push("/games"); }}
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-xl text-[12px] font-semibold transition-opacity hover:opacity-90"
+            style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
           >
+            <DiceIcon size={16} />
+            Enter the arena
+          </button>
+        }
+      >
+        <div className="space-y-2">
+          {RULES.map((rule, i) => (
             <motion.div
-              initial={{ y: 60, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 40, opacity: 0 }}
-              transition={{ type: "spring", damping: 26, stiffness: 320 }}
-              onClick={(e) => e.stopPropagation()}
-              className="surface-glass w-full max-w-sm rounded-3xl p-5"
+              key={rule.text}
+              initial={{ opacity: 0, x: -6 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.04, duration: 0.24 }}
+              className="flex items-start gap-2.5 rounded-xl border px-3 py-2.5"
+              style={{ borderColor: "var(--border)", background: "var(--bg-elevated)" }}
             >
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-black uppercase tracking-widest text-white">How to Play</h3>
-                <button onClick={() => setRulesOpen(false)} className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                  Close
-                </button>
-              </div>
-
-              <div className="mt-4 space-y-2">
-                {RULES.map((rule, i) => (
-                  <motion.div
-                    key={rule.text}
-                    initial={{ opacity: 0, x: -6 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    className="flex items-start gap-2.5 rounded-xl border border-slate-800/70 bg-slate-950/50 px-3 py-2.5"
-                  >
-                    <span className="mt-0.5 flex-none text-sm leading-none"><SymbolIcon name={rule.icon} size={17} /></span>
-                    <span className="text-[11px] font-semibold leading-snug text-slate-300">{rule.text}</span>
-                  </motion.div>
-                ))}
-              </div>
-
-              <button
-                onClick={() => { setRulesOpen(false); router.push("/games"); }}
-                className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-purple-400/40 bg-gradient-to-r from-purple-600 to-indigo-600 text-[11px] font-black uppercase tracking-widest text-white"
-              >
-                <DiceIcon size={16} />
-                Enter the arena
-              </button>
+              <span className="mt-0.5 flex-none text-[var(--accent)]">
+                <SymbolIcon name={rule.icon} size={17} />
+              </span>
+              <span className="text-[12px] font-medium leading-snug text-[var(--text-secondary)]">{rule.text}</span>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          ))}
+        </div>
+      </Sheet>
     </div>
   );
 }

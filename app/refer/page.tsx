@@ -10,7 +10,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import { showToast } from "@/components/ui/Toast";
 import { useApp } from "@/hooks/useApp";
-import { formatUSDT } from "@/lib/utils";
+import { formatUSDT, initials } from "@/lib/utils";
 import Button from "@/components/ui/Button";
 
 interface ReferralStats {
@@ -198,7 +198,7 @@ export default function ReferPage() {
                     >
                       <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-black text-white"
                         style={{ background: "linear-gradient(135deg, #23856C, #63D9B4)" }}>
-                        {r.name[0]}
+                        {initials(r.name || "User", 1)}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-semibold text-[var(--text-primary)] truncate">

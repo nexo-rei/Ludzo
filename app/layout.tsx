@@ -3,6 +3,7 @@ import Script from "next/script";
 import "./globals.css";
 import "./workspace.css";
 import MotionPreferences from "@/components/layout/MotionPreferences";
+import TelegramHardening from "@/components/layout/TelegramHardening";
 import { AppProvider } from "@/hooks/useApp";
 
 export const metadata: Metadata = {
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="theme-color" content="#111715" />
       </head>
       <body>
+        <TelegramHardening />
         <MotionPreferences><AppProvider>{children}</AppProvider></MotionPreferences>
       </body>
     </html>

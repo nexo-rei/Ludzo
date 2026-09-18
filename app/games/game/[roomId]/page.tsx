@@ -1284,7 +1284,7 @@ export default function LudoGamePage() {
   if (phase === "ended" && room) {
     const iWon = room.winner_id === userId;
     return (
-      <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-sm flex items-center justify-center z-[999] px-4">
+      <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-sm flex items-center justify-center z-[999] px-4 py-6 overflow-y-auto">
         <motion.div
           initial={{ opacity: 0, scale: 0.85, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}

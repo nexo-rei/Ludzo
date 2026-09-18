@@ -663,7 +663,10 @@ export default function DepositPage() {
                   initial={{ opacity: 0, scale: 0.94 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.25 }}
-                  className="bg-white p-3 rounded-2xl shadow-[0_8px_30px_-12px_rgba(0,0,0,0.35)]"
+                  // The QR is the one place a long press is still useful (save the
+                  // code for a hardware wallet), so it opts out of the global
+                  // callout suppression — see app/workspace.css.
+                  className="allow-longpress bg-white p-3 rounded-2xl shadow-[0_8px_30px_-12px_rgba(0,0,0,0.35)]"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img

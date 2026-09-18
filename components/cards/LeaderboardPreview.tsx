@@ -1,13 +1,22 @@
 "use client";
 
-import { type ReactElement } from "react";
+/**
+ * LUDZO — "Top Earners" card (Home dashboard)
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Same data contract as /leaderboard: rows come pre-normalised from
+ * lib/leaderboard.ts, so the only name this card can render is the account name.
+ * The old "@handle" suffix is gone, along with the hard-coded gold/slate palette —
+ * everything now resolves through the workspace tokens so the card matches the
+ * rest of Home in light and dark mode.
+ */
+
 import { motion } from "framer-motion";
-import { ChevronRightIcon } from "@/components/ui/DuotoneIcons";
-import Link from "next/link";
 import Image from "next/image";
+import Link from "next/link";
 import Badge from "@/components/ui/Badge";
+import { ChevronRightIcon, TrophyDuotoneIcon } from "@/components/ui/DuotoneIcons";
+import { cn, displayName, formatUSDT, initials } from "@/lib/utils";
 import type { LeaderboardEntry } from "@/types";
-import { formatUSDT } from "@/lib/utils";
 
 interface LeaderboardPreviewProps {
   entries: LeaderboardEntry[];
@@ -15,16 +24,11 @@ interface LeaderboardPreviewProps {
 
 const RANK_BADGE: Record<number, "gold" | "silver" | "bronze"> = { 1: "gold", 2: "silver", 3: "bronze" };
 
-const RANK_COLORS: Record<number, { ring: string; bg: string; text: string }> = {
-  1: { ring: "rgba(245,158,11,0.6)",  bg: "rgba(245,158,11,0.12)", text: "#F59E0B" },
-  2: { ring: "rgba(148,163,184,0.6)", bg: "rgba(148,163,184,0.1)", text: "#94A3B8" },
-  3: { ring: "rgba(180,83,9,0.6)",    bg: "rgba(180,83,9,0.1)",   text: "#D97706" },
-};
-
-const RANK_ICONS: Record<number, ReactElement> = {
-  1: <svg width="16" height="16" viewBox="0 0 24 24" fill="#F59E0B" stroke="none"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z"/></svg>,
-  2: <svg width="16" height="16" viewBox="0 0 24 24" fill="#94A3B8" stroke="none"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z"/></svg>,
-  3: <svg width="16" height="16" viewBox="0 0 24 24" fill="#D97706" stroke="none"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z"/></svg>,
+/** Podium accents, in theme tokens: 1st owns the accent, 2nd/3rd stay neutral. */
+const RANK_TONE: Record<number, { ring: string; bg: string; text: string }> = {
+  1: { ring: "var(--accent)", bg: "var(--accent-soft)", text: "var(--accent)" },
+  2: { ring: "var(--border)", bg: "var(--bg-elevated)", text: "var(--text-secondary)" },
+  3: { ring: "var(--border)", bg: "var(--bg-elevated)", text: "var(--text-muted)" },
 };
 
 export default function LeaderboardPreview({ entries }: LeaderboardPreviewProps) {
@@ -33,61 +37,70 @@ export default function LeaderboardPreview({ entries }: LeaderboardPreviewProps)
   if (top3.length === 0) return null;
 
   return (
-    <div className="rounded-2xl p-4" style={{ background: "var(--card-bg)", border: "1px solid rgba(245,158,11,0.12)" }}>
-      <div className="flex items-center justify-between mb-3">
+    <div className="rounded-2xl border" style={{ borderColor: "var(--border)", background: "var(--card-bg)" }}>
+      <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-            style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.2)" }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="#F59E0B" stroke="none">
-              <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z"/>
-            </svg>
-          </div>
-          <span className="text-sm font-bold text-[var(--text-primary)]">Top Earners</span>
+          <span
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--accent)]"
+            style={{ background: "var(--accent-soft)" }}
+            aria-hidden
+          >
+            <TrophyDuotoneIcon size={15} />
+          </span>
+          <span className="text-sm font-semibold tracking-tight text-[var(--text-primary)]">Top earners</span>
         </div>
-        <Link href="/leaderboard"
-          className="flex items-center gap-0.5 text-xs font-semibold hover:opacity-80 transition-opacity"
-          style={{ color: "#63D9B4" }}>
-          View All <ChevronRightIcon size={12} />
+        <Link
+          href="/leaderboard"
+          className="flex items-center gap-0.5 rounded-lg px-1.5 py-1 text-xs font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent-soft)]"
+        >
+          View all <ChevronRightIcon size={12} />
         </Link>
       </div>
 
-      <div className="space-y-2">
+      <ul>
         {top3.map((entry, i) => {
-          const rankColors = RANK_COLORS[entry.rank] ?? { ring: "var(--border)", bg: "var(--bg-elevated)", text: "var(--text-muted)" };
+          const tone = RANK_TONE[entry.rank] ?? RANK_TONE[3];
+          const name = displayName(entry);
           return (
-            <motion.div
+            <motion.li
               key={entry.user_id}
               initial={{ opacity: 0, x: -6 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.06 }}
-              className="flex items-center gap-3 py-2 border-b last:border-0"
+              transition={{ delay: i * 0.06, duration: 0.26, ease: "easeOut" }}
+              className={cn(
+                "flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[var(--bg-elevated)]",
+                i < top3.length - 1 && "border-b"
+              )}
               style={{ borderColor: "var(--border)" }}
             >
-              <div className="w-6 h-6 flex items-center justify-center">
-                {RANK_ICONS[entry.rank] ?? <span className="text-xs font-bold text-[var(--text-muted)]">#{entry.rank}</span>}
-              </div>
-              <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center text-xs font-bold"
-                style={{ border: `1.5px solid ${rankColors.ring}`, background: rankColors.bg, color: rankColors.text }}>
+              <span
+                className="flex h-6 w-6 flex-none items-center justify-center rounded-lg text-[11px] font-semibold font-numeric"
+                style={{ border: `1px solid ${tone.ring}`, background: tone.bg, color: tone.text }}
+              >
+                {entry.rank}
+              </span>
+
+              <span
+                className="flex h-8 w-8 flex-none items-center justify-center overflow-hidden rounded-full text-[11px] font-semibold"
+                style={{ border: `1.5px solid ${tone.ring}`, background: "var(--bg-elevated)", color: "var(--text-secondary)" }}
+                aria-hidden
+              >
                 {entry.photo_url ? (
-                  <Image src={entry.photo_url} alt={entry.first_name} width={32} height={32} className="object-cover" />
+                  <Image src={entry.photo_url} alt="" width={32} height={32} className="h-full w-full object-cover" />
                 ) : (
-                  entry.first_name[0]
+                  initials(name)
                 )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold text-[var(--text-primary)] truncate">
-                  {entry.first_name}
-                  {entry.username && <span className="text-[var(--text-muted)] font-normal ml-1">@{entry.username}</span>}
-                </div>
-              </div>
-              {/* ✅ FIXED: was entry.total_usdt_earned — new SQL returns usdt_earned */}
+              </span>
+
+              <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text-primary)]">{name}</span>
+
               <Badge variant={RANK_BADGE[entry.rank] ?? "default"} size="sm">
                 ${formatUSDT(entry.usdt_earned)}
               </Badge>
-            </motion.div>
+            </motion.li>
           );
         })}
-      </div>
+      </ul>
     </div>
   );
 }

@@ -475,6 +475,38 @@ body {
   scrollbar-width: none;
 }
 
+/* ── Dialog / bottom-sheet sizing ─────────────────────────────────────────── */
+/* The sheet must never outgrow the *visible* viewport: the Telegram WebView
+   reports a taller 100vh while its chrome is collapsing, which is what pushed
+   the confirm/cancel row of the stake dialog off-screen. `svh` fixes it, and the
+   plain `vh` line above stays as the fallback for older WebKit/Chromium engines. */
+.ludzo-sheet-panel {
+  max-height: 86vh;
+  max-height: 86svh;
+}
+@media (min-width: 640px) {
+  .ludzo-sheet-panel {
+    max-height: min(760px, 92vh);
+    max-height: min(760px, 92svh);
+  }
+}
+
+/* ── Leaderboard motion ───────────────────────────────────────────────────── */
+/* Slow sheen that sweeps the champion's podium bar — the only "shine" effect on
+   the board, kept at low opacity so it reads as polish in light mode too. */
+@keyframes ludzo-sheen {
+  0%   { transform: translateX(-120%); opacity: 0; }
+  35%  { opacity: 1; }
+  100% { transform: translateX(320%); opacity: 0; }
+}
+.podium-sheen { animation: ludzo-sheen 3.4s ease-in-out infinite; }
+
+@keyframes ludzo-crown-bob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50%      { transform: translateY(-3px) rotate(2deg); }
+}
+.crown-bob { animation: ludzo-crown-bob 3.2s ease-in-out infinite; }
+
 /* ── Gaming hub glass surfaces (used by the 3-tab nav, sheets & cards) ──── */
 .surface-glass {
   background: rgba(11, 13, 26, 0.8);

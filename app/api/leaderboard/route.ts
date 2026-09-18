@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAuth } from "@/lib/auth";
+import { normalizeLeaderboardRows } from "@/lib/leaderboard";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
@@ -24,13 +27,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
+    // Display rows: account name only — never a @username (lib/leaderboard.ts).
+    const entries = normalizeLeaderboardRows(data as never[]);
+
     // ── Fetch caller's rank if they're outside the top-N list ─
     let my_rank: { rank: number; usdt_earned: number } | null = null;
 
     if (auth.ok) {
-      const inList = (data ?? []).some(
-        (e: { user_id: string }) => e.user_id === auth.userId
-      );
+      const inList = entries.some((e) => e.user_id === auth.userId);
 
       if (!inList) {
         const { data: rankData, error: rankError } = await supabase.rpc("get_user_rank", {
@@ -51,7 +55,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data:    data ?? [],
+      data:    entries,
       my_rank,
     });
 

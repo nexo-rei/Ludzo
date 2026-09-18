@@ -70,7 +70,9 @@ export default function LegalPageLayout({
   return (
     <AppShell hideNav>
       <PageHeader title={title} back />
-      <div className="px-4 py-4 pb-10 space-y-5">
+      {/* `.selectable` keeps policy copy selectable/copyable: the one deliberate
+          exception to the app-wide long-press suppression (app/workspace.css). */}
+      <div className="selectable px-4 py-4 pb-10 space-y-5">
         <p className="text-xs text-[var(--text-muted)]">Last updated: {lastUpdated}</p>
         <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{intro}</p>
 

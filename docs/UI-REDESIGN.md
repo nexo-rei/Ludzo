@@ -69,3 +69,80 @@ No changes to `app/api/*`, `hooks/*`, `lib/*` (incl. `ludo-engine.ts`), SQL, Tel
 
 ### Limitations
 - Browser automation was not possible in this sandbox: the Chromium-for-testing and apt repositories are not reachable (TLS/network reset), same as the previous session. Visual confirmation therefore rests on SSR HTML inspection + the live server preview; a real device pass inside the Telegram app (auth, live deposit settlement, light/dark/reduced-motion) still requires the production backend per the checklist above.
+
+---
+
+## Follow-up — leaderboard tokens, viewport-safe sheets, Telegram long-press (session 01a0b350)
+
+Three player-reported defects, all presentation-layer. No API contract, economy rule,
+matchmaking or engine code was changed.
+
+### 1. Leaderboard now speaks the workspace design system
+`app/leaderboard/page.tsx` (and the Home "Top earners" card) carried a private palette —
+gold/silver/bronze gradients, `#63D9B4`, `#10B981`, `rgba(91,33,182,…)` and `text-white` —
+so in light mode names went white-on-white and the board looked like a different product.
+Everything now resolves through the shared tokens (`--card-bg`, `--border`, `--accent`,
+`--accent-soft`, `--accent-contrast`, `--text-primary/secondary/muted`, `--bg-elevated`),
+which is what makes it read as professional in both themes:
+
+- flat `rounded-2xl` cards, no drop-shadow soup; the champion alone gets an accent ring + glow;
+- segmented period control with one spring-driven `layoutId` pill instead of three painted buttons;
+- podium bars tinted from tokens (accent → 2nd/3rd step down into neutrals), staggered spring entrance,
+  count-up amounts, a slow sheen on the champion bar, and a pinned "your rank" card that stays
+  reachable while the list scrolls;
+- standings rows show a share-of-leader bar so rank gaps are readable without a second column;
+- loading is a podium-shaped shimmer (not a generic list), plus real empty and error/retry states;
+- `useReducedMotion` + the existing `MotionConfig reducedMotion="user"` collapse all of it.
+
+### 2. Rankings expose names, never handles
+Ranks 4+ used to append `@username`. `lib/leaderboard.ts` now normalises the
+`get_leaderboard()` rows **server-side** into `display_name` (first + last name, whitespace
+collapsed, 26-char cap, neutral `"Ludzo Player"` fallback — never a handle), and `username`
+is simply not part of the payload any more, so no client can render it. `/api/leaderboard`
+and `/api/home` (`leaderboard_top3`) both run through it, and `LeaderboardEntry` lost the
+`username` field so TypeScript flags any future regression.
+
+### 3. Dialogs cannot fall off the screen
+`components/ui/Sheet.tsx` is the new single dialog primitive: panel capped to the *visible*
+viewport (`.ludzo-sheet-panel`: `86vh` → `86svh` where supported), header and action row
+pinned, only the body scrolls (`overscroll-contain`), safe-area padding on the footer,
+bottom sheet on phones / centered card from `sm:` up, drag-the-handle or Escape or backdrop
+to dismiss, body scroll locked, `role="dialog"` + `aria-modal`, and it portals to `document.body`
+so hub styling or an ancestor `transform` can never clip or re-tint it.
+
+Adopted by the Ludo lobby's **Match confirmation** (the reported bug: Confirm/Cancel slid under
+the nav after picking a stake), the **matchmaking radar**, and the hub profile **rules sheet**.
+The game-end overlay and the two admin modals that had the same clipping hazard got a scroll
+container.
+
+### 4. Long press does nothing (the URL leak)
+Inside Telegram, holding Home / Tasks / Games / Refer / Profile opened the WebView callout with
+the app's real address — defeating the whole point of a hidden domain. Two layers now stop it:
+
+- `app/workspace.css`: `*` gets `-webkit-touch-callout: none` + `-webkit-user-drag: none`, body gets
+  `user-select: none`; form fields, `.selectable` (legal copy) and `.allow-longpress` (deposit QR,
+  where saving the code is a feature) opt back in; the admin console stays selectable for staff.
+- `components/layout/TelegramHardening.tsx` (mounted in the root layout): `contextmenu` blocked
+  for touch/pen gestures (a desktop right-click still works, for QA), `dragstart` and `selectstart`
+  blocked, selection cleared when a hold crosses 520 ms, and the follow-up click on an
+  `<a href>` is swallowed so a long press navigates nowhere.
+
+Taps, momentum scrolling and every form field behave exactly as before.
+
+### Boundaries
+No change to auth, wallet math, escrow/settlement, queue polling, task or ad eligibility, SQL,
+`lib/ludo-engine.ts` or any API contract beyond dropping `username` from leaderboard rows.
+`/api/leaderboard` is now explicitly `force-dynamic` (rankings must never be cached at the edge).
+
+### Verification
+- `npx tsc --noEmit`: clean. `npx next build`: passed.
+- `npm run verify:ui` (`scripts/verify-ui-fixes.mjs`): 79 checks — name-only rows, token-only
+  palette, portal/sheet invariants, `svh` cap, hardening CSS + listeners, and `displayName()`
+  unit assertions (a handle can never become a name).
+- `npm run verify:engine`: unchanged at 59/60 — the single failing check is the pre-existing
+  `bot avoids stepping into danger when a safe alternative exists` behaviour; no engine diff here.
+- SSR smoke on `next dev`: `/leaderboard`, `/home`, `/games`, `/games/play`, `/games/profile`,
+  `/tasks`, `/deposit` → HTTP 200, no server warnings.
+- Still required on a device (no browser automation in this sandbox): Telegram iOS + Android long
+  press on every nav tab and card, stake confirm sheet on a 320 × 568 viewport, light/dark
+  appearance on the board, and reduced-motion.
