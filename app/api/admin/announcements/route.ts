@@ -71,8 +71,10 @@ export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
     const { id, ...fields } = body;
+    if (!id) return NextResponse.json({ success: false, error: "id required" }, { status: 400 });
     const supabase = createAdminClient();
-    await supabase.from("announcements").update({ ...fields, updated_at: new Date().toISOString() }).eq("id", id);
+    const { error } = await supabase.from("announcements").update({ ...fields, updated_at: new Date().toISOString() }).eq("id", id);
+    if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     await logAdminAction(supabase, {
       adminId: auth.adminId, action: "announcement_update", targetType: "announcement", targetId: id,
     });
@@ -92,7 +94,8 @@ export async function DELETE(req: NextRequest) {
     if (!id) return NextResponse.json({ success: false, error: "id required" }, { status: 400 });
 
     const supabase = createAdminClient();
-    await supabase.from("announcements").delete().eq("id", id);
+    const { error } = await supabase.from("announcements").delete().eq("id", id);
+    if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     await logAdminAction(supabase, {
       adminId: auth.adminId, action: "announcement_delete", targetType: "announcement", targetId: id,
     });

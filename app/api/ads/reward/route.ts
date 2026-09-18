@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSettings } from "@/lib/settings";
+import { creditCoins } from "@/lib/coins";
 import { startOfDay } from "date-fns";
 
 export async function POST(req: NextRequest) {
@@ -55,13 +56,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Credit coins for normal ads only
     if (adType === "normal") {
-      await supabase.rpc("credit_coins", {
-        p_user_id: user.id,
-        p_amount: settings.ad_reward_coins,
-        p_reason: "ad_reward",
+      const credited = await creditCoins(supabase, {
+        userId: user.id,
+        amount: settings.ad_reward_coins,
+        reason: "ad_reward",
       });
+      if (!credited.ok) {
+        return NextResponse.json({ success: false, error: credited.error ?? "Failed to credit coins" }, { status: 500 });
+      }
     }
 
     return NextResponse.json({

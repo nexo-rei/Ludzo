@@ -12,8 +12,17 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase.from("settings").select("key, value");
     if (error) throw error;
 
+    const ALIASES: Record<string, string> = {
+      min_deposit: "min_deposit_usdt",
+      min_withdrawal: "min_withdrawal_usdt",
+      app_name: "site_name",
+    };
+
     const settings: Record<string, string> = {};
-    (data ?? []).forEach(({ key, value }) => { settings[key] = value; });
+    (data ?? []).forEach(({ key, value }) => {
+      settings[key] = value;
+      if (ALIASES[key]) settings[ALIASES[key]] = value;
+    });
 
     return NextResponse.json({ success: true, data: settings });
   } catch (err) {

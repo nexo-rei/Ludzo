@@ -46,6 +46,7 @@ console.log("HOME USER ERROR:", JSON.stringify(userError));
     const [
       walletRes,
       adCountRes,
+      bonusAdCountRes,
       streakRes,
       announcementsRes,
       recentActivityRes,
@@ -53,6 +54,7 @@ console.log("HOME USER ERROR:", JSON.stringify(userError));
     ] = await Promise.all([
       supabase.from("wallets").select("coin_balance, usdt_balance, won_coins_balance").eq("user_id", user.id).maybeSingle(),
       supabase.from("ad_logs").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("ad_type", "normal").gte("created_at", todayStart),
+      supabase.from("ad_logs").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("ad_type", "bonus").gte("created_at", todayStart),
       supabase.from("daily_streaks").select("*").eq("user_id", user.id).maybeSingle(),
       supabase.from("announcements").select("id, title, description, priority, created_at").eq("is_active", true).order("priority", { ascending: false }).limit(3),
       supabase.from("transactions").select("id, type, currency, amount, status, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(10),

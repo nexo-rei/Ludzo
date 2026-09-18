@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logAdminAction } from "@/lib/admin-log";
+import { creditCoins, creditUsdt } from "@/lib/coins";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdminAuth(req);
@@ -63,17 +64,23 @@ export async function PATCH(req: NextRequest) {
     const supabase = createAdminClient();
 
     if (action === "suspend") {
-      await supabase.from("users").update({ status: "suspended" }).eq("id", user_id);
+      const { error } = await supabase.from("users").update({ status: "suspended" }).eq("id", user_id);
+      if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     } else if (action === "unsuspend") {
-      await supabase.from("users").update({ status: "active" }).eq("id", user_id);
+      const { error } = await supabase.from("users").update({ status: "active" }).eq("id", user_id);
+      if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     } else if (action === "add_coins" && amount) {
-      await supabase.rpc("credit_coins", { p_user_id: user_id, p_amount: amount, p_reason: reason ?? "admin_adjustment" });
+      const credited = await creditCoins(supabase, { userId: user_id, amount, reason: reason ?? "admin_adjustment" });
+      if (!credited.ok) return NextResponse.json({ success: false, error: credited.error }, { status: 500 });
     } else if (action === "remove_coins" && amount) {
-      await supabase.rpc("debit_coins", { p_user_id: user_id, p_amount: amount, p_reason: reason ?? "admin_adjustment" });
+      const { error } = await supabase.rpc("debit_coins", { p_user_id: user_id, p_amount: amount, p_reason: reason ?? "admin_adjustment" });
+      if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     } else if (action === "add_usdt" && amount) {
-      await supabase.rpc("credit_usdt", { p_user_id: user_id, p_amount: amount, p_reason: reason ?? "admin_adjustment" });
+      const credited = await creditUsdt(supabase, { userId: user_id, amount, reason: reason ?? "admin_adjustment" });
+      if (!credited.ok) return NextResponse.json({ success: false, error: credited.error }, { status: 500 });
     } else if (action === "remove_usdt" && amount) {
-      await supabase.rpc("debit_usdt", { p_user_id: user_id, p_amount: amount, p_reason: reason ?? "admin_adjustment" });
+      const { error } = await supabase.rpc("debit_usdt", { p_user_id: user_id, p_amount: amount, p_reason: reason ?? "admin_adjustment" });
+      if (error) return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     } else {
       return NextResponse.json({ success: false, error: "Invalid action" }, { status: 400 });
     }

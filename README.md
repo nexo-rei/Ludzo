@@ -83,9 +83,12 @@ ludzo-v3/
 │   ├── 02_ludo_fixes.sql       # REQUIRED — missing RPCs/columns, race guards
 │   ├── 03_ludo_cron.sql        # Janitor for stuck rooms / queue refunds
 │   ├── 04_ludo_two_tokens_cleanup.sql
-│   └── 05_support_and_task_verification.sql
+│   ├── 05_support_and_task_verification.sql
 │                               # REQUIRED — support_tickets + task chat columns
 │                               # + admin_logs hardening (logs page crash fix)
+│   └── 06_admin_tasks_withdrawals.sql
+│                               # REQUIRED — task hard-delete CASCADE,
+│                               # withdrawal statuses + wallet RPCs
 ├── types/index.ts              # All TypeScript types
 ├── middleware.ts               # Maintenance mode redirect
 ├── next.config.ts              # Next.js config
@@ -148,10 +151,16 @@ sql/04_ludo_two_tokens_cleanup.sql
 
 -- 5. REQUIRED — Support tickets + task join-verification + admin_logs fix
 sql/05_support_and_task_verification.sql
+
+-- 6. REQUIRED — Admin task delete + withdrawal approve/reject
+sql/06_admin_tasks_withdrawals.sql
 ```
 
 `05` ke bina: support tickets save nahi honge, channel/group task verify nahi hoga,
 aur `/admin/logs` khaali/error dikha sakta hai.
+
+`06` ke bina: admin task delete FK pe atak sakta hai, aur withdrawal approve/reject
+status check / missing `credit_usdt(p_reason)` ki wajah se fail ho sakta hai.
 
 ### 4. Run Locally
 

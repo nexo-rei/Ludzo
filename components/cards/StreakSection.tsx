@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { PlayIcon } from "@/components/ui/DuotoneIcons";
+import { CheckIcon, PlayIcon, StreakFlameIcon } from "@/components/ui/DuotoneIcons";
 import Button from "@/components/ui/Button";
 import { showToast } from "@/components/ui/Toast";
 import { useApp } from "@/hooks/useApp";
@@ -12,11 +12,13 @@ import type { DailyStreak, HomePageStreak } from "@/types";
 interface StreakSectionProps {
   streak: DailyStreak | HomePageStreak | null;
   todayReward: number;
+  dayRewards?: number[];
+  bonusAdsToday?: number;
   onClaimed?: () => void;
 }
 
 const BONUS_ADS_REQUIRED = 3;
-const DAY_REWARDS = [2, 3, 5, 7, 10, 15, 25];
+const DEFAULT_DAY_REWARDS = [2, 3, 4, 5, 6, 8, 10];
 
 declare global {
   interface Window {
@@ -24,13 +26,24 @@ declare global {
   }
 }
 
-export default function StreakSection({ streak, todayReward, onClaimed }: StreakSectionProps) {
+export default function StreakSection({
+  streak,
+  todayReward,
+  dayRewards,
+  bonusAdsToday = 0,
+  onClaimed,
+}: StreakSectionProps) {
   const { userId, refreshWallet } = useApp();
-  const [bonusWatched, setBonusWatched] = useState(0);
+  const rewards = dayRewards && dayRewards.length === 7 ? dayRewards : DEFAULT_DAY_REWARDS;
+  const [bonusWatched, setBonusWatched] = useState(bonusAdsToday);
   const [loading, setLoading] = useState(false);
   const [watchingBonus, setWatchingBonus] = useState(false);
 
-  const currentDay = streak?.current_day ?? 1;
+  useEffect(() => {
+    setBonusWatched(bonusAdsToday);
+  }, [bonusAdsToday]);
+
+  const nextDayToClaim = streak?.current_day ?? 1;
 
   const alreadyClaimed = (() => {
     if (!streak?.last_claimed_at) return false;
@@ -43,8 +56,13 @@ export default function StreakSection({ streak, todayReward, onClaimed }: Streak
     );
   })();
 
+  // After a claim the DB already points at tomorrow's day.
+  const displayDay = alreadyClaimed
+    ? nextDayToClaim === 1 ? 7 : nextDayToClaim - 1
+    : nextDayToClaim;
+
   const canClaim = bonusWatched >= BONUS_ADS_REQUIRED && !alreadyClaimed;
-  const bonusProgress = (bonusWatched / BONUS_ADS_REQUIRED) * 100;
+  const bonusProgress = Math.min((bonusWatched / BONUS_ADS_REQUIRED) * 100, 100);
 
   const handleWatchBonusAd = async () => {
     if (bonusWatched >= BONUS_ADS_REQUIRED || watchingBonus || !userId) return;
@@ -91,7 +109,7 @@ export default function StreakSection({ streak, todayReward, onClaimed }: Streak
       });
       const data = await res.json();
       if (data.success) {
-        showToast(`Streak Day ${currentDay} claimed! +${todayReward} Coins`, "success");
+        showToast(`Streak Day ${displayDay} claimed! +${todayReward} Coins`, "success");
         setBonusWatched(0);
         await refreshWallet();
         onClaimed?.();
@@ -106,111 +124,79 @@ export default function StreakSection({ streak, todayReward, onClaimed }: Streak
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
+    <motion.article
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.25 }}
-      className="rounded-xl p-5"
-      style={{
-        background: "var(--card-bg)",
-        border: "1px solid var(--border)",
-        boxShadow: "none",
-      }}
+      transition={{ delay: 0.18, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      className="reward-card"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-            style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.2)" }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="#F59E0B" stroke="none">
-              <path d="M12 2c0 0-4 4-4 8a4 4 0 008 0c0-4-4-8-4-8z" opacity="0.3"/>
-              <path d="M12 2c0 0-4 4-4 8a4 4 0 008 0c0-4-4-8-4-8z" fill="none" stroke="#F59E0B" strokeWidth="1.5"/>
-              <path d="M9 13c0 0 1 2 3 2s3-2 3-2" stroke="#F59E0B" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-            </svg>
+      <div className="reward-card-head">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="reward-icon streak flame" aria-hidden="true">
+            <StreakFlameIcon size={18} />
           </div>
-          <div>
-            <div className="text-sm font-bold text-[var(--text-primary)]">Daily Streak</div>
-            <div className="text-[10px]" style={{ color: "#F59E0B" }}>Day {currentDay} / 7</div>
+          <div className="min-w-0">
+            <h3 className="reward-title">Daily streak</h3>
+            <p className="reward-sub" style={{ color: alreadyClaimed ? "var(--success-strong)" : "#D97706" }}>
+              {alreadyClaimed ? `Day ${displayDay} claimed` : `Day ${displayDay} of 7`}
+            </p>
           </div>
         </div>
-        <div className="text-right flex flex-col items-end">
-          <div className="text-sm font-black font-numeric flex items-center gap-1" style={{ color: "#F59E0B" }}>
-            <LudzoCoin size={14} /> +{todayReward}
+        <div className="text-right">
+          <div className="reward-count font-numeric" style={{ color: "#D97706" }}>
+            <LudzoCoin size={14} /> +{alreadyClaimed ? (rewards[displayDay - 1] ?? todayReward) : todayReward}
           </div>
-          <div className="text-[10px] text-[var(--text-muted)]">Coins today</div>
+          <div className="text-[10px] text-[var(--text-muted)]">{alreadyClaimed ? "earned today" : "coins today"}</div>
         </div>
       </div>
 
-      {/* 7-day dots */}
-      <div className="flex gap-1.5 mb-3">
-        {DAY_REWARDS.map((reward, i) => {
+      <div className="streak-days" role="list" aria-label="Seven day streak">
+        {rewards.map((reward, i) => {
           const dayNum = i + 1;
-          const isPast = dayNum < currentDay;
-          const isCurrent = dayNum === currentDay;
-          const isFuture = dayNum > currentDay;
+          const isDone = alreadyClaimed ? dayNum <= displayDay : dayNum < displayDay;
+          const isCurrent = dayNum === displayDay;
           return (
-            <motion.div
-              key={i}
-              className="flex-1 flex flex-col items-center gap-1"
-              whileHover={{ scale: 1.05 }}
-            >
+            <div key={dayNum} className="streak-day" role="listitem">
               <div
-                className="w-full h-1.5 rounded-full transition-all duration-300"
-                style={{
-                  background: isPast
-                    ? "#F59E0B"
-                    : isCurrent
-                    ? alreadyClaimed ? "#10B981" : "#F59E0B"
-                    : "var(--bg-elevated)",
-                  boxShadow: (isPast || (isCurrent && alreadyClaimed))
-                    ? "0 0 6px rgba(245,158,11,0.4)" : "none",
-                  animation: isCurrent && !alreadyClaimed ? "pulse 1.5s ease-in-out infinite" : "none",
-                }}
-              />
-              <span className="text-[9px] font-medium"
-                style={{ color: isFuture ? "#475569" : isPast ? "#F59E0B" : isCurrent ? (alreadyClaimed ? "#10B981" : "#F59E0B") : "#94A3B8" }}>
-                {reward}
-              </span>
-            </motion.div>
+                className={`streak-pip${isDone ? " is-done" : ""}${isCurrent && !alreadyClaimed ? " is-current" : ""}${isCurrent && alreadyClaimed ? " is-done" : ""}`}
+              >
+                {isDone || (isCurrent && alreadyClaimed) ? <CheckIcon size={10} /> : dayNum}
+              </div>
+              <span className="streak-day-reward font-numeric">{reward}</span>
+            </div>
           );
         })}
       </div>
 
-      {/* Claimed state */}
       <AnimatePresence mode="wait">
         {alreadyClaimed ? (
           <motion.div
             key="claimed"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex items-center gap-2 p-2.5 rounded-xl"
-            style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)" }}
+            className="streak-claimed"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            <span className="text-xs font-semibold" style={{ color: "#10B981" }}>
-              Claimed! Come back tomorrow for Day {Math.min(currentDay + 1, 7)}
-            </span>
+            <CheckIcon size={14} />
+            <span>Come back tomorrow for Day {nextDayToClaim}</span>
           </motion.div>
         ) : (
           <motion.div key="unclaimed" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            {/* Bonus progress */}
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] text-[var(--text-muted)]">Bonus ads: {bonusWatched}/{BONUS_ADS_REQUIRED}</span>
-              <span className="text-[11px] font-semibold flex items-center gap-1" style={{ color: "#F59E0B" }}>
-                <LudzoCoin size={13} /> +{todayReward} Coins
+              <span className="text-[11px] text-[var(--text-muted)]">
+                Bonus ads {bonusWatched}/{BONUS_ADS_REQUIRED}
+              </span>
+              <span className="text-[11px] font-semibold inline-flex items-center gap-1" style={{ color: "#D97706" }}>
+                <LudzoCoin size={13} /> +{todayReward}
               </span>
             </div>
-            <div className="h-1.5 rounded-full mb-3 overflow-hidden" style={{ background: "rgba(245,158,11,0.1)" }}>
+            <div className="reward-track" style={{ background: "rgba(217,119,6,0.12)" }}>
               <motion.div
-                className="h-full rounded-full"
-                style={{ background: "linear-gradient(90deg, #D97706, #F59E0B, #FCD34D)" }}
+                className="reward-track-fill streak"
                 animate={{ width: `${bonusProgress}%` }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
+                transition={{ duration: 0.45, ease: "easeOut" }}
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 mt-3">
               <Button
                 variant="secondary"
                 size="sm"
@@ -219,7 +205,7 @@ export default function StreakSection({ streak, todayReward, onClaimed }: Streak
                 onClick={handleWatchBonusAd}
                 className="flex-1 gap-1"
               >
-                <PlayIcon size={12} /> Bonus Ad
+                <PlayIcon size={12} /> Bonus ad
               </Button>
               <Button
                 size="sm"
@@ -227,22 +213,14 @@ export default function StreakSection({ streak, todayReward, onClaimed }: Streak
                 disabled={!canClaim}
                 onClick={handleClaimStreak}
                 className="flex-1 gap-1"
-                style={{
-                  background: canClaim
-                    ? "linear-gradient(135deg, #D97706, #F59E0B)"
-                    : "rgba(245,158,11,0.15)",
-                  color: canClaim ? "#0F172A" : "#64748B",
-                } as React.CSSProperties}
+                variant="gold"
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                  <path d="M12 2c0 0-4 4-4 8a4 4 0 008 0c0-4-4-8-4-8z" />
-                </svg>
-                Claim
+                <StreakFlameIcon size={13} /> Claim
               </Button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </motion.article>
   );
 }

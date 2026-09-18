@@ -99,3 +99,85 @@ export async function creditCoins(
 
   return { ok: false, error: "Credit failed after retries" };
 }
+
+export interface CreditUsdtArgs {
+  userId: string;
+  amount: number;
+  reason: string;
+}
+
+/**
+ * USDT credit — RPC pehle, phir direct wallet fallback.
+ * Admin withdrawal reject / deposit approve yahi use karte hain.
+ */
+export async function creditUsdt(
+  supabase: SupabaseClient,
+  { userId, amount, reason }: CreditUsdtArgs
+): Promise<CreditCoinsResult> {
+  if (!userId || !Number.isFinite(amount) || amount === 0) {
+    return { ok: false, error: "Invalid USDT credit request" };
+  }
+
+  // Signature drift: kuch DBs me p_reason nahi hota
+  const rpcAttempts: Record<string, unknown>[] = [
+    { p_user_id: userId, p_amount: amount, p_reason: reason },
+    { p_user_id: userId, p_amount: amount },
+  ];
+  for (const args of rpcAttempts) {
+    try {
+      const { error } = await supabase.rpc("credit_usdt", args);
+      if (!error) return { ok: true, method: "rpc" };
+      console.error("[creditUsdt] rpc failed:", error.message);
+    } catch (err) {
+      console.error("[creditUsdt] rpc threw:", err);
+    }
+  }
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const { data: wallet, error: readErr } = await supabase
+        .from("wallets")
+        .select("usdt_balance")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (readErr) throw readErr;
+
+      if (!wallet) {
+        const { error: insertErr } = await supabase
+          .from("wallets")
+          .insert({ user_id: userId, coin_balance: 0, usdt_balance: amount });
+        if (insertErr) throw insertErr;
+      } else {
+        const current = Number(wallet.usdt_balance ?? 0);
+        const { error: updateErr } = await supabase
+          .from("wallets")
+          .update({ usdt_balance: current + amount, updated_at: new Date().toISOString() })
+          .eq("user_id", userId)
+          .eq("usdt_balance", current);
+        if (updateErr) throw updateErr;
+      }
+
+      try {
+        await supabase.from("transactions").insert({
+          user_id: userId,
+          type: reason,
+          currency: "usdt",
+          amount,
+          status: "completed",
+          description: `+${amount} USDT — ${reason.replace(/_/g, " ")}`,
+        });
+      } catch {
+        /* ledger optional */
+      }
+
+      return { ok: true, method: "fallback" };
+    } catch (err) {
+      if (attempt === 2) {
+        return { ok: false, error: err instanceof Error ? err.message : "USDT credit failed" };
+      }
+      await new Promise((r) => setTimeout(r, 120 * (attempt + 1)));
+    }
+  }
+
+  return { ok: false, error: "USDT credit failed after retries" };
+}
