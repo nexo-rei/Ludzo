@@ -23,16 +23,24 @@ export const SETTING_DEFAULTS: AppSettings = {
   maintenance_message: "We are performing scheduled maintenance. Back soon!",
 };
 
+/** Admin panel historically saved aliased keys (min_deposit_usdt, site_name). */
+const SETTING_ALIASES: Record<string, keyof AppSettings> = {
+  min_deposit_usdt: "min_deposit",
+  min_withdrawal_usdt: "min_withdrawal",
+  site_name: "app_name",
+};
+
 export async function getSettings(supabase: SupabaseClient): Promise<AppSettings> {
   const { data } = await supabase.from("settings").select("key, value");
   if (!data || data.length === 0) return { ...SETTING_DEFAULTS };
 
   const result: Record<string, unknown> = { ...SETTING_DEFAULTS };
   for (const row of data as Array<{ key: string; value: string }>) {
-    const def = SETTING_DEFAULTS[row.key as keyof AppSettings];
-    if (typeof def === "number") result[row.key] = parseFloat(row.value) || 0;
-    else if (typeof def === "boolean") result[row.key] = row.value === "true";
-    else result[row.key] = row.value;
+    const mapped = (SETTING_ALIASES[row.key] ?? row.key) as keyof AppSettings;
+    const def = SETTING_DEFAULTS[mapped];
+    if (typeof def === "number") result[mapped] = parseFloat(row.value) || 0;
+    else if (typeof def === "boolean") result[mapped] = String(row.value) === "true";
+    else if (def !== undefined) result[mapped] = row.value;
   }
   return result as unknown as AppSettings;
 }

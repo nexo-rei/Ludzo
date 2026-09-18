@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logAdminAction } from "@/lib/admin-log";
+import { updateById } from "@/lib/db-write";
+import { creditUsdt } from "@/lib/coins";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdminAuth(req);
@@ -13,7 +15,6 @@ export async function GET(req: NextRequest) {
     const limit = 20;
     const offset = (page - 1) * limit;
     const status = url.searchParams.get("status") ?? "all";
-    const search = url.searchParams.get("search") ?? "";
 
     const supabase = createAdminClient();
     let query = supabase
@@ -27,7 +28,6 @@ export async function GET(req: NextRequest) {
     const { data: deposits, count, error } = await query;
     if (error) throw error;
 
-    // Attach user info
     const userIds = [...new Set((deposits ?? []).map((d) => d.user_id))];
     let userMap: Record<string, { first_name: string; username?: string; telegram_id: string }> = {};
     if (userIds.length > 0) {
@@ -39,6 +39,7 @@ export async function GET(req: NextRequest) {
     const items = (deposits ?? []).map((d) => ({ ...d, user: userMap[d.user_id] ?? null }));
     return NextResponse.json({ success: true, data: { items, total: count ?? 0, page, limit } });
   } catch (err) {
+    console.error("[admin/deposits GET]", err);
     return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
   }
 }
@@ -51,24 +52,53 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const { deposit_id, action } = body as { deposit_id: string; action: "approve" | "reject" };
 
+    if (!deposit_id || !action) {
+      return NextResponse.json({ success: false, error: "deposit_id and action required" }, { status: 400 });
+    }
+
     const supabase = createAdminClient();
-    const { data: deposit } = await supabase
+    const { data: deposit, error: readErr } = await supabase
       .from("deposits").select("*").eq("id", deposit_id).maybeSingle();
+    if (readErr) return NextResponse.json({ success: false, error: readErr.message }, { status: 500 });
     if (!deposit) return NextResponse.json({ success: false, error: "Deposit not found" }, { status: 404 });
 
-    if (action === "approve" && deposit.status === "pending") {
-      await supabase.from("deposits").update({
+    const now = new Date().toISOString();
+
+    if (action === "approve") {
+      if (deposit.status !== "pending") {
+        return NextResponse.json({ success: false, error: `Cannot approve deposit with status ${deposit.status}` }, { status: 400 });
+      }
+      const updated = await updateById(supabase, "deposits", deposit_id, {
         status: "completed",
-        completed_at: new Date().toISOString(),
-        reviewed_by: auth.adminId,
-      }).eq("id", deposit_id);
-      await supabase.rpc("credit_usdt", {
-        p_user_id: deposit.user_id, p_amount: deposit.amount, p_reason: "deposit",
+        completed_at: now,
+        reviewed_by: auth.adminId ?? null,
+        updated_at: now,
       });
+      if (!updated.ok) {
+        return NextResponse.json({ success: false, error: `Approve failed: ${updated.error}` }, { status: 500 });
+      }
+      const credited = await creditUsdt(supabase, {
+        userId: deposit.user_id,
+        amount: Number(deposit.amount),
+        reason: "deposit",
+      });
+      if (!credited.ok) {
+        return NextResponse.json({
+          success: true,
+          warning: `Marked completed, but USDT credit failed: ${credited.error}`,
+        });
+      }
     } else if (action === "reject") {
-      await supabase.from("deposits").update({
-        status: "failed", reviewed_by: auth.adminId,
-      }).eq("id", deposit_id);
+      const updated = await updateById(supabase, "deposits", deposit_id, {
+        status: "failed",
+        reviewed_by: auth.adminId ?? null,
+        updated_at: now,
+      });
+      if (!updated.ok) {
+        return NextResponse.json({ success: false, error: `Reject failed: ${updated.error}` }, { status: 500 });
+      }
+    } else {
+      return NextResponse.json({ success: false, error: "Invalid action" }, { status: 400 });
     }
 
     await logAdminAction(supabase, {
@@ -80,6 +110,7 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (err) {
+    console.error("[admin/deposits PATCH]", err);
     return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
   }
 }

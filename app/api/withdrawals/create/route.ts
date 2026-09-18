@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getSettings } from "@/lib/settings";
 
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
@@ -35,11 +36,26 @@ export async function POST(req: NextRequest) {
         { status: 404 }
       );
 
-    // Debit USDT balance via RPC
-    const { error: rpcError } = await supabase.rpc("debit_usdt", {
+    const settings = await getSettings(supabase);
+    const amountNum = Number(amount);
+    if (!Number.isFinite(amountNum) || amountNum < settings.min_withdrawal) {
+      return NextResponse.json(
+        { success: false, error: `Minimum withdrawal is $${settings.min_withdrawal}` },
+        { status: 400 }
+      );
+    }
+
+    let rpcError = (await supabase.rpc("debit_usdt", {
       p_user_id: user.id,
-      p_amount: amount,
-    });
+      p_amount: amountNum,
+      p_reason: "withdrawal",
+    })).error;
+    if (rpcError) {
+      rpcError = (await supabase.rpc("debit_usdt", {
+        p_user_id: user.id,
+        p_amount: amountNum,
+      })).error;
+    }
 
     if (rpcError) {
       console.error("[withdrawals/create] debit_usdt error:", rpcError);
@@ -49,15 +65,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Insert withdrawal record
-    const fee_amount = 0; // adjust if you have a fee formula
-    const net_amount = Number(amount) - fee_amount;
+    const fee_amount = Math.round(amountNum * (settings.withdrawal_fee_pct / 100) * 100) / 100;
+    const net_amount = Math.round((amountNum - fee_amount) * 100) / 100;
 
     const { data: withdrawal, error: insertError } = await supabase
       .from("withdrawals")
       .insert({
         user_id: user.id,
-        amount,
+        amount: amountNum,
         fee_amount,
         net_amount,
         wallet_address,

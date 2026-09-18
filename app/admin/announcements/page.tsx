@@ -83,6 +83,7 @@ export default function AdminAnnouncementsPage() {
       const res = await fetch(`/api/admin/announcements?id=${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${getToken()}` } });
       const data = await res.json();
       if (data.success) { showToast("Deleted", "success"); await load(); }
+      else showToast(data.error ?? "Failed to delete", "error");
     } catch { showToast("Failed to delete", "error"); }
   };
 

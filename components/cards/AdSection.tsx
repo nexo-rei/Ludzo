@@ -26,7 +26,7 @@ export default function AdSection({ adsWatchedToday, dailyLimit, adReward, onAdW
   const { userId, refreshWallet } = useApp();
   const limitReached = adsWatchedToday >= dailyLimit;
   const remaining = Math.max(0, dailyLimit - adsWatchedToday);
-  const progress = Math.min((adsWatchedToday / dailyLimit) * 100, 100);
+  const progress = dailyLimit > 0 ? Math.min((adsWatchedToday / dailyLimit) * 100, 100) : 0;
 
   const handleWatchAd = async () => {
     if (limitReached || loading || !userId) return;
@@ -59,51 +59,42 @@ export default function AdSection({ adsWatchedToday, dailyLimit, adReward, onAdW
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
+    <motion.article
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.2 }}
-      className="rounded-xl p-5"
-      style={{
-        background: "var(--card-bg)",
-        border: "1px solid var(--border)",
-        boxShadow: "none",
-      }}
+      transition={{ delay: 0.12, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      className="reward-card"
     >
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-            style={{ background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.2)" }}>
-            <AdPlayIcon size={16} style={{ color: "#3B82F6" }} />
+      <div className="reward-card-head">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="reward-icon ads" aria-hidden="true">
+            <AdPlayIcon size={18} />
           </div>
-          <div>
-            <div className="text-sm font-bold text-[var(--text-primary)]">Rewarded Ads</div>
-            <div className="text-[10px] text-[var(--text-muted)]">
-              {limitReached ? "Come back tomorrow" : `${remaining} remaining today`}
-            </div>
+          <div className="min-w-0">
+            <h3 className="reward-title">Rewarded ads</h3>
+            <p className="reward-sub">
+              {limitReached ? "Daily limit reached · come back tomorrow" : `${remaining} left today`}
+            </p>
           </div>
         </div>
-        <div className="flex items-center gap-1 text-xs font-bold" style={{ color: "#3B82F6" }}>
-          <span className="font-numeric">{adsWatchedToday}</span>
-          <span className="text-[var(--text-muted)] font-normal">/</span>
-          <span className="font-numeric text-[var(--text-muted)] font-normal">{dailyLimit}</span>
+        <div className="reward-count font-numeric" style={{ color: "var(--accent)" }}>
+          {adsWatchedToday}
+          <span>/{dailyLimit}</span>
         </div>
       </div>
 
-      {/* Progress bar */}
-      <div className="h-1.5 rounded-full mb-3 overflow-hidden" style={{ background: "rgba(59,130,246,0.1)" }}>
+      <div className="reward-track" aria-hidden="true">
         <motion.div
-          className="h-full rounded-full"
-          style={{ background: "linear-gradient(90deg, #3B82F6, #60A5FA)" }}
+          className="reward-track-fill ads"
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
+          transition={{ duration: 0.55, ease: "easeOut" }}
         />
       </div>
 
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-[var(--text-muted)] inline-flex items-center gap-1.5">
-          <LudzoCoin size={14} /> +{adReward} Coins per ad
+      <div className="reward-card-foot">
+        <span className="reward-payout">
+          <LudzoCoin size={15} /> +{adReward} coins / ad
         </span>
         <Button
           variant="primary"
@@ -112,11 +103,10 @@ export default function AdSection({ adsWatchedToday, dailyLimit, adReward, onAdW
           disabled={limitReached}
           onClick={handleWatchAd}
           className="gap-1.5 shrink-0"
-          style={{ background: limitReached ? "rgba(59,130,246,0.2)" : "linear-gradient(135deg, #3B82F6, #2563EB)" } as React.CSSProperties}
         >
-          <PlayIcon size={12} /> Watch Ad
+          <PlayIcon size={12} /> {limitReached ? "Done" : "Watch ad"}
         </Button>
       </div>
-    </motion.div>
+    </motion.article>
   );
 }

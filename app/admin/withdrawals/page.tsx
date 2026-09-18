@@ -10,7 +10,7 @@ import { formatUSDT, formatDateTime } from "@/lib/utils";
 
 interface WithdrawalItem {
   id: string;
-  user: { first_name: string; username?: string; telegram_id: string };
+  user: { first_name: string; username?: string; telegram_id: string } | null;
   amount: number;
   fee_amount: number;
   net_amount: number;
@@ -109,8 +109,8 @@ export default function AdminWithdrawalsPage() {
               ) : items.map((w) => (
                 <tr key={w.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
                   <td className="px-4 py-3">
-                    <div className="text-white font-medium">{w.user.first_name}</div>
-                    {w.user.username && <div className="text-xs text-gray-500">@{w.user.username}</div>}
+                    <div className="text-white font-medium">{w.user?.first_name ?? "Unknown"}</div>
+                    {w.user?.username && <div className="text-xs text-gray-500">@{w.user.username}</div>}
                   </td>
                   <td className="px-4 py-3 text-white font-numeric">${formatUSDT(w.amount)}</td>
                   <td className="px-4 py-3 text-red-400 font-numeric text-xs">-${formatUSDT(w.fee_amount)}</td>
@@ -159,7 +159,7 @@ export default function AdminWithdrawalsPage() {
             </div>
             <div className="space-y-2 text-sm">
               {[
-                ["User", `${selected.user.first_name} (@${selected.user.username ?? selected.user.telegram_id})`],
+                ["User", `${selected.user?.first_name ?? "Unknown"} (@${selected.user?.username ?? selected.user?.telegram_id ?? "—"})`],
                 ["Amount", `$${formatUSDT(selected.amount)} USDT`],
                 ["Fee (5%)", `-$${formatUSDT(selected.fee_amount)}`],
                 ["Net Amount", `$${formatUSDT(selected.net_amount)} USDT`],

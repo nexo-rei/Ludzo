@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, type ReactElement } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -21,30 +21,7 @@ import { formatDateTime } from "@/lib/utils";
 import type { HomePageData } from "@/types";
 import LudzoLogo from "@/components/layout/LudzoLogo";
 import LudzoCoin from "@/components/ui/LudzoCoin";
-
-// SVG icon mapping for activity types
-const ACTIVITY_SVG: Record<string, { icon: ReactElement; color: string; bg: string }> = {
-  ad_reward:           { icon: <polygon points="5 3 19 12 5 21 5 3" stroke="currentColor" strokeWidth="1.5" fill="none" />, color: "#3B82F6", bg: "rgba(59,130,246,0.12)" },
-  task_reward:         { icon: <><path d="M9 11l3 3L22 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></>, color: "#10B981", bg: "rgba(16,185,129,0.12)" },
-  daily_streak:        { icon: <path d="M12 2c0 0-4 4-4 8a4 4 0 008 0c0-4-4-8-4-8z" fill="currentColor" />, color: "#F59E0B", bg: "rgba(245,158,11,0.12)" },
-  deposit:             { icon: <><rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" fill="none" /><path d="M2 10h20" stroke="currentColor" strokeWidth="1.5" /></>, color: "#10B981", bg: "rgba(16,185,129,0.12)" },
-  withdrawal:          { icon: <><path d="M12 2v10M8 8l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M4 14v4a2 2 0 002 2h12a2 2 0 002-2v-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></>, color: "#63D9B4", bg: "rgba(99,217,180,0.12)" },
-  referral_commission: { icon: <><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.5" fill="none" /><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></>, color: "#63D9B4", bg: "rgba(99,217,180,0.12)" },
-  welcome_bonus:       { icon: <><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="currentColor" strokeWidth="1.5" fill="none" /></>, color: "#F59E0B", bg: "rgba(245,158,11,0.12)" },
-  referral_bonus:      { icon: <><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.5" fill="none" /></>, color: "#3B82F6", bg: "rgba(59,130,246,0.12)" },
-};
-
-const DEFAULT_ICON = { icon: <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" fill="none" />, color: "#64748B", bg: "rgba(100,116,139,0.12)" };
-
-function ActivityIcon({ type }: { type: string }) {
-  const { icon, color, bg } = ACTIVITY_SVG[type] ?? DEFAULT_ICON;
-  return (
-    <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-      style={{ background: bg, border: `1px solid ${color}30` }}>
-      <svg width="14" height="14" viewBox="0 0 24 24" style={{ color }}>{icon}</svg>
-    </div>
-  );
-}
+import TxTypeIcon from "@/components/ui/TxTypeIcon";
 
 export default function HomePage() {
   const router = useRouter();
@@ -153,6 +130,8 @@ export default function HomePage() {
         <StreakSection
           streak={data.streak}
           todayReward={data.streak?.today_reward ?? 2}
+          dayRewards={data.streak?.day_rewards}
+          bonusAdsToday={data.streak?.bonus_ads_today ?? 0}
           onClaimed={loadData}
         />
 
@@ -197,7 +176,7 @@ export default function HomePage() {
                   className="flex items-center gap-3 px-4 py-3"
                   style={{ borderBottom: i < data.recent_activity.length - 1 ? "1px solid var(--border)" : "none" }}
                 >
-                  <ActivityIcon type={tx.type} />
+                  <TxTypeIcon type={tx.type} size={15} box={32} />
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-semibold text-[var(--text-primary)] capitalize truncate">
                       {tx.type.replace(/_/g, " ")}

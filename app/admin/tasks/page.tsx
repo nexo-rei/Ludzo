@@ -135,7 +135,13 @@ export default function AdminTasksPage() {
     try {
       const res = await fetch(`/api/admin/tasks?id=${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${getToken()}` } });
       const data = await res.json();
-      if (data.success) { showToast("Task deleted", "success"); await load(); }
+      if (data.success) {
+        showToast("Task deleted", "success");
+        setTasks((prev) => prev.filter((t) => t.id !== id));
+        await load();
+      } else {
+        showToast(data.error ?? "Failed to delete task", "error");
+      }
     } catch { showToast("Failed to delete", "error"); }
     finally { setDeleting(null); }
   };

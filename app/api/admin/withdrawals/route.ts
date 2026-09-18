@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logAdminAction } from "@/lib/admin-log";
+import { updateById } from "@/lib/db-write";
+import { creditUsdt } from "@/lib/coins";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdminAuth(req);
@@ -34,9 +36,13 @@ export async function GET(req: NextRequest) {
       userMap = Object.fromEntries((users ?? []).map((u) => [u.id, u]));
     }
 
-    const items = (withdrawals ?? []).map((w) => ({ ...w, user: userMap[w.user_id] ?? null }));
+    const items = (withdrawals ?? []).map((w) => ({
+      ...w,
+      user: userMap[w.user_id] ?? { first_name: "Unknown", telegram_id: "" },
+    }));
     return NextResponse.json({ success: true, data: { items, total: count ?? 0, page, limit } });
   } catch (err) {
+    console.error("[admin/withdrawals GET]", err);
     return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
   }
 }
@@ -51,33 +57,81 @@ export async function PATCH(req: NextRequest) {
       withdrawal_id: string; action: "approve" | "reject" | "mark_paid"; note?: string;
     };
 
+    if (!withdrawal_id || !action) {
+      return NextResponse.json({ success: false, error: "withdrawal_id and action required" }, { status: 400 });
+    }
+
     const supabase = createAdminClient();
-    const { data: withdrawal } = await supabase
+    const { data: withdrawal, error: readErr } = await supabase
       .from("withdrawals").select("*").eq("id", withdrawal_id).maybeSingle();
+    if (readErr) {
+      return NextResponse.json({ success: false, error: readErr.message }, { status: 500 });
+    }
     if (!withdrawal) return NextResponse.json({ success: false, error: "Withdrawal not found" }, { status: 404 });
 
     const now = new Date().toISOString();
+    const current = String(withdrawal.status ?? "pending").toLowerCase();
 
-    if (action === "approve" && withdrawal.status === "pending") {
-      await supabase.from("withdrawals").update({
-        status: "approved", reviewed_at: now, reviewed_by: auth.adminId, admin_note: note ?? null,
-      }).eq("id", withdrawal_id);
-    } else if (action === "reject" && ["pending", "approved"].includes(withdrawal.status)) {
-      await supabase.from("withdrawals").update({
-        status: "rejected", reviewed_at: now, reviewed_by: auth.adminId, admin_note: note ?? null,
-      }).eq("id", withdrawal_id);
-      // Refund USDT to user
-      await supabase.rpc("credit_usdt", {
-        p_user_id: withdrawal.user_id,
-        p_amount: withdrawal.amount,
-        p_reason: "withdrawal_rejected",
+    if (action === "approve") {
+      if (current !== "pending") {
+        return NextResponse.json({ success: false, error: `Cannot approve withdrawal with status ${withdrawal.status}` }, { status: 400 });
+      }
+      const updated = await updateById(supabase, "withdrawals", withdrawal_id, {
+        status: "approved",
+        reviewed_at: now,
+        reviewed_by: auth.adminId ?? null,
+        admin_note: note ?? null,
+        updated_at: now,
       });
-    } else if (action === "mark_paid" && withdrawal.status === "approved") {
-      await supabase.from("withdrawals").update({
-        status: "paid", paid_at: now,
-      }).eq("id", withdrawal_id);
+      if (!updated.ok) {
+        return NextResponse.json({
+          success: false,
+          error: `Approve failed: ${updated.error}. Agar status check constraint hai to sql/06_admin_tasks_withdrawals.sql chalao.`,
+        }, { status: 500 });
+      }
+    } else if (action === "reject") {
+      if (!["pending", "approved"].includes(current)) {
+        return NextResponse.json({ success: false, error: `Cannot reject withdrawal with status ${withdrawal.status}` }, { status: 400 });
+      }
+      const updated = await updateById(supabase, "withdrawals", withdrawal_id, {
+        status: "rejected",
+        reviewed_at: now,
+        reviewed_by: auth.adminId ?? null,
+        admin_note: note ?? null,
+        updated_at: now,
+      });
+      if (!updated.ok) {
+        return NextResponse.json({
+          success: false,
+          error: `Reject failed: ${updated.error}. Agar status check constraint hai to sql/06_admin_tasks_withdrawals.sql chalao.`,
+        }, { status: 500 });
+      }
+      const refund = await creditUsdt(supabase, {
+        userId: withdrawal.user_id,
+        amount: Number(withdrawal.amount),
+        reason: "withdrawal_rejected",
+      });
+      if (!refund.ok) {
+        console.error("[admin/withdrawals] refund failed after reject:", refund.error);
+        return NextResponse.json({
+          success: true,
+          warning: `Rejected, but USDT refund failed: ${refund.error}`,
+        });
+      }
+    } else if (action === "mark_paid") {
+      if (current !== "approved") {
+        return NextResponse.json({ success: false, error: `Cannot mark paid with status ${withdrawal.status}` }, { status: 400 });
+      }
+      const updated = await updateById(supabase, "withdrawals", withdrawal_id, {
+        status: "paid",
+        paid_at: now,
+        updated_at: now,
+      });
+      if (!updated.ok) {
+        return NextResponse.json({ success: false, error: `Mark paid failed: ${updated.error}` }, { status: 500 });
+      }
     } else {
-      return NextResponse.json({ success: false, error: `Cannot ${action} withdrawal with status ${withdrawal.status}` }, { status: 400 });
+      return NextResponse.json({ success: false, error: `Unknown action ${action}` }, { status: 400 });
     }
 
     await logAdminAction(supabase, {
@@ -90,6 +144,7 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (err) {
+    console.error("[admin/withdrawals PATCH]", err);
     return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
   }
 }

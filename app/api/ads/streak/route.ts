@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSettings, getStreakReward } from "@/lib/settings";
+import { creditCoins } from "@/lib/coins";
 import { startOfDay, differenceInCalendarDays } from "date-fns";
 
 const BONUS_ADS_REQUIRED = 3;
@@ -101,12 +102,14 @@ export async function POST(req: NextRequest) {
     const reward = getStreakReward(settings, currentDay);
     const nextDay = currentDay >= 7 ? 1 : currentDay + 1;
 
-    // Credit coins
-    await supabase.rpc("credit_coins", {
-      p_user_id: user.id,
-      p_amount: reward,
-      p_reason: "daily_streak",
+    const credited = await creditCoins(supabase, {
+      userId: user.id,
+      amount: reward,
+      reason: "daily_streak",
     });
+    if (!credited.ok) {
+      return NextResponse.json({ success: false, error: credited.error ?? "Failed to credit coins" }, { status: 500 });
+    }
 
     // Update streak
     await supabase

@@ -119,8 +119,8 @@ export default function AdminUsersPage() {
                     {user.username && <div className="text-xs text-gray-500">@{user.username}</div>}
                   </td>
                   <td className="px-4 py-3 text-gray-400 font-mono text-xs">{user.telegram_id}</td>
-                  <td className="px-4 py-3 text-yellow-400 font-numeric">{formatCoins(user.wallet.coin_balance)}</td>
-                  <td className="px-4 py-3 text-green-400 font-numeric">${formatUSDT(user.wallet.usdt_balance)}</td>
+                  <td className="px-4 py-3 text-yellow-400 font-numeric">{formatCoins(user.wallet?.coin_balance ?? 0)}</td>
+                  <td className="px-4 py-3 text-green-400 font-numeric">${formatUSDT(user.wallet?.usdt_balance ?? 0)}</td>
                   <td className="px-4 py-3">
                     <Badge variant={user.status === "active" ? "success" : "error"} size="sm">{user.status}</Badge>
                   </td>

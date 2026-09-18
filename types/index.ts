@@ -265,6 +265,8 @@ export interface HomePageStreak {
   current_day: number;
   last_claimed_at: string | null;
   today_reward: number;
+  bonus_ads_today?: number;
+  day_rewards?: number[];
 }
 
 export interface HomePageSettings {

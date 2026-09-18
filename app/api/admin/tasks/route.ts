@@ -3,6 +3,7 @@ import { requireAdminAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logAdminAction } from "@/lib/admin-log";
 import { getBotChatAccess, normalizeChatRef } from "@/lib/telegram-chat";
+import { updateById } from "@/lib/db-write";
 
 const JOIN_TYPES = ["channel_join", "group_join"];
 
@@ -49,7 +50,6 @@ export async function POST(req: NextRequest) {
     const type = String(body.type ?? "channel_join");
     if (!title) return NextResponse.json({ success: false, error: "Title is required" }, { status: 400 });
 
-    // Channel/group task ke liye verifiable chat chahiye
     const targetLink: string | null = body.target_link ? String(body.target_link).trim() : null;
     const targetId: string | null = normalizeChatRef(body.target_id) ?? normalizeChatRef(targetLink);
 
@@ -86,7 +86,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
-    // Bot us chat me admin hai ya nahi — soft warning (task phir bhi ban jayega)
     let warning: string | null = null;
     if (JOIN_TYPES.includes(type) && targetId) {
       const access = await getBotChatAccess(targetId);
@@ -128,8 +127,10 @@ export async function PATCH(req: NextRequest) {
     if (fields.sort_order !== undefined) fields.sort_order = Number(fields.sort_order);
 
     const supabase = createAdminClient();
-    const { error } = await supabase.from("tasks").update(fields).eq("id", id);
-    if (error) throw error;
+    const updated = await updateById(supabase, "tasks", id, fields);
+    if (!updated.ok) {
+      return NextResponse.json({ success: false, error: updated.error }, { status: 500 });
+    }
 
     await logAdminAction(supabase, {
       adminId: auth.adminId,
@@ -156,12 +157,34 @@ export async function DELETE(req: NextRequest) {
     if (!id) return NextResponse.json({ success: false, error: "id required" }, { status: 400 });
 
     const supabase = createAdminClient();
-    // Soft delete — user_tasks history aur rewards intact rehte hain
-    const { error } = await supabase
+
+    // Completions history hatao taaki FK hard-delete na roke
+    const { error: utErr } = await supabase.from("user_tasks").delete().eq("task_id", id);
+    if (utErr) {
+      console.error("[admin/tasks DELETE] user_tasks:", utErr.message);
+    }
+
+    const { data: removed, error } = await supabase
       .from("tasks")
-      .update({ is_active: false, updated_at: new Date().toISOString() })
-      .eq("id", id);
-    if (error) throw error;
+      .delete()
+      .eq("id", id)
+      .select("id")
+      .maybeSingle();
+
+    if (error) {
+      console.error("[admin/tasks DELETE]", error.message);
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            `Delete failed: ${error.message}. user_tasks FK block kar raha ho to sql/06_admin_tasks_withdrawals.sql chalao.`,
+        },
+        { status: 500 }
+      );
+    }
+    if (!removed) {
+      return NextResponse.json({ success: false, error: "Task not found" }, { status: 404 });
+    }
 
     await logAdminAction(supabase, {
       adminId: auth.adminId,
