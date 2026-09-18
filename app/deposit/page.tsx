@@ -34,8 +34,6 @@ import {
   ZapIcon,
 } from "@/components/ui/DuotoneIcons";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 type Network = "TRC20" | "BEP20" | "TON";
 type PaymentStatus =
   | "waiting"
@@ -66,8 +64,6 @@ interface DepositHistoryItem {
   status: string;
   created_at: string;
 }
-
-// ─── Constants ────────────────────────────────────────────────────────────────
 
 const MIN_COINS = MIN_DEPOSIT_COINS;
 const MAX_COINS = MAX_DEPOSIT_COINS;
@@ -183,8 +179,6 @@ const TERMINAL = new Set<PaymentStatus>([
   "expired",
 ]);
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function coinsToUsdt(coins: number): number {
   return parseFloat((coins / COINS_PER_USDT).toFixed(2));
 }
@@ -205,8 +199,6 @@ function fmtDt(dt: string): string {
     minute: "2-digit",
   });
 }
-
-// ─── Step Indicator ───────────────────────────────────────────────────────────
 
 function StepBar({ step }: { step: Step }) {
   const steps = ["Amount", "Network", "Payment"];
@@ -303,8 +295,6 @@ function StepBar({ step }: { step: Step }) {
     </div>
   );
 }
-
-// ─── Countdown Timer ──────────────────────────────────────────────────────────
 
 function useCountdown(expiresAt: number | null) {
   const [secs, setSecs] = useState<number>(0);
@@ -421,8 +411,6 @@ function CountdownBadge({
   );
 }
 
-// ─── Warning Banner ───────────────────────────────────────────────────────────
-
 function WarningBanner() {
   return (
     <div className="flex items-start gap-3 px-4 py-3 rounded-xl border border-yellow-500/30 bg-yellow-500/10">
@@ -441,8 +429,6 @@ function WarningBanner() {
     </div>
   );
 }
-
-// ─── Trust Strip ──────────────────────────────────────────────────────────────
 
 function TrustStrip() {
   const items = [
@@ -480,8 +466,6 @@ function TrustStrip() {
     </div>
   );
 }
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function DepositPage() {
   const { userId } = useApp();
@@ -553,8 +537,6 @@ export default function DepositPage() {
     );
   }, [effectiveCoinAmount]);
 
-  // ── Load data ──────────────────────────────────────────────────────────────
-
   const loadData = useCallback(async () => {
     if (!userId) return;
 
@@ -592,8 +574,6 @@ export default function DepositPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  // ── Poll payment status ────────────────────────────────────────────────────
 
   const pollStatus = useCallback(
     async (pid: string) => {
@@ -656,8 +636,6 @@ export default function DepositPage() {
     };
   }, [payment, pollStatus]);
 
-  // ── Session expiry ─────────────────────────────────────────────────────────
-
   useEffect(() => {
     if (!sessionExp) return;
 
@@ -679,8 +657,7 @@ export default function DepositPage() {
     };
   }, [sessionExp]);
 
-  // ── Reset scroll when deposit step changes ─────────────────────────────────
-
+  // Scroll reset for every wizard step.
   useEffect(() => {
     const resetScroll = () => {
       window.scrollTo(0, 0);
@@ -696,8 +673,6 @@ export default function DepositPage() {
       window.cancelAnimationFrame(frame);
     };
   }, [step]);
-
-  // ── Handlers ───────────────────────────────────────────────────────────────
 
   const handleCreatePayment = async () => {
     if (!isValidAmount || !network || !agreed || !userId) {
@@ -803,8 +778,6 @@ export default function DepositPage() {
     }
   };
 
-  // ── STEP 1 — Select Coins ──────────────────────────────────────────────────
-
   const Step1 = (
     <motion.div
       key="step1"
@@ -828,7 +801,9 @@ export default function DepositPage() {
 
         <div className="relative z-[1] flex items-start justify-between gap-3">
           <div>
-            <p className="deposit-hero-label">Current balance</p>
+            <p className="deposit-hero-label">
+              Current balance
+            </p>
 
             <p className="deposit-hero-value">
               {fmtCoins(coinBalance)}
@@ -850,7 +825,9 @@ export default function DepositPage() {
       <div className="deposit-card">
         <div className="deposit-card-head">
           <div>
-            <p className="deposit-card-title">Select amount</p>
+            <p className="deposit-card-title">
+              Select amount
+            </p>
 
             <p className="deposit-card-sub">
               Min ${fmtUsd(MIN_DEPOSIT_USD)} · Max $
@@ -1123,8 +1100,6 @@ export default function DepositPage() {
     </motion.div>
   );
 
-  // ── STEP 2 — Select Network ────────────────────────────────────────────────
-
   const Step2 = (
     <motion.div
       key="step2"
@@ -1163,7 +1138,9 @@ export default function DepositPage() {
         </div>
 
         <div className="text-right">
-          <p className="deposit-recap-label">You pay</p>
+          <p className="deposit-recap-label">
+            You pay
+          </p>
 
           <p className="deposit-recap-value">
             ${fmtUsd(usdtAmount)} USDT
@@ -1314,8 +1291,6 @@ export default function DepositPage() {
       </motion.button>
     </motion.div>
   );
-
-  // ── STEP 3 — Payment Confirmation ─────────────────────────────────────────
 
   const Step3 = (
     <motion.div
@@ -1689,7 +1664,9 @@ export default function DepositPage() {
             </div>
 
             <div className="text-right">
-              <p className="deposit-recap-label">Network</p>
+              <p className="deposit-recap-label">
+                Network
+              </p>
 
               <div className="flex items-center gap-1.5 justify-end mt-0.5">
                 <NetworkIcon
@@ -1839,8 +1816,6 @@ export default function DepositPage() {
     </motion.div>
   );
 
-  // ── Deposit History ────────────────────────────────────────────────────────
-
   const HistorySection = (
     <div>
       <h3 className="deposit-card-eyebrow mb-3">
@@ -1923,7 +1898,6 @@ export default function DepositPage() {
     </div>
   );
 
-  // One active keyed step keeps the wizard stable in Telegram WebView.
   const activeStep =
     step === 1 ? Step1 : step === 2 ? Step2 : Step3;
 
@@ -1945,9 +1919,14 @@ export default function DepositPage() {
       <div className="deposit-page">
         <StepBar step={step} />
 
-        <AnimatePresence mode="sync" initial={false}>
+        {/* Important: only the active step is mounted.
+            No AnimatePresence here, so old Step 1 cannot push Step 2 down. */}
+        <div
+          key={step}
+          className="deposit-step-screen w-full min-w-0"
+        >
           {activeStep}
-        </AnimatePresence>
+        </div>
 
         {step === 1 && (
           <div className="pt-2">
