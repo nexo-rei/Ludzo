@@ -41,8 +41,11 @@ export interface User {
 export interface Wallet {
   id: string;
   user_id: string;
+  /** Playable balance: deposits, ads, tasks, streaks, referrals and admin credits. */
   coin_balance: number;
+  /** Protected deposit/admin USDT balance. It is never eligible for withdrawal. */
   usdt_balance: number;
+  /** Locked Ludo prize balance. Only this balance can be converted/withdrawn. */
   won_coins_balance: number;
   updated_at: string;
 }
@@ -115,6 +118,7 @@ export interface Referral {
   id: string;
   referrer_id: string;
   referee_id: string;
+  /** Referral reward in playable Coins; never a Won-Coin withdrawal balance. */
   commission_amount: number;
   commission_status: "pending" | "earned";
   first_deposit_processed: boolean;
@@ -126,6 +130,7 @@ export interface ReferralItem {
   name: string;
   username?: string;
   commission_amount: number;
+  commission_coins?: number;
   commission_status: "pending" | "earned";
   joined_at: string;
 }
@@ -134,6 +139,8 @@ export interface ReferralStats {
   total_referrals: number;
   total_commission: number;
   pending_commission: number;
+  total_commission_coins?: number;
+  pending_commission_coins?: number;
 }
 
 // ─── Deposits ─────────────────────────────────────────────────────────────────
@@ -155,10 +162,14 @@ export interface Deposit {
 export interface Withdrawal {
   id: string;
   user_id: string;
+  /** Gross USDT value of the won coins converted. */
   amount: number;
+  /** Won Coins debited from the locked Ludo prize balance. */
+  coin_amount?: number;
   fee_amount: number;
   net_amount: number;
   wallet_address: string;
+  source?: "ludo_won" | string;
   status: "pending" | "approved" | "rejected" | "paid";
   admin_note?: string;
   reviewed_at?: string;

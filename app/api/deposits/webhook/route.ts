@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createHmac } from "crypto";
+import { COINS_PER_USDT } from "@/lib/economy";
+import { getSettings } from "@/lib/settings";
 
 // Verify NOWPayments IPN signature
 // Docs: sort payload keys alphabetically, JSON.stringify, HMAC-SHA512 with IPN_SECRET
@@ -120,12 +122,14 @@ export async function POST(req: NextRequest) {
   }
 
   const userId     = deposit.user_id as string;
-  const coinAmount = (deposit.coin_amount as number) ?? Math.round((deposit.usdt_amount as number) * 100);
+  // `coin_amount` is stored on each payment so old orders remain stable. The
+  // fallback is only for legacy rows and uses the new 200 Coins = $1 rate.
+  const coinAmount = (deposit.coin_amount as number) ?? Math.round((deposit.usdt_amount as number) * COINS_PER_USDT);
   const depositId  = deposit.id as string;
 
   // Credit coins atomically via DB function
   const { data: credited, error: creditErr } = await supabase.rpc(
-    "credit_coins_for_deposit",
+    "credit_playable_coins_for_deposit",
     {
       p_deposit_id:  depositId,
       p_user_id:     userId,
@@ -142,7 +146,32 @@ export async function POST(req: NextRequest) {
   if (!credited) {
     console.log("[deposits/webhook] Already credited (race condition guard):", depositId);
   } else {
-    console.log(`[deposits/webhook] Credited ${coinAmount} coins to user ${userId} for deposit ${depositId}`);
+    console.log(`[deposits/webhook] Credited ${coinAmount} playable Coins to user ${userId} for deposit ${depositId}`);
+  }
+
+  // Referral rewards are also playable Coins. Run this on every finished
+  // webhook: the RPC locks the pending referral row and returns 0 on retries,
+  // so a webhook that arrived while the deposit was already being credited can
+  // still settle the one-time referral without creating a duplicate reward.
+  try {
+    const settings = await getSettings(supabase);
+    const { data: referralCoins, error: referralError } = await supabase.rpc(
+      "settle_referral_playable_coins",
+      {
+        p_referee_id: userId,
+        p_deposit_coin_amount: coinAmount,
+        p_commission_pct: settings.referral_commission_pct,
+      },
+    );
+    if (referralError) {
+      console.error("[deposits/webhook] playable referral reward failed:", referralError);
+    } else if (Number(referralCoins) > 0) {
+      console.log(`[deposits/webhook] Credited ${referralCoins} playable referral Coins`);
+    }
+  } catch (referralErr) {
+    // The deposit itself is already committed; an absent optional referral
+    // function must not turn a paid deposit into a failed payment webhook.
+    console.error("[deposits/webhook] referral reward exception:", referralErr);
   }
 
   return NextResponse.json({ success: true, message: "Coins credited" });

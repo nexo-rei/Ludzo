@@ -74,7 +74,8 @@ ludzo-v3/
 │   ├── telegram.ts             # Telegram init data validator + Binance webhook
 │   ├── utils.ts                # Formatting utilities
 │   ├── i18n.ts                 # Translation system (10 languages)
-│   ├── coins.ts                # creditCoins() — RPC + fallback reward crediting
+│   ├── coins.ts                # playable + locked Won Coin credit helpers
+│   ├── economy.ts              # 200 Coins = $1 conversion constants
 │   ├── telegram-chat.ts        # getChatMember join verification (bot must be admin)
 │   ├── admin-log.ts            # Safe admin action logging (never breaks the action)
 │   └── supabase/               # Supabase client (browser + admin)
@@ -89,8 +90,11 @@ ludzo-v3/
 │   ├── 06_admin_tasks_withdrawals.sql
 │                               # REQUIRED — task hard-delete CASCADE,
 │                               # withdrawal statuses + wallet RPCs
-│   └── 07_arena_players.sql    # REQUIRED — Display Profiles removed, 20 arena
-│                               # players seeded, 20–28 s random matchmaking
+│   ├── 07_arena_players.sql    # REQUIRED — Display Profiles removed, 20 arena
+│   │                           # players seeded, 20–28 s random matchmaking
+│   └── 08_coin_economy_and_won_withdrawals.sql
+│                               # REQUIRED — two ledgers, fixed rate, Won-Coin
+│                               # conversion/withdrawal RPCs
 ├── types/index.ts              # All TypeScript types
 ├── middleware.ts               # Maintenance mode redirect
 ├── next.config.ts              # Next.js config
@@ -160,6 +164,10 @@ sql/06_admin_tasks_withdrawals.sql
 -- 7. REQUIRED — Display Profiles removed, arena roster (5 ladkiyan + 15 ladke),
 --    arena opponent 20–28 second ke beech random time pe seat leta hai
 sql/07_arena_players.sql
+
+-- 8. REQUIRED — fixed 100 Coins = $0.50 economy, separate playable/won ledgers,
+--    1,000 Won Coins ($5) minimum, and Won-Coin-only withdrawals
+sql/08_coin_economy_and_won_withdrawals.sql
 ```
 
 `05` ke bina: support tickets save nahi honge, channel/group task verify nahi hoga,
@@ -174,6 +182,11 @@ status check / missing `credit_usdt(p_reason)` ki wajah se fail ho sakta hai.
 profiles hata kar 20 real-naam arena players seed karta hai aur match ke liye
 har queue entry pe ek random **20–28 s** window set karta hai.
 
+`08` ke bina naya withdrawal converter enable nahi hoga. Is migration ke baad
+`coin_balance` (ads/tasks/deposits/admin → play only) aur `won_coins_balance`
+(settled Ludo wins → locked, convert-only) alag ledgers ki tarah enforce hote hain.
+Conversion ka rate **100 Coins = $0.50**, minimum **1,000 Won Coins = $5** hai.
+
 ### 4. Run Locally
 
 ```bash
@@ -187,9 +200,13 @@ a static + unit contract test:
 
 ```bash
 npm run verify:ui
+npm run verify:sql
 ```
 
-Full invariant suite (engine, SQL, support, UI): `npm run verify`. Design notes live in
+`verify:sql` applies migrations 01–08 in an in-process PostgreSQL-compatible test database and
+checks the two-ledger conversion rules, including the 1,000 Won-Coin minimum. The engine suite is
+available via `npm run verify:engine`; the default `npm run verify` covers UI and i18n checks.
+Design notes live in
 [`docs/UI-REDESIGN.md`](docs/UI-REDESIGN.md).
 
 ---
@@ -210,7 +227,7 @@ Admin features:
 - Withdrawal management (review, approve, reject, mark paid)
 - Support inbox (tickets, threads, replies, status/priority)
 - Announcement management (priority levels)
-- Platform settings (all economy values configurable)
+- Platform settings (reward values configurable; the 200 Coins = $1 conversion rate is fixed)
 - Maintenance mode toggle
 - Admin action logs
 
@@ -253,12 +270,13 @@ Bot admin nahi hai? → verification unavailable (admin ko batana chahiye).
 | Daily ad limit | 15 ads (30 Coins max/day) |
 | Bonus ads for streak | 3 (separate from normal) |
 | Streak rewards | Day 1–7: 2/3/4/5/6/8/10 Coins |
-| Referral commission | 10% of referee's first deposit (USDT) |
-| Minimum deposit | $5 USDT |
-| Minimum withdrawal | $5 USDT |
+| Referral commission | 10% of referee's first deposit in playable Coins |
+| Minimum deposit | 100 Coins = $0.50 |
+| Minimum Won-Coin conversion | 1,000 Won Coins = $5 USDT |
+| Won-Coin conversion step | 200 Won Coins = $1 USDT |
 | Withdrawal fee | 5% |
 
-**Important:** Coins cannot be withdrawn, converted, or transferred. USDT only flows through deposits and withdrawals.
+**Important:** Playable Coins from ads, tasks, streaks, referrals, deposits, welcome bonuses, and admin credits cannot be withdrawn or converted. Only locked Won Coins awarded by settled Ludo matches can be converted, and Won Coins cannot be staked in a match.
 
 ---
 

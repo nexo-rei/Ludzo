@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
 
     const { data, count, error } = await supabase
       .from("withdrawals")
-      .select("id, amount, fee_amount, net_amount, wallet_address, status, created_at, reviewed_at", { count: "exact" })
+      .select("id, amount, coin_amount, source, fee_amount, net_amount, wallet_address, status, created_at, reviewed_at", { count: "exact" })
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);

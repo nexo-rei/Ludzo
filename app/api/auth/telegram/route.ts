@@ -203,7 +203,7 @@ export async function POST(req: NextRequest) {
     // Check if this is a new user (wallet doesn't exist yet)
     const { data: wallet } = await supabase
       .from("wallets")
-      .select("id, coin_balance, usdt_balance")
+      .select("id, coin_balance, usdt_balance, won_coins_balance")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -277,7 +277,7 @@ if (referralCode && referralCode !== telegramId) {
     // Fetch fresh wallet
     const { data: freshWallet } = await supabase
       .from("wallets")
-      .select("coin_balance, usdt_balance")
+      .select("coin_balance, usdt_balance, won_coins_balance")
       .eq("user_id", user.id)
       .maybeSingle();
 

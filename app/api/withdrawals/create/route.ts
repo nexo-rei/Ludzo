@@ -2,99 +2,121 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSettings } from "@/lib/settings";
+import {
+  COINS_PER_USDT,
+  MIN_WON_WITHDRAWAL_COINS,
+  WON_WITHDRAWAL_STEP,
+  coinsToUsd,
+  isValidWonWithdrawalAmount,
+  isValidUsdtWalletAddress,
+} from "@/lib/economy";
 
+/**
+ * Convert only the locked Ludo-prize ledger into a withdrawal request.
+ *
+ * `wallets.usdt_balance` is deliberately not read here. That balance contains
+ * deposit/admin funds and is protected from withdrawal by product design.
+ */
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
-  if (!auth.ok)
+  if (!auth.ok) {
     return NextResponse.json(
       { success: false, error: auth.error },
-      { status: 401 }
+      { status: 401 },
     );
+  }
 
   try {
-    const { amount, wallet_address } = await req.json();
+    const body = await req.json();
+    const rawCoinAmount = body.coin_amount ?? (
+      Number.isFinite(Number(body.amount)) ? Number(body.amount) * COINS_PER_USDT : NaN
+    );
+    const coinAmount = Number(rawCoinAmount);
+    const walletAddress = String(body.wallet_address ?? "").trim();
 
-    if (!amount || !wallet_address) {
+    if (!isValidWonWithdrawalAmount(coinAmount)) {
       return NextResponse.json(
-        { success: false, error: "Missing required fields" },
-        { status: 400 }
+        {
+          success: false,
+          error: `Minimum conversion is ${MIN_WON_WITHDRAWAL_COINS.toLocaleString()} Won Coins ($${coinsToUsd(MIN_WON_WITHDRAWAL_COINS).toFixed(2)}). Use ${WON_WITHDRAWAL_STEP}-Coin steps.`,
+        },
+        { status: 400 },
+      );
+    }
+
+    if (!isValidUsdtWalletAddress(walletAddress)) {
+      return NextResponse.json(
+        { success: false, error: "Enter a valid TRC20 or BEP20 USDT wallet address." },
+        { status: 400 },
       );
     }
 
     const supabase = createAdminClient();
-
-    // ✅ FIXED: look up by id (UUID), not telegram_id
-    const { data: user } = await supabase
+    const { data: user, error: userError } = await supabase
       .from("users")
-      .select("id")
-      .eq("id", auth.userId!)   // <-- was: .eq("telegram_id", auth.userId!)
+      .select("id, status")
+      .eq("id", auth.userId!)
       .maybeSingle();
 
-    if (!user)
-      return NextResponse.json(
-        { success: false, error: "User not found" },
-        { status: 404 }
-      );
+    if (userError) throw userError;
+    if (!user) {
+      return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
+    }
+    if (user.status === "suspended") {
+      return NextResponse.json({ success: false, error: "Account suspended" }, { status: 403 });
+    }
 
     const settings = await getSettings(supabase);
-    const amountNum = Number(amount);
-    if (!Number.isFinite(amountNum) || amountNum < settings.min_withdrawal) {
-      return NextResponse.json(
-        { success: false, error: `Minimum withdrawal is $${settings.min_withdrawal}` },
-        { status: 400 }
-      );
-    }
+    const feePct = Math.max(0, Math.min(99, Number(settings.withdrawal_fee_pct) || 0));
 
-    let rpcError = (await supabase.rpc("debit_usdt", {
-      p_user_id: user.id,
-      p_amount: amountNum,
-      p_reason: "withdrawal",
-    })).error;
-    if (rpcError) {
-      rpcError = (await supabase.rpc("debit_usdt", {
+    // This RPC locks the wallet, checks won_coins_balance, debits it and
+    // inserts the pending withdrawal in one database transaction.
+    const { data: withdrawalId, error: createError } = await supabase.rpc(
+      "create_ludo_won_withdrawal",
+      {
         p_user_id: user.id,
-        p_amount: amountNum,
-      })).error;
-    }
+        p_coin_amount: coinAmount,
+        p_wallet_address: walletAddress,
+        p_fee_pct: feePct,
+      },
+    );
 
-    if (rpcError) {
-      console.error("[withdrawals/create] debit_usdt error:", rpcError);
+    if (createError || !withdrawalId) {
+      console.error("[withdrawals/create] won-coin conversion failed:", createError);
+      const message = createError?.message ?? "Insufficient Won Coins or conversion unavailable";
       return NextResponse.json(
-        { success: false, error: rpcError.message ?? "Insufficient balance or debit failed" },
-        { status: 400 }
+        {
+          success: false,
+          error: message.includes("function")
+            ? "Won Coin conversion is not enabled yet. Please apply sql/08_coin_economy_and_won_withdrawals.sql."
+            : message,
+        },
+        { status: 400 },
       );
     }
 
-    const fee_amount = Math.round(amountNum * (settings.withdrawal_fee_pct / 100) * 100) / 100;
-    const net_amount = Math.round((amountNum - fee_amount) * 100) / 100;
+    const grossAmount = coinsToUsd(coinAmount);
+    const feeAmount = Math.round(grossAmount * (feePct / 100) * 100) / 100;
+    const netAmount = Math.round((grossAmount - feeAmount) * 100) / 100;
 
-    const { data: withdrawal, error: insertError } = await supabase
-      .from("withdrawals")
-      .insert({
-        user_id: user.id,
-        amount: amountNum,
-        fee_amount,
-        net_amount,
-        wallet_address,
+    return NextResponse.json({
+      success: true,
+      data: {
+        id: withdrawalId,
+        withdrawal_id: withdrawalId,
+        source: "ludo_won",
+        coin_amount: coinAmount,
+        amount: grossAmount,
+        fee_amount: feeAmount,
+        net_amount: netAmount,
         status: "pending",
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error("[withdrawals/create] insert error:", insertError);
-      return NextResponse.json(
-        { success: false, error: "Failed to record withdrawal" },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ success: true, data: withdrawal });
+      },
+    });
   } catch (err) {
     console.error("[withdrawals/create]", err);
     return NextResponse.json(
       { success: false, error: "Server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

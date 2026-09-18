@@ -100,6 +100,82 @@ export async function creditCoins(
   return { ok: false, error: "Credit failed after retries" };
 }
 
+export interface WonCoinsCreditArgs {
+  userId: string;
+  amount: number;
+  reason: string;
+}
+
+/**
+ * Credit the locked Ludo-prize ledger. This intentionally does not call
+ * `credit_coins`: task/ad/deposit/admin coins live in the playable balance and
+ * must never become withdrawable Won Coins.
+ */
+export async function creditWonCoins(
+  supabase: SupabaseClient,
+  { userId, amount, reason }: WonCoinsCreditArgs,
+): Promise<CreditCoinsResult> {
+  if (!userId || !Number.isFinite(amount) || amount <= 0) {
+    return { ok: false, error: "Invalid Won Coins credit request" };
+  }
+
+  try {
+    const { error } = await supabase.rpc("credit_won_coins", {
+      p_user_id: userId,
+      p_amount: amount,
+      p_reason: reason,
+    });
+    if (!error) return { ok: true, method: "rpc" };
+    console.error("[creditWonCoins] rpc failed, using fallback:", error.message);
+  } catch (err) {
+    console.error("[creditWonCoins] rpc threw, using fallback:", err);
+  }
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const { data: wallet, error: readErr } = await supabase
+        .from("wallets")
+        .select("won_coins_balance")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (readErr) throw readErr;
+      if (!wallet) throw new Error("Wallet not found");
+
+      const current = Number(wallet.won_coins_balance ?? 0);
+      const { error: updateErr } = await supabase
+        .from("wallets")
+        .update({
+          won_coins_balance: current + amount,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", userId)
+        .eq("won_coins_balance", current);
+      if (updateErr) throw updateErr;
+
+      try {
+        await supabase.from("transactions").insert({
+          user_id: userId,
+          type: reason,
+          currency: "coins",
+          amount,
+          status: "completed",
+          description: `+${amount} Won Coins — ${reason.replace(/_/g, " ")}`,
+        });
+      } catch {
+        /* The wallet update is authoritative; the ledger is best effort. */
+      }
+      return { ok: true, method: "fallback" };
+    } catch (err) {
+      if (attempt === 2) {
+        return { ok: false, error: err instanceof Error ? err.message : "Won Coins credit failed" };
+      }
+      await new Promise((r) => setTimeout(r, 120 * (attempt + 1)));
+    }
+  }
+
+  return { ok: false, error: "Won Coins credit failed after retries" };
+}
+
 export interface CreditUsdtArgs {
   userId: string;
   amount: number;

@@ -3,7 +3,7 @@ import { requireAdminAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logAdminAction } from "@/lib/admin-log";
 import { updateById } from "@/lib/db-write";
-import { creditUsdt } from "@/lib/coins";
+import { creditUsdt, creditWonCoins } from "@/lib/coins";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdminAuth(req);
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     const supabase = createAdminClient();
     let query = supabase
       .from("withdrawals")
-      .select("id, user_id, amount, fee_amount, net_amount, wallet_address, status, created_at, reviewed_at", { count: "exact" })
+      .select("id, user_id, amount, coin_amount, source, fee_amount, net_amount, wallet_address, status, created_at, reviewed_at", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -106,16 +106,26 @@ export async function PATCH(req: NextRequest) {
           error: `Reject failed: ${updated.error}. Agar status check constraint hai to sql/06_admin_tasks_withdrawals.sql chalao.`,
         }, { status: 500 });
       }
-      const refund = await creditUsdt(supabase, {
-        userId: withdrawal.user_id,
-        amount: Number(withdrawal.amount),
-        reason: "withdrawal_rejected",
-      });
+      // New requests reserve Won Coins, not the protected USDT/deposit ledger.
+      // Legacy rows have no coin_amount and are refunded to the protected USDT
+      // balance only for backwards compatibility; that balance is not
+      // withdrawable through the new user endpoint.
+      const refund = Number(withdrawal.coin_amount) > 0
+        ? await creditWonCoins(supabase, {
+            userId: withdrawal.user_id,
+            amount: Number(withdrawal.coin_amount),
+            reason: "ludo_withdrawal_rejected",
+          })
+        : await creditUsdt(supabase, {
+            userId: withdrawal.user_id,
+            amount: Number(withdrawal.amount),
+            reason: "legacy_withdrawal_rejected",
+          });
       if (!refund.ok) {
         console.error("[admin/withdrawals] refund failed after reject:", refund.error);
         return NextResponse.json({
           success: true,
-          warning: `Rejected, but USDT refund failed: ${refund.error}`,
+          warning: `Rejected, but balance refund failed: ${refund.error}`,
         });
       }
     } else if (action === "mark_paid") {

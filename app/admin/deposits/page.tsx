@@ -7,6 +7,7 @@ import AdminShell from "@/components/admin/AdminShell";
 import Badge from "@/components/ui/Badge";
 import { showToast } from "@/components/ui/Toast";
 import { formatDateTime } from "@/lib/utils";
+import { COINS_PER_USDT } from "@/lib/economy";
 
 interface DepositItem {
   id:                  string;
@@ -119,7 +120,7 @@ export default function AdminDepositsPage() {
               ) : deposits.length === 0 ? (
                 <tr><td colSpan={8} className="text-center py-8 text-gray-500">No deposits found</td></tr>
               ) : deposits.map((d) => {
-                const coins    = d.coin_amount ?? Math.round((d.usdt_amount ?? d.amount) * 100);
+                const coins    = d.coin_amount ?? Math.round((d.usdt_amount ?? d.amount) * COINS_PER_USDT);
                 const usdtAmt  = d.usdt_amount ?? d.amount;
                 const nowSt    = d.nowpayments_status ?? d.status;
                 return (

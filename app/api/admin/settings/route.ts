@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logAdminAction } from "@/lib/admin-log";
+import { COINS_PER_USDT, MIN_WON_WITHDRAWAL_COINS, coinsToUsd } from "@/lib/economy";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdminAuth(req);
@@ -24,6 +25,11 @@ export async function GET(req: NextRequest) {
       if (ALIASES[key]) settings[ALIASES[key]] = value;
     });
 
+    const fixedMinimum = coinsToUsd(MIN_WON_WITHDRAWAL_COINS).toFixed(2);
+    settings.coin_rate = String(COINS_PER_USDT);
+    settings.min_withdrawal = fixedMinimum;
+    settings.min_withdrawal_usdt = fixedMinimum;
+
     return NextResponse.json({ success: true, data: settings });
   } catch (err) {
     return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
@@ -41,9 +47,15 @@ export async function POST(req: NextRequest) {
     const supabase = createAdminClient();
     const upserts = Object.entries(settings).map(([key, value]) => ({
       key,
-      value: String(value),
+      // Keep the public economy rules fixed: 100 Coins = $0.50 and
+      // 1,000 Won Coins = $5 is the minimum conversion.
+      value: key === "coin_rate"
+        ? String(COINS_PER_USDT)
+        : key === "min_withdrawal" || key === "min_withdrawal_usdt"
+          ? coinsToUsd(MIN_WON_WITHDRAWAL_COINS).toFixed(2)
+          : String(value),
     }));
-        const { error: upsertErr } = await supabase
+    const { error: upsertErr } = await supabase
       .from("settings")
       .upsert(upserts, { onConflict: "key" });
 

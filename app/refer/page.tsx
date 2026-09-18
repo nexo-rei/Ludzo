@@ -10,13 +10,15 @@ import EmptyState from "@/components/ui/EmptyState";
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import { showToast } from "@/components/ui/Toast";
 import { useApp } from "@/hooks/useApp";
-import { formatUSDT, initials } from "@/lib/utils";
+import { formatCoins, initials } from "@/lib/utils";
 import Button from "@/components/ui/Button";
 
 interface ReferralStats {
   total_referrals: number;
   total_commission: number;
   pending_commission: number;
+  total_commission_coins?: number;
+  pending_commission_coins?: number;
   referral_link: string;
 }
 
@@ -25,6 +27,7 @@ interface ReferralHistory {
   name: string;
   username?: string;
   commission_amount: number;
+  commission_coins?: number;
   commission_status: string;
   joined_at: string;
 }
@@ -96,12 +99,12 @@ export default function ReferPage() {
                   icon: <><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" strokeLinecap="round" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" strokeLinecap="round" /></>,
                 },
                 {
-                  label: t("total_stat"), value: `$${formatUSDT(stats?.total_commission ?? 0)}`,
+                  label: t("total_stat"), value: `${formatCoins(Number(stats?.total_commission_coins ?? stats?.total_commission ?? 0))} Coins`,
                   color: "#10B981", bg: "rgba(16,185,129,0.12)",
                   icon: <><circle cx="12" cy="12" r="10" /><path d="M12 6v12M8 9h8M9 12h6" strokeLinecap="round" /></>,
                 },
                 {
-                  label: t("pending_stat"), value: `$${formatUSDT(stats?.pending_commission ?? 0)}`,
+                  label: t("pending_stat"), value: `${formatCoins(Number(stats?.pending_commission_coins ?? stats?.pending_commission ?? 0))} Coins`,
                   color: "#F59E0B", bg: "rgba(245,158,11,0.12)",
                   icon: <><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" strokeLinecap="round" /></>,
                 },
@@ -205,7 +208,7 @@ export default function ReferPage() {
                           {r.name}{r.username ? ` @${r.username}` : ""}
                         </div>
                         <div className="text-[10px] text-[var(--text-muted)]">
-                          ${formatUSDT(r.commission_amount)} commission
+                          {formatCoins(Number(r.commission_coins ?? r.commission_amount ?? 0))} Coins commission
                         </div>
                       </div>
                       <Badge variant={r.commission_status === "earned" ? "success" : "warning"} size="sm">

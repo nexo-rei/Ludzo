@@ -181,12 +181,27 @@ export default function GamingHomePage() {
             </div>
           </div>
 
-          <div className="mt-4 flex items-center justify-between border-t border-purple-500/10 pt-3">
-            <span className="text-[10px] font-bold tracking-wide text-purple-300/90">
-              100 Won Coins = $1.00 USDT
-            </span>
+          <div className="mt-4 flex items-center justify-between gap-2 border-t border-purple-500/10 pt-3">
+            <div>
+              <span className="block text-[10px] font-bold tracking-wide text-purple-300/90">
+                100 Won Coins = $0.50
+              </span>
+              <span className="block text-[9px] font-semibold tracking-wide text-slate-500">
+                1,000 Won Coins = $5 minimum · Ludo wins only
+              </span>
+            </div>
+            <motion.button
+              whileTap={{ scale: 0.94 }}
+              onClick={() => router.push("/withdraw")}
+              className="flex-none rounded-lg border border-purple-400/35 bg-purple-500/10 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wider text-purple-200"
+            >
+              Convert
+            </motion.button>
+          </div>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <span className="text-[9px] font-semibold text-slate-500">Deposit/admin USDT is protected</span>
             <span className="rounded-md border border-slate-800 bg-slate-900/70 px-2 py-1 font-mono text-[9px] font-bold text-emerald-400">
-              Cash ${usdt.toFixed(2)}
+              ${usdt.toFixed(2)} locked
             </span>
           </div>
         </motion.div>

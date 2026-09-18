@@ -46,12 +46,12 @@ export default function EconomyCard({
               <CashIcon size={18} />
             </div>
             <div>
-              <p className="text-xs text-gaming-muted">Cash Balance</p>
+              <p className="text-xs text-gaming-muted">Protected Funds</p>
               <p className="text-sm font-bold text-gaming-foreground">${cashBalance.toFixed(2)}</p>
             </div>
           </div>
         </div>
-        <p className="mt-2.5 text-[10px] text-gaming-muted/70">100 Coins = $1</p>
+        <p className="mt-2.5 text-[10px] text-gaming-muted/70">100 Coins = $0.50 · Won Coins are locked</p>
       </motion.div>
     );
   }
@@ -84,7 +84,7 @@ export default function EconomyCard({
                 <CashIcon size={20} />
               </div>
               <div>
-                <p className="text-xs text-gaming-muted">Cash</p>
+                <p className="text-xs text-gaming-muted">Protected Funds</p>
                 <p className="text-base font-bold text-gaming-foreground">${cashBalance.toFixed(2)}</p>
               </div>
             </div>
@@ -109,7 +109,7 @@ export default function EconomyCard({
             </div>
           </div>
 
-          <p className="mt-3 text-[10px] text-gaming-muted/60">100 Coins = $1</p>
+          <p className="mt-3 text-[10px] text-gaming-muted/60">100 Coins = $0.50 · only settled Ludo wins can be converted</p>
         </div>
       </div>
     </motion.div>

@@ -1,10 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AppSettings } from "@/types";
+import { COINS_PER_USDT } from "@/lib/economy";
 
 export const SETTING_DEFAULTS: AppSettings = {
   app_name: "LUDZO",
   support_username: "LudzoSupportBot",
-  coin_rate: 100,
+  // `coin_rate` is coins per $1. 100 Coins therefore equals $0.50.
+  coin_rate: COINS_PER_USDT,
   ad_reward_coins: 2,
   daily_ad_limit: 15,
   welcome_bonus_coins: 10,
@@ -38,7 +40,12 @@ export async function getSettings(supabase: SupabaseClient): Promise<AppSettings
   for (const row of data as Array<{ key: string; value: string }>) {
     const mapped = (SETTING_ALIASES[row.key] ?? row.key) as keyof AppSettings;
     const def = SETTING_DEFAULTS[mapped];
-    if (typeof def === "number") result[mapped] = parseFloat(row.value) || 0;
+    // The conversion is a product rule, not a per-request override. Older
+    // deployments may still have `coin_rate = 100` in settings, so normalise
+    // it here as well as in the SQL migration.
+    if (mapped === "coin_rate") result[mapped] = COINS_PER_USDT;
+    else if (mapped === "min_withdrawal") result[mapped] = 5;
+    else if (typeof def === "number") result[mapped] = parseFloat(row.value) || 0;
     else if (typeof def === "boolean") result[mapped] = String(row.value) === "true";
     else if (def !== undefined) result[mapped] = row.value;
   }
