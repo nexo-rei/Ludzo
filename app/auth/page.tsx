@@ -10,12 +10,14 @@ import { useTelegram } from "@/hooks/useTelegram";
 import { useApp } from "@/hooks/useApp";
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import { isSupportedLanguage, normalizeLanguage } from "@/lib/i18n";
+import { useI18n } from "@/hooks/useI18n";
 
 function AuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { tgUser, initData, startParam, isReady } = useTelegram();
   const { setUser, setPrefs } = useApp();
+  const { setLanguage, t } = useI18n();
   const [status, setStatus] = useState<"loading" | "error" | "success">("loading");
   const [error, setError] = useState("");
 
@@ -24,13 +26,10 @@ function AuthContent() {
 
     if (!tgUser) {
       setStatus("error");
-      setError("Could not detect Telegram. Please open this app inside Telegram.");
+      setError(t("connect_no_tg"));
       return;
     }
 
-    // The language screen is part of the first-run contract. Keeping this
-    // guard here also covers users who open /auth directly instead of coming
-    // through the splash screen.
     const selectedLanguage = localStorage.getItem("ludzo_lang");
     if (!isSupportedLanguage(selectedLanguage)) {
       router.replace("/language");
@@ -48,9 +47,8 @@ function AuthContent() {
         ? selectedLanguage
         : normalizeLanguage(tgUser?.language_code);
 
-      console.log("START PARAM:", startParam);
-      console.log("REFERRAL SENT:", referralCode);
-      
+      setLanguage(chosenLanguage);
+
       const res = await fetch("/api/auth/telegram", {
         method: "POST",
         headers: {
@@ -73,8 +71,9 @@ function AuthContent() {
 
       setUser(data.data.user);
 
-      const savedLanguage = data.data.prefs?.language ?? chosenLanguage;
-      localStorage.setItem("ludzo_lang", normalizeLanguage(savedLanguage));
+      const savedLanguage = normalizeLanguage(data.data.prefs?.language ?? chosenLanguage);
+      localStorage.setItem("ludzo_lang", savedLanguage);
+      setLanguage(savedLanguage);
       if (data.data.prefs) {
         setPrefs(data.data.prefs);
       }
@@ -103,10 +102,10 @@ function AuthContent() {
           <>
             <div className="text-center">
               <h2 className="text-xl font-bold text-[var(--text-primary)]">
-                Authenticating...
+                {t("authenticating")}
               </h2>
               <p className="text-sm text-[var(--text-muted)] mt-1">
-                Verifying your Telegram identity
+                {t("verifying_tg")}
               </p>
             </div>
 
@@ -121,10 +120,10 @@ function AuthContent() {
           <div className="text-center">
             <CheckCircleIcon size={44} className="mx-auto text-[var(--accent)]" />
             <h2 className="text-xl font-bold text-[var(--text-primary)] mt-3">
-              Welcome to LUDZO!
+              {t("welcome_ludzo")}
             </h2>
             <p className="text-sm text-[var(--text-muted)] mt-1">
-              Redirecting...
+              {t("redirecting")}
             </p>
           </div>
         )}
@@ -133,7 +132,7 @@ function AuthContent() {
           <div className="text-center">
             <ShieldAlertIcon size={44} className="mx-auto text-[var(--accent)]" />
             <h2 className="text-xl font-bold text-[var(--text-primary)] mt-3">
-              Let’s get you connected
+              {t("connect_title")}
             </h2>
 
             <p className="text-sm text-[var(--text-muted)] mt-2 leading-relaxed">
@@ -147,7 +146,7 @@ function AuthContent() {
               }}
               className="mt-4 px-6 py-3 rounded-xl bg-[#23856C] text-white font-semibold hover:bg-[#196A55] transition-colors"
             >
-              Retry
+              {t("retry")}
             </button>
           </div>
         )}
@@ -157,11 +156,12 @@ function AuthContent() {
 }
 
 export default function AuthPage() {
+  const { t } = useI18n();
   return (
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center">
-          Loading...
+          {t("loading")}
         </div>
       }
     >

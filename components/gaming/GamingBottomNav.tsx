@@ -1,46 +1,30 @@
 "use client";
 
-/**
- * LUDZO — Gaming Hub bottom navigation
- * ─────────────────────────────────────────────────────────────────────────────
- * Exactly THREE tabs now (as specified):
- *
- *   1. Home    → /games/home    (arena dashboard, balances, quick play)
- *   2. Play    → /games         (goes straight into Ludo — no other games)
- *   3. Profile → /games/profile (stats + Matches entry + everything else)
- *
- * The old "Matches" tab is gone from the bar — match history now lives inside
- * Profile ("Battle History" row → /games/matches).
- *
- * Icons are the custom SVG set from GamingIcons (ArenaHomeIcon / ArenaLudoIcon
- * / ArenaProfileIcon), so the bar has its own identity instead of generic
- * outline icons. Framed with a spring-animated glass pill for the active tab.
- */
-
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArenaHomeIcon, ArenaLudoIcon, ArenaProfileIcon } from "./GamingIcons";
+import { useI18n } from "@/hooks/useI18n";
 
 interface Tab {
-  label: string;
+  labelKey: string;
   href: string;
   Icon: React.ComponentType<{ size?: number; className?: string; active?: boolean }>;
-  /** Extra paths that should light this tab up. */
   aliases?: string[];
 }
 
-const TABS: Tab[] = [
-  { label: "Home", href: "/games/home", Icon: ArenaHomeIcon },
-  { label: "Play", href: "/games", Icon: ArenaLudoIcon, aliases: ["/games/play"] },
-  { label: "Profile", href: "/games/profile", Icon: ArenaProfileIcon, aliases: ["/games/matches"] },
-];
-
 export default function GamingBottomNav() {
   const pathname = usePathname();
+  const { t } = useI18n();
 
   // The live board takes over the whole viewport — no chrome during a match.
   if (pathname.startsWith("/games/game/")) return null;
+
+  const TABS: Tab[] = [
+    { labelKey: "nav_home", href: "/games/home", Icon: ArenaHomeIcon },
+    { labelKey: "nav_play", href: "/games", Icon: ArenaLudoIcon, aliases: ["/games/play"] },
+    { labelKey: "nav_profile", href: "/games/profile", Icon: ArenaProfileIcon, aliases: ["/games/matches"] },
+  ];
 
   const isTabActive = (tab: Tab) =>
     pathname === tab.href ||
@@ -54,22 +38,21 @@ export default function GamingBottomNav() {
     >
       <div className="mx-auto w-full max-w-app px-3 pb-2.5">
         <div className="relative flex items-stretch justify-around h-[62px] rounded-2xl surface-glass-nav">
-          {/* top hairline highlight */}
           <span className="pointer-events-none absolute inset-x-4 -top-px h-px bg-gradient-to-r from-transparent via-purple-400/50 to-transparent" />
 
           {TABS.map((tab) => {
             const Icon = tab.Icon;
             const active = isTabActive(tab);
+            const label = t(tab.labelKey);
 
             return (
               <Link
-                key={tab.label}
+                key={tab.href}
                 href={tab.href}
-                aria-label={tab.label}
+                aria-label={label}
                 aria-current={active ? "page" : undefined}
                 className="relative flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl select-none touch-manipulation"
               >
-                {/* Active glass pill */}
                 {active && (
                   <motion.span
                     layoutId="gaming-nav-pill"
@@ -98,7 +81,7 @@ export default function GamingBottomNav() {
                       active ? "text-purple-300" : "text-slate-500"
                     }`}
                   >
-                    {tab.label}
+                    {label}
                   </span>
                 </motion.span>
               </Link>

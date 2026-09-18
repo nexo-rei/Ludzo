@@ -8,6 +8,7 @@ import { showToast } from "@/components/ui/Toast";
 import { useApp } from "@/hooks/useApp";
 import LudzoCoin from "@/components/ui/LudzoCoin";
 import type { DailyStreak, HomePageStreak } from "@/types";
+import { useI18n } from "@/hooks/useI18n";
 
 interface StreakSectionProps {
   streak: DailyStreak | HomePageStreak | null;
@@ -34,6 +35,7 @@ export default function StreakSection({
   onClaimed,
 }: StreakSectionProps) {
   const { userId, refreshWallet } = useApp();
+  const { t } = useI18n();
   const rewards = dayRewards && dayRewards.length === 7 ? dayRewards : DEFAULT_DAY_REWARDS;
   const [bonusWatched, setBonusWatched] = useState(bonusAdsToday);
   const [loading, setLoading] = useState(false);
@@ -56,7 +58,6 @@ export default function StreakSection({
     );
   })();
 
-  // After a claim the DB already points at tomorrow's day.
   const displayDay = alreadyClaimed
     ? nextDayToClaim === 1 ? 7 : nextDayToClaim - 1
     : nextDayToClaim;
@@ -109,7 +110,7 @@ export default function StreakSection({
       });
       const data = await res.json();
       if (data.success) {
-        showToast(`Streak Day ${displayDay} claimed! +${todayReward} Coins`, "success");
+        showToast(t("streak_claimed_toast", { n: displayDay, amount: todayReward }), "success");
         setBonusWatched(0);
         await refreshWallet();
         onClaimed?.();
@@ -136,9 +137,9 @@ export default function StreakSection({
             <StreakFlameIcon size={18} />
           </div>
           <div className="min-w-0">
-            <h3 className="reward-title">Daily streak</h3>
+            <h3 className="reward-title">{t("daily_streak")}</h3>
             <p className="reward-sub" style={{ color: alreadyClaimed ? "var(--success-strong)" : "#D97706" }}>
-              {alreadyClaimed ? `Day ${displayDay} claimed` : `Day ${displayDay} of 7`}
+              {alreadyClaimed ? t("day_claimed", { n: displayDay }) : t("day_of_7", { n: displayDay })}
             </p>
           </div>
         </div>
@@ -146,11 +147,11 @@ export default function StreakSection({
           <div className="reward-count font-numeric" style={{ color: "#D97706" }}>
             <LudzoCoin size={14} /> +{alreadyClaimed ? (rewards[displayDay - 1] ?? todayReward) : todayReward}
           </div>
-          <div className="text-[10px] text-[var(--text-muted)]">{alreadyClaimed ? "earned today" : "coins today"}</div>
+          <div className="text-[10px] text-[var(--text-muted)]">{alreadyClaimed ? t("earned_today") : t("coins_today")}</div>
         </div>
       </div>
 
-      <div className="streak-days" role="list" aria-label="Seven day streak">
+      <div className="streak-days" role="list" aria-label={t("daily_streak")}>
         {rewards.map((reward, i) => {
           const dayNum = i + 1;
           const isDone = alreadyClaimed ? dayNum <= displayDay : dayNum < displayDay;
@@ -177,13 +178,13 @@ export default function StreakSection({
             className="streak-claimed"
           >
             <CheckIcon size={14} />
-            <span>Come back tomorrow for Day {nextDayToClaim}</span>
+            <span>{t("come_back_tomorrow", { n: nextDayToClaim })}</span>
           </motion.div>
         ) : (
           <motion.div key="unclaimed" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <div className="flex items-center justify-between mb-2">
               <span className="text-[11px] text-[var(--text-muted)]">
-                Bonus ads {bonusWatched}/{BONUS_ADS_REQUIRED}
+                {t("bonus_ads_progress", { count: bonusWatched, needed: BONUS_ADS_REQUIRED })}
               </span>
               <span className="text-[11px] font-semibold inline-flex items-center gap-1" style={{ color: "#D97706" }}>
                 <LudzoCoin size={13} /> +{todayReward}
@@ -205,7 +206,7 @@ export default function StreakSection({
                 onClick={handleWatchBonusAd}
                 className="flex-1 gap-1"
               >
-                <PlayIcon size={12} /> Bonus ad
+                <PlayIcon size={12} /> {t("bonus_ad_btn")}
               </Button>
               <Button
                 size="sm"
@@ -215,7 +216,7 @@ export default function StreakSection({
                 className="flex-1 gap-1"
                 variant="gold"
               >
-                <StreakFlameIcon size={13} /> Claim
+                <StreakFlameIcon size={13} /> {t("claim_btn")}
               </Button>
             </div>
           </motion.div>

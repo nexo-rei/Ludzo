@@ -1,15 +1,5 @@
 "use client";
 
-/**
- * LUDZO — "Top Earners" card (Home dashboard)
- * ─────────────────────────────────────────────────────────────────────────────
- * Same data contract as /leaderboard: rows come pre-normalised from
- * lib/leaderboard.ts, so the only name this card can render is the account name.
- * The old "@handle" suffix is gone, along with the hard-coded gold/slate palette —
- * everything now resolves through the workspace tokens so the card matches the
- * rest of Home in light and dark mode.
- */
-
 import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
@@ -17,6 +7,7 @@ import Badge from "@/components/ui/Badge";
 import { ChevronRightIcon, TrophyDuotoneIcon } from "@/components/ui/DuotoneIcons";
 import { cn, displayName, formatUSDT, initials } from "@/lib/utils";
 import type { LeaderboardEntry } from "@/types";
+import { useI18n } from "@/hooks/useI18n";
 
 interface LeaderboardPreviewProps {
   entries: LeaderboardEntry[];
@@ -24,7 +15,6 @@ interface LeaderboardPreviewProps {
 
 const RANK_BADGE: Record<number, "gold" | "silver" | "bronze"> = { 1: "gold", 2: "silver", 3: "bronze" };
 
-/** Podium accents, in theme tokens: 1st owns the accent, 2nd/3rd stay neutral. */
 const RANK_TONE: Record<number, { ring: string; bg: string; text: string }> = {
   1: { ring: "var(--accent)", bg: "var(--accent-soft)", text: "var(--accent)" },
   2: { ring: "var(--border)", bg: "var(--bg-elevated)", text: "var(--text-secondary)" },
@@ -32,6 +22,7 @@ const RANK_TONE: Record<number, { ring: string; bg: string; text: string }> = {
 };
 
 export default function LeaderboardPreview({ entries }: LeaderboardPreviewProps) {
+  const { t } = useI18n();
   const top3 = entries.slice(0, 3);
 
   if (top3.length === 0) return null;
@@ -47,13 +38,13 @@ export default function LeaderboardPreview({ entries }: LeaderboardPreviewProps)
           >
             <TrophyDuotoneIcon size={15} />
           </span>
-          <span className="text-sm font-semibold tracking-tight text-[var(--text-primary)]">Top earners</span>
+          <span className="text-sm font-semibold tracking-tight text-[var(--text-primary)]">{t("top_earners")}</span>
         </div>
         <Link
           href="/leaderboard"
           className="flex items-center gap-0.5 rounded-lg px-1.5 py-1 text-xs font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent-soft)]"
         >
-          View all <ChevronRightIcon size={12} />
+          {t("view_all")} <ChevronRightIcon size={12} />
         </Link>
       </div>
 

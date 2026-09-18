@@ -1,24 +1,5 @@
 "use client";
 
-/**
- * LUDZO — Leaderboard
- * ─────────────────────────────────────────────────────────────────────────────
- * Rebuilt on the workspace design tokens (var(--card-bg) / --border / --accent /
- * --text-* …) instead of the old hard-coded gold-silver-bronze + blue-purple
- * palette, so the board finally reads as part of the same app in light AND dark
- * mode. Nothing here assumes a dark background any more (`text-white` and the
- * slate-only rank numbers were invisible on the light theme).
- *
- * Rows 4+ used to render "First name @handle". Rankings now expose a single
- * `display_name` (see lib/leaderboard.ts) — the account name, never the handle —
- * so every row, podium slot and the pinned "your rank" card use one helper.
- *
- * Motion is deliberate: a spring-driven segmented period switch, the podium
- * rising into place, rows staggering in as they enter the viewport, amounts that
- * count up once, and share bars that grow to their value — all of it collapsed by
- * MotionConfig / prefers-reduced-motion.
- */
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -40,17 +21,6 @@ interface MyRank {
   usdt_earned: number;
 }
 
-const PERIODS: Array<{ value: Period; label: string; caption: string }> = [
-  { value: "all",   label: "All time", caption: "Lifetime USDT earned" },
-  { value: "month", label: "Monthly",  caption: "USDT earned this calendar month" },
-  { value: "week",  label: "Weekly",   caption: "USDT earned this week" },
-];
-
-/**
- * Medal tones, all pulled from the shared theme so light/dark stay consistent.
- * The champion carries the accent; 2nd and 3rd step down into neutrals, which is
- * what the rest of the workspace does instead of painting three different hues.
- */
 const MEDAL_TONE: Record<number, { ring: string; bar: string; amount: string; height: number }> = {
   1: {
     ring: "var(--accent)",
@@ -72,9 +42,6 @@ const MEDAL_TONE: Record<number, { ring: string; bar: string; amount: string; he
   },
 };
 
-// ── Small pieces ─────────────────────────────────────────────────────────────
-
-/** Counts to `value` once per change; honours the OS reduced-motion setting. */
 function useCountUp(value: number, duration = 650) {
   const reduceMotion = useReducedMotion();
   const [display, setDisplay] = useState(reduceMotion ? value : 0);
@@ -176,7 +143,6 @@ function PodiumSlot({
       <span
         className="relative mt-1.5 rounded-full"
         style={{
-          // Only the champion earns a glow — the workspace keeps everything else flat.
           boxShadow: isLeader ? "0 0 0 3px var(--card-bg), 0 8px 20px -10px var(--accent)" : "0 0 0 3px var(--card-bg)",
         }}
       >
@@ -301,11 +267,9 @@ function BoardSkeleton() {
   );
 }
 
-// ── Page ─────────────────────────────────────────────────────────────────────
-
 export default function LeaderboardPage() {
   const router = useRouter();
-  const { user, userId } = useApp();
+  const { user, userId, t } = useApp();
   const { haptic } = useTelegram();
 
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
@@ -314,6 +278,12 @@ export default function LeaderboardPage() {
   const [failed, setFailed] = useState(false);
   const [period, setPeriod] = useState<Period>("all");
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+
+  const PERIODS: Array<{ value: Period; label: string; caption: string }> = [
+    { value: "all",   label: t("all_time"), caption: "Lifetime USDT earned" },
+    { value: "month", label: t("monthly"),  caption: "USDT earned this calendar month" },
+    { value: "week",  label: t("weekly"),   caption: "USDT earned this week" },
+  ];
 
   const load = useCallback(
     async (p: Period) => {
@@ -349,12 +319,11 @@ export default function LeaderboardPage() {
   const rest = entries.slice(3);
   const leaderAmount = top3[0]?.usdt_earned ?? 0;
 
-  /* Podium order is the classic 2 · 1 · 3, and missing places simply drop out. */
   const podium = [top3[1], top3[0], top3[2]]
     .map((entry, i) => ({ entry, rank: [2, 1, 3][i] }))
     .filter((slot) => Boolean(slot.entry));
 
-  const periodLabel = PERIODS.find((p) => p.value === period)?.label ?? "All time";
+  const periodLabel = PERIODS.find((p) => p.value === period)?.label ?? t("all_time");
 
   const changePeriod = (next: Period) => {
     if (next === period) return;
@@ -365,7 +334,7 @@ export default function LeaderboardPage() {
   return (
     <AppShell hideNav>
       <PageHeader
-        title="Leaderboard"
+        title={t("leaderboard_title")}
         back
         backHref="/home"
         right={
@@ -383,7 +352,7 @@ export default function LeaderboardPage() {
       />
 
       <div className="mx-auto w-full max-w-[560px] px-4 pb-6 pt-4">
-        {/* Period switch — the sliding pill is the only motion in the header. */}
+        {/* Period switch */}
         <div
           className="relative flex gap-1 rounded-xl border p-1"
           role="group"
@@ -417,7 +386,7 @@ export default function LeaderboardPage() {
 
         <div className="mt-2 flex items-center justify-between px-0.5">
           <p className="text-[11px] text-[var(--text-muted)]">
-            {loading ? "Loading rankings…" : PERIODS.find((p) => p.value === period)?.caption}
+            {loading ? t("loading") : PERIODS.find((p) => p.value === period)?.caption}
           </p>
           {!loading && updatedAt && (
             <p className="text-[11px] font-numeric text-[var(--text-muted)]">Updated {updatedAt}</p>
@@ -434,9 +403,9 @@ export default function LeaderboardPage() {
               <motion.div key="error" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                 <EmptyState
                   variant="compact"
-                  title="Leaderboard unavailable"
-                  description="We could not reach the rankings. Check your connection and try again."
-                  action={{ label: "Retry", onClick: () => load(period) }}
+                  title={t("error")}
+                  description={t("error")}
+                  action={{ label: t("retry"), onClick: () => load(period) }}
                 />
               </motion.div>
             ) : entries.length === 0 ? (
@@ -444,19 +413,17 @@ export default function LeaderboardPage() {
                 <EmptyState
                   emoji="🏆"
                   variant="compact"
-                  title={`No ${periodLabel.toLowerCase()} rankings yet`}
-                  description="Earn USDT from matches and streaks and you will appear on this board."
-                  action={{ label: "Back to home", onClick: () => router.push("/home") }}
+                  title={t("no_leaderboard")}
+                  action={{ label: t("back"), onClick: () => router.push("/home") }}
                 />
               </motion.div>
             ) : (
               <motion.div key={period} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
-                {/* ── Podium ── */}
                 {podium.length > 0 && (
                   <section
                     className="overflow-hidden rounded-2xl border"
                     style={{ borderColor: "var(--border)", background: "var(--card-bg)" }}
-                    aria-label={`Top ${podium.length} for ${periodLabel.toLowerCase()}`}
+                    aria-label={`Top ${podium.length}`}
                   >
                     <div className="flex items-center justify-between px-4 pt-3.5">
                       <h2 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
@@ -473,7 +440,6 @@ export default function LeaderboardPage() {
                   </section>
                 )}
 
-                {/* ── Ranks 4 … n ── */}
                 {rest.length > 0 && (
                   <section
                     className="overflow-hidden rounded-2xl border"
@@ -481,10 +447,10 @@ export default function LeaderboardPage() {
                   >
                     <div className="flex items-center justify-between border-b px-4 py-2.5" style={{ borderColor: "var(--border)" }}>
                       <h2 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-                        Standings
+                        {t("leaderboard_title")}
                       </h2>
                       <span className="text-[11px] font-numeric text-[var(--text-muted)] tabular-nums">
-                        {rest.length} ranked
+                        {rest.length}
                       </span>
                     </div>
                     <ul>
@@ -501,7 +467,6 @@ export default function LeaderboardPage() {
                   </section>
                 )}
 
-                {/* ── Your rank, pinned while the list scrolls ── */}
                 {myRank && !iAmInList && (
                   <motion.div
                     initial={{ opacity: 0, y: 12 }}
@@ -525,12 +490,10 @@ export default function LeaderboardPage() {
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[13px] font-medium text-[var(--text-primary)]">
-                          {displayName(user, "Your rank")}
+                          {displayName(user, t("your_rank"))}
                         </p>
                         <p className="text-[10px] text-[var(--text-muted)]">
-                          {myRank.rank > entries.length && entries.length > 0
-                            ? `Outside this ${periodLabel.toLowerCase()} top ${entries.length}`
-                            : `Rank #${myRank.rank} · ${periodLabel.toLowerCase()}`}
+                          {`Rank #${myRank.rank} · ${periodLabel}`}
                         </p>
                       </div>
                       <Amount value={myRank.usdt_earned} className="flex-none text-[13px] font-semibold" />

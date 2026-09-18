@@ -11,17 +11,6 @@ import TxTypeIcon from "@/components/ui/TxTypeIcon";
 import { useApp } from "@/hooks/useApp";
 import { formatDateTime } from "@/lib/utils";
 
-const FILTERS = [
-  { value: "all",                 label: "All"         },
-  { value: "coins",               label: "Coins"       },
-  { value: "usdt",                label: "USDT"        },
-  { value: "deposit",             label: "Deposits"    },
-  { value: "withdrawal",          label: "Withdrawals" },
-  { value: "ad_reward",           label: "Ads"         },
-  { value: "task_reward",         label: "Tasks"       },
-  { value: "referral_commission", label: "Referrals"   },
-];
-
 interface TxItem {
   id: string;
   type: string;
@@ -32,13 +21,24 @@ interface TxItem {
 }
 
 export default function HistoryPage() {
-  const { userId } = useApp();
+  const { userId, t } = useApp();
   const [filter, setFilter] = useState("all");
   const [items, setItems] = useState<TxItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+
+  const FILTERS = [
+    { value: "all",                 label: t("all") },
+    { value: "coins",               label: t("coins") },
+    { value: "usdt",                label: t("usdt") },
+    { value: "deposit",             label: t("filter_deposits") },
+    { value: "withdrawal",          label: t("filter_withdrawals") },
+    { value: "ad_reward",           label: t("filter_ads") },
+    { value: "task_reward",         label: t("filter_tasks") },
+    { value: "referral_commission", label: t("filter_referrals") },
+  ];
 
   const load = useCallback(async (f: string, p: number, append = false) => {
     if (!userId) return;
@@ -63,7 +63,7 @@ export default function HistoryPage() {
 
   return (
     <AppShell hideNav>
-      <PageHeader title="Transaction History" back />
+      <PageHeader title={t("history_title")} back />
       <div className="pb-6">
         {/* Filters */}
         <div className="px-4 py-3 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
@@ -87,7 +87,7 @@ export default function HistoryPage() {
           {loading ? (
             <SkeletonList count={8}/>
           ) : items.length === 0 ? (
-            <EmptyState title="No transactions" description="No transactions found for this filter."/>
+            <EmptyState title={t("no_transactions")} description={t("no_transactions_desc")}/>
           ) : (
             <>
               <div className="rounded-2xl overflow-hidden"
@@ -110,7 +110,7 @@ export default function HistoryPage() {
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <span className={`text-sm font-bold font-numeric ${Number(tx.amount) > 0 ? "text-[#059669]" : "text-[#DC2626]"}`}>
-                        {Number(tx.amount) > 0 ? "+" : ""}{tx.amount} {tx.currency === "usdt" ? "USDT" : "Coins"}
+                        {Number(tx.amount) > 0 ? "+" : ""}{tx.amount} {tx.currency === "usdt" ? "USDT" : t("coins")}
                       </span>
                       {tx.status !== "completed" && (
                         <Badge variant={tx.status === "pending" ? "warning" : "error"} size="sm">{tx.status}</Badge>
@@ -125,7 +125,7 @@ export default function HistoryPage() {
                   className="w-full mt-4 py-3 rounded-xl text-sm font-medium transition-colors disabled:opacity-60"
                   style={{ background: "var(--card-bg)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}
                 >
-                  {loadingMore ? "Loading…" : "Load More"}
+                  {loadingMore ? t("loading") : t("load_more")}
                 </button>
               )}
             </>

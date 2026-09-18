@@ -10,6 +10,8 @@ import {
 } from "react";
 import type { User, Wallet, UserPreferences } from "@/types";
 import { showToast } from "@/components/ui/Toast";
+import { useI18n } from "./useI18n";
+import { isSupportedLanguage, type LanguageCode } from "@/lib/i18n";
 
 export interface GamingStats {
   totalMatches: number;
@@ -36,6 +38,9 @@ interface AppContextValue {
   updateWalletBalances: (coinsChange: number, usdtChange: number, wonCoinsChange: number) => void;
   recordMatchResult: (isWin: boolean, stakes: number) => void;
   clearGamingData: () => void;
+  language: LanguageCode;
+  setLanguage: (lang: LanguageCode) => void;
+  t: (key: string, vars?: Record<string, string | number>) => string;
 }
 
 const AppContext = createContext<AppContextValue>({
@@ -47,9 +52,14 @@ const AppContext = createContext<AppContextValue>({
   updateWalletBalances: () => {},
   recordMatchResult: () => {},
   clearGamingData: () => {},
+  language: "en",
+  setLanguage: () => {},
+  t: (key) => key,
 });
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const { language, setLanguage, t } = useI18n();
+
   const [user, setUser] = useState<User | null>(null);
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [prefs, setPrefs] = useState<UserPreferences | null>(null);
@@ -68,26 +78,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
 
   const setIsInGamingHub = useCallback((value: boolean) => {
-    // The gaming hub is now a self-contained route group (/games/*), so this
-    // flag only exists for backwards compatibility with old saved state.
-    // Never let a stale "true" from a previous session turn the main app's
-    // Home/Profile into the gamer dashboard.
     setIsInGamingHubState(value);
     localStorage.setItem("ludzo_in_gaming_hub", value ? "true" : "false");
   }, []);
 
   useEffect(() => {
-    // Clear legacy hub mode saved by older builds — the /games/* routes own
-    // the game experience now, not the shared Home/Profile screens.
     localStorage.removeItem("ludzo_in_gaming_hub");
     setIsInGamingHubState(false);
   }, []);
 
   const userId = user?.id ?? null;
 
-  // Sync legacy local stats on mount. Won Coins are NOT read from localStorage
-  // anymore — they are always the DB value (wallets.won_coins_balance), because
-  // every match is settled server-side by settle_ludo_match().
   useEffect(() => {
     const storedStats = localStorage.getItem("ludzo_gaming_stats");
     if (storedStats) {
@@ -103,9 +104,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
-          // The database is the single source of truth for balances. The old
-          // localStorage "override" values used to shadow DB writes, which is
-          // why Won Coins / Coins never appeared to change after a match.
           const dbWallet = data.data;
           setWallet(dbWallet);
           setWonCoinsBalanceState(Number(dbWallet?.won_coins_balance ?? 0));
@@ -118,7 +116,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (userId) await fetchWallet(userId);
   }, [userId, fetchWallet]);
 
-  // Load user from localStorage on mount
+  // Load user and prefs from localStorage on mount
   useEffect(() => {
     const stored = localStorage.getItem("ludzo_user");
     const storedPrefs = localStorage.getItem("ludzo_prefs");
@@ -134,9 +132,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     }
     if (storedPrefs) {
-      try { setPrefs(JSON.parse(storedPrefs)); } catch { /* silent */ }
+      try {
+        const p = JSON.parse(storedPrefs);
+        setPrefs(p);
+        if (p?.language && isSupportedLanguage(p.language)) {
+          setLanguage(p.language);
+        }
+      } catch { /* silent */ }
     }
-  }, [fetchWallet]);
+  }, [fetchWallet, setLanguage]);
 
   // Apply theme
   useEffect(() => {
@@ -163,10 +167,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const handleSetPrefs = useCallback((p: UserPreferences | null) => {
     setPrefs(p);
-    if (p) localStorage.setItem("ludzo_prefs", JSON.stringify(p));
-  }, []);
+    if (p) {
+      localStorage.setItem("ludzo_prefs", JSON.stringify(p));
+      if (p.language && isSupportedLanguage(p.language)) {
+        setLanguage(p.language as LanguageCode);
+      }
+    }
+  }, [setLanguage]);
 
-  // Update wallet coin and usdt balances locally (optimistic, DB wins on next refresh)
   const updateWalletBalances = useCallback((coinsChange: number, usdtChange: number, wonCoinsChange: number) => {
     setWallet((prev) => {
       if (!prev) return null;
@@ -185,7 +193,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setWonCoinsBalanceState((prev) => Math.max(0, prev + wonCoinsChange));
   }, []);
 
-  // Record simulated match result
   const recordMatchResult = useCallback((isWin: boolean, stakes: number) => {
     setGamingStatsState((prev) => {
       const nextWins = isWin ? prev.wins + 1 : prev.wins;
@@ -206,7 +213,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       localStorage.setItem("ludzo_gaming_stats", JSON.stringify(nextStats));
 
-      // Append to the list of user match history in localStorage
       const historyKey = "ludzo_match_history";
       const storedHistory = localStorage.getItem(historyKey);
       let historyList = [];
@@ -228,15 +234,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
 
     if (isWin) {
-      // Entry fee of 50 was deducted at start of match. Winning awards 100 total (refund 50 stake + win 50).
-      // This results in net +50 Coins. We also add +50 to Won Coins balance!
       updateWalletBalances(100, 0, 50);
-    } else {
-      // Loss: entry fee of 50 was deducted at start, and nothing is returned. Net -50 Coins.
     }
   }, [updateWalletBalances]);
 
-  // Clear all legacy game logs / demo overrides and statistics
   const clearGamingData = useCallback(() => {
     localStorage.removeItem("ludzo_won_coins_balance");
     localStorage.removeItem("ludzo_gaming_stats");
@@ -279,6 +280,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updateWalletBalances,
         recordMatchResult,
         clearGamingData,
+        language,
+        setLanguage,
+        t,
       }}
     >
       {children}

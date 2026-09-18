@@ -25,12 +25,11 @@ import TxTypeIcon from "@/components/ui/TxTypeIcon";
 
 export default function HomePage() {
   const router = useRouter();
-  const { userId, wallet, wonCoinsBalance, refreshWallet } = useApp();
+  const { userId, wallet, wonCoinsBalance, refreshWallet, t } = useApp();
   const [data, setData] = useState<HomePageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [key, setKey] = useState(0);
 
-  // Fetch API info
   const loadData = useCallback(async () => {
     if (!userId) return;
     try {
@@ -45,7 +44,7 @@ export default function HomePage() {
   useEffect(() => {
     if (!userId) { router.replace("/auth"); return; }
     loadData();
-    refreshWallet();          // keep Coins / Won Coins fresh after matches
+    refreshWallet();
   }, [userId, loadData, router, refreshWallet]);
 
   const refresh = () => { setKey((k) => k + 1); loadData(); };
@@ -62,12 +61,11 @@ export default function HomePage() {
   if (!data) {
     return (
       <AppShell>
-        <EmptyState title="Failed to load" description="Could not load home data." action={{ label: "Retry", onClick: refresh }} />
+        <EmptyState title={t("error")} description={t("error")} action={{ label: t("retry"), onClick: refresh }} />
       </AppShell>
     );
   }
 
-  // ── Main app dashboard (the arena lives under /games/* now) ────────────────
   return (
     <AppShell>
       <div className="dashboard-page px-4 py-4 space-y-6 pb-6" key={key}>
@@ -82,9 +80,9 @@ export default function HomePage() {
             <LudzoLogo size={34} />
             <div>
               <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)] leading-tight">
-                Welcome back, {data.user.first_name?.trim() || "player"}
+                {t("welcome_user", { name: data.user.first_name?.trim() || "player" })}
               </h1>
-              <p className="text-[11px] text-[var(--text-muted)]">Here’s what’s happening in your workspace.</p>
+              <p className="text-[11px] text-[var(--text-muted)]">{t("workspace_sub")}</p>
             </div>
           </div>
           {data.user.photo_url ? (
@@ -105,11 +103,20 @@ export default function HomePage() {
         </motion.div>
 
         <section className="dashboard-hero">
-          <div className="hero-copy"><span className="eyebrow"><span /> THE LUDZO WORKSPACE</span><h2>Make your next<br />move count.</h2><p>Play a round. Build your streak. Keep all your rewards in one place.</p><Link href="/games/home" className="hero-link">Enter the arena <ArrowUpRightIcon size={17} /></Link></div>
+          <div className="hero-copy">
+            <span className="eyebrow"><span /> {t("eyebrow")}</span>
+            <h2>{t("hero_heading")}</h2>
+            <p>{t("hero_desc")}</p>
+            <Link href="/games/home" className="hero-link">{t("enter_arena")} <ArrowUpRightIcon size={17} /></Link>
+          </div>
           <ArenaArtwork />
         </section>
-        <div className="section-heading"><h2>Your wallet</h2><span>Balances at a glance</span></div>
-        {/* Wallet Cards — Won Coins comes from wallets.won_coins_balance (DB) */}
+
+        <div className="section-heading">
+          <h2>{t("your_wallet")}</h2>
+          <span>{t("balances_glance")}</span>
+        </div>
+
         <WalletCards
           coinBalance={data.wallet.coin_balance}
           usdtBalance={data.wallet.usdt_balance}
@@ -118,29 +125,27 @@ export default function HomePage() {
         />
 
         <div className="dashboard-rewards">
-        {/* Ad Rewards */}
-        <AdSection
-          adsWatchedToday={data.ads.watched_today}
-          dailyLimit={data.ads.daily_limit}
-          adReward={data.ads.reward_per_ad}
-          onAdWatched={loadData}
-        />
+          <AdSection
+            adsWatchedToday={data.ads.watched_today}
+            dailyLimit={data.ads.daily_limit}
+            adReward={data.ads.reward_per_ad}
+            onAdWatched={loadData}
+          />
 
-        {/* Daily Streak */}
-        <StreakSection
-          streak={data.streak}
-          todayReward={data.streak?.today_reward ?? 2}
-          dayRewards={data.streak?.day_rewards}
-          bonusAdsToday={data.streak?.bonus_ads_today ?? 0}
-          onClaimed={loadData}
-        />
-
+          <StreakSection
+            streak={data.streak}
+            todayReward={data.streak?.today_reward ?? 2}
+            dayRewards={data.streak?.day_rewards}
+            bonusAdsToday={data.streak?.bonus_ads_today ?? 0}
+            onClaimed={loadData}
+          />
         </div>
+
         {/* Announcements */}
         {data.announcements.length > 0 && (
           <div>
             <h2 className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-2.5 px-0.5">
-              Announcements
+              {t("announcements")}
             </h2>
             <div className="space-y-2">
               {data.announcements.map((a, i) => (
@@ -154,16 +159,16 @@ export default function HomePage() {
         <div>
           <div className="flex items-center justify-between mb-2.5 px-0.5">
             <h2 className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
-              Recent Activity
+              {t("recent_activity")}
             </h2>
             <button onClick={() => router.push("/history")}
               className="text-[11px] font-semibold transition-opacity hover:opacity-70"
               style={{ color: "#63D9B4" }}>
-              View All
+              {t("view_all")}
             </button>
           </div>
           {data.recent_activity.length === 0 ? (
-            <EmptyState title="No activity yet" description="Start watching ads to earn Coins!" variant="compact" />
+            <EmptyState title={t("no_activity")} description={t("no_activity_desc")} variant="compact" />
           ) : (
             <div className="rounded-2xl overflow-hidden"
               style={{ background: "var(--card-bg)", border: "1px solid var(--border)" }}>
@@ -186,7 +191,7 @@ export default function HomePage() {
                   <div className={`flex items-center gap-1 text-sm font-black font-numeric ${Number(tx.amount) > 0 ? "text-[#10B981]" : "text-[#EF4444]"}`}>
                     {Number(tx.amount) > 0 ? "+" : ""}{tx.amount}
                     <span className="text-[10px] font-normal text-[var(--text-muted)] inline-flex items-center gap-1">
-                      {tx.currency === "usdt" ? "USDT" : <><LudzoCoin size={11} /> Coins</>}
+                      {tx.currency === "usdt" ? "USDT" : <><LudzoCoin size={11} /> {t("coins")}</>}
                     </span>
                   </div>
                 </motion.div>

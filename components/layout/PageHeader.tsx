@@ -5,6 +5,7 @@ import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { BackArrowIcon } from "@/components/ui/DuotoneIcons";
 import LudzoLogo from "./LudzoLogo";
+import { useI18n } from "@/hooks/useI18n";
 
 interface PageHeaderProps {
   title: string;
@@ -15,15 +16,9 @@ interface PageHeaderProps {
   className?: string;
   transparent?: boolean;
   showLogo?: boolean;
-  /** Accessible name override for the back control. */
   backLabel?: string;
 }
 
-/**
- * Shared workspace header.
- * The back control is a full 44 × 44 px touch target (WCAG 2.5.5) even though
- * the glyph itself stays compact — tap area and visual size are decoupled.
- */
 export default function PageHeader({
   title,
   back = false,
@@ -33,15 +28,18 @@ export default function PageHeader({
   className,
   transparent = false,
   showLogo = false,
-  backLabel = "Go back",
+  backLabel,
 }: PageHeaderProps) {
   const router = useRouter();
+  const { t } = useI18n();
 
   const handleBack = () => {
     if (onBack) { onBack(); return; }
     if (backHref) router.push(backHref);
     else router.back();
   };
+
+  const label = backLabel ?? t("back");
 
   return (
     <header
@@ -65,7 +63,7 @@ export default function PageHeader({
         <button
           type="button"
           onClick={handleBack}
-          aria-label={backLabel}
+          aria-label={label}
           className="back-control flex items-center justify-center w-11 h-11 -ml-1.5
                      rounded-xl text-[var(--text-secondary)]
                      hover:text-[var(--text-primary)] hover:bg-[var(--accent-soft)]
