@@ -1051,6 +1051,11 @@ export default function DepositPage() {
     </div>
   );
 
+  // Resolve one keyed screen before handing it to AnimatePresence. Keeping a
+  // single child avoids the empty hand-off that mode="wait" can produce in
+  // Telegram's WebView while the wizard moves from amount to network.
+  const activeStep = step === 1 ? Step1 : step === 2 ? Step2 : Step3;
+
   return (
     <AppShell hideNav>
       <PageHeader
@@ -1062,10 +1067,8 @@ export default function DepositPage() {
       <div className="deposit-page">
         <StepBar step={step} />
 
-        <AnimatePresence mode="wait">
-          {step === 1 && Step1}
-          {step === 2 && Step2}
-          {step === 3 && Step3}
+        <AnimatePresence mode="sync" initial={false}>
+          {activeStep}
         </AnimatePresence>
 
         {step === 1 && <div className="pt-2">{HistorySection}</div>}
