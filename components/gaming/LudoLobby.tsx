@@ -68,6 +68,10 @@ export default function LudoLobby() {
 
   const stakesRef = useRef<HTMLDivElement | null>(null);
 
+  /** Matchmaking resilience: one long-search notice, one retry notice. */
+  const stallNoticedRef  = useRef(false);
+  const pollFailuresRef  = useRef(0);
+
   const playSound = (soundName: string) => {
     try {
       const audio = new Audio(`/sounds/${soundName}.mp3`);
@@ -108,10 +112,26 @@ export default function LudoLobby() {
 
   // ── Queue elapsed-seconds ticker ────────────────────────────────────────────
   useEffect(() => {
-    if (!isQueueing) { setQueueTimer(0); return; }
+    if (!isQueueing) {
+      setQueueTimer(0);
+      stallNoticedRef.current = false;
+      pollFailuresRef.current = 0;
+      return;
+    }
     const interval = setInterval(() => setQueueTimer((prev) => prev + 1), 1000);
     return () => clearInterval(interval);
   }, [isQueueing]);
+
+  // ── Long-search notice ──────────────────────────────────────────────────────
+  // An arena opponent is seated between 20 s and 28 s, so anything past ~35 s
+  // means matchmaking is stuck (server/queue issue) — tell the user instead of
+  // letting the radar spin forever in silence.
+  useEffect(() => {
+    if (isQueueing && queueTimer >= 35 && !stallNoticedRef.current) {
+      stallNoticedRef.current = true;
+      showToast("Still searching — you can cancel matchmaking and try again.", "info");
+    }
+  }, [isQueueing, queueTimer]);
 
   // ── Queue status polling ────────────────────────────────────────────────────
   useEffect(() => {
@@ -127,10 +147,30 @@ export default function LudoLobby() {
           headers: { "Authorization": `Bearer ${userId}`, "x-user-id": userId || "" },
           cache: "no-store",
         });
-        if (!res.ok) return;
+
+        if (!res.ok) {
+          // Don't fail silently — a server error used to leave the radar
+          // spinning with the stake escrowed and no explanation at all.
+          pollFailuresRef.current += 1;
+          if (pollFailuresRef.current === 3) {
+            showToast("Matchmaking hiccup — still trying…", "info");
+          }
+          if (res.status === 401) {
+            setIsQueueing(false);
+            setQueueId(null);
+            refreshWallet();
+            showToast("Session expired. Please reload the app.", "error");
+          }
+          return;
+        }
 
         const data = await res.json();
-        if (!data.success) return;
+        pollFailuresRef.current = 0;
+
+        if (!data.success) {
+          if (data.error) console.warn("[matchmaking]", data.error, data.reason ?? "");
+          return;
+        }
 
         if (data.matched && data.room_id) {
           setIsQueueing(false);
@@ -192,11 +232,16 @@ export default function LudoLobby() {
         if (data.matched && data.room_id) {
           playSound("match-found");
           router.push(`/games/game/${data.room_id}`);
-        } else {
-          setQueueId(data.queue_id ?? null);
+        } else if (data.queue_id) {
+          setQueueId(data.queue_id);
           setIsQueueing(true);
           setQueueTimer(0);
           showToast(`${stake} Coins staked. Searching for an opponent…`, "success");
+        } else {
+          // Accepted but no queue id — the radar could never poll. Never leave
+          // the user stuck; the server refunds via the janitor if it did debit.
+          refreshWallet();
+          showToast("Could not start matchmaking. Please try again.", "error");
         }
       } else {
         // 400 + room_id means "you are already in a live match" — go play it.
@@ -583,8 +628,8 @@ export default function LudoLobby() {
             </div>
 
             <p className="mt-2.5 text-[11px] leading-relaxed text-[var(--text-muted)]">
-              Matching pairs you with a player on the same stake. If nobody joins in time the arena seats a bot, and
-              the stake is refunded if the match is cancelled before the first roll.
+              Matching pairs you with a player on the same stake. If no live player connects within a few seconds an
+              arena opponent takes the seat, and the stake is refunded if the match is cancelled before the first roll.
             </p>
           </div>
         )}

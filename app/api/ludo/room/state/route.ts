@@ -491,9 +491,12 @@ export async function GET(req: NextRequest) {
       .from("users").select("first_name, photo_url")
       .eq("id", room.player_1_id).maybeSingle();
 
+    // Seat 2 profile. Arena (house-seated) opponents carry their real player
+    // profile in board_state.bot_profile — the fallback below is only used if a
+    // very old room predates that (never "Ludo Bot" as a visible name).
     let p2Profile = {
-      name:   "Ludo Bot",
-      avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=LudoBot",
+      name:   "Opponent",
+      avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Opponent",
     };
 
     if (!String(room.player_2_id).startsWith("bot_")) {
