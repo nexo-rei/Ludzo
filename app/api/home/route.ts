@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSettings, getStreakReward } from "@/lib/settings";
+import { checkEntryCapacity } from "@/lib/capacity";
+import { trackApiRequest, touchUserPresence } from "@/lib/usage-tracker";
 import { COINS_PER_USDT } from "@/lib/economy";
 import { normalizeLeaderboardRows } from "@/lib/leaderboard";
 import { startOfDay, differenceInCalendarDays } from "date-fns";
@@ -9,6 +11,8 @@ import { startOfDay, differenceInCalendarDays } from "date-fns";
 // Aggregated home page data in one request
 //redeploy
 export async function GET(req: NextRequest) {
+  // Cloudflare quota counter — in-memory batched, per-request DB write nahi hota
+  trackApiRequest("api");
   const auth = await requireAuth(req);
   if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: 401 });
 
@@ -26,6 +30,23 @@ export async function GET(req: NextRequest) {
         message: settings.maintenance_message,
       }, { status: 503 });
     }
+
+    // ── Capacity guard (System / Bot Health) ────────────────────────────────
+    // Block mode ON + active users limit cross → NAYE users ko server-full
+    // screen. Already-active user ya match me phase player andar aata hai.
+    // NOTE: ye check touchUserPresence se PEHLE hona chahiye, warna user khud
+    // ko "active" mark karke limit bypass kar jayega.
+    const entry = await checkEntryCapacity(supabase, settings, auth.userId!);
+    if (entry.blocked) {
+      return NextResponse.json({
+        success: false,
+        error: "server_full",
+        message: entry.message,
+      }, { status: 503 });
+    }
+
+    // Presence — users.last_seen (60s self-throttle, capacity/active counts)
+    if (auth.userId) touchUserPresence(auth.userId);
 
     console.log("AUTH USER ID:", auth.userId);
 

@@ -8,6 +8,7 @@ import {
   MIN_DEPOSIT_USD,
   isValidDepositCoinAmount,
 } from "@/lib/economy";
+import { trackApiRequest } from "@/lib/usage-tracker";
 
 // Network currency mapping for NOWPayments API
 const NETWORK_CURRENCY: Record<string, string> = {
@@ -32,6 +33,8 @@ function checkRateLimit(userId: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
+  // Cloudflare quota counter — in-memory batched, per-request DB write nahi hota
+  trackApiRequest("api");
   const auth = await requireAuth(req);
   if (!auth.ok)
     return NextResponse.json({ success: false, error: auth.error }, { status: 401 });

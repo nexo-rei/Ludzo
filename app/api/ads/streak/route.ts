@@ -4,10 +4,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getSettings, getStreakReward } from "@/lib/settings";
 import { creditCoins } from "@/lib/coins";
 import { startOfDay, differenceInCalendarDays } from "date-fns";
+import { trackApiRequest } from "@/lib/usage-tracker";
 
 const BONUS_ADS_REQUIRED = 3;
 
 export async function POST(req: NextRequest) {
+  // Cloudflare quota counter — in-memory batched, per-request DB write nahi hota
+  trackApiRequest("api");
   const auth = await requireAuth(req);
   if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: 401 });
 

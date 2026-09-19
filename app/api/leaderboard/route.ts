@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAuth } from "@/lib/auth";
 import { normalizeLeaderboardRows } from "@/lib/leaderboard";
+import { trackApiRequest } from "@/lib/usage-tracker";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  // Cloudflare quota counter — in-memory batched, per-request DB write nahi hota
+  trackApiRequest("api");
   try {
     const url    = new URL(req.url);
     const period = url.searchParams.get("period") ?? "all"; // all | month | week

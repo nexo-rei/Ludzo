@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { trackApiRequest } from "@/lib/usage-tracker";
 
 /**
  * POST /api/support/reply — user apne hi ticket me reply kare.
  * Ticket apne aap "open" ho jata hai taaki admin ko dobara dikhe.
  */
 export async function POST(req: NextRequest) {
+  // Cloudflare quota counter — in-memory batched, per-request DB write nahi hota
+  trackApiRequest("api");
   const auth = await requireAuth(req);
   if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: 401 });
 

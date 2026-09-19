@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { trackApiRequest } from "@/lib/usage-tracker";
 
 export async function GET(_req: NextRequest) {
+  // Cloudflare quota counter — in-memory batched, per-request DB write nahi hota
+  trackApiRequest("api");
   try {
     const supabase = createAdminClient();
     const { data, error } = await supabase

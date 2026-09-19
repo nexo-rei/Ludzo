@@ -12,6 +12,7 @@ import {
   isWithdrawalNetwork,
   WITHDRAWAL_NETWORKS,
 } from "@/lib/economy";
+import { trackApiRequest } from "@/lib/usage-tracker";
 
 /**
  * Convert only the locked Ludo-prize ledger into a withdrawal request.
@@ -20,6 +21,8 @@ import {
  * deposit/admin funds and is protected from withdrawal by product design.
  */
 export async function POST(req: NextRequest) {
+  // Cloudflare quota counter — in-memory batched, per-request DB write nahi hota
+  trackApiRequest("api");
   const auth = await requireAuth(req);
   if (!auth.ok) {
     return NextResponse.json(
