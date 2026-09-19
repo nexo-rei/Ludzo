@@ -14,6 +14,7 @@ import {
   MAX_CONSECUTIVE_SIXES,
   PIECES_PER_PLAYER,
 } from "@/lib/ludo-engine";
+import { trackApiRequest, touchUserPresence } from "@/lib/usage-tracker";
 
 /** Default (empty) board for a fresh room: 2 tokens per player. */
 const EMPTY_BOARD = {
@@ -31,6 +32,8 @@ const BOT_ROLL_DELAY_SECS = 1.2;
 const BOT_MOVE_DELAY_SECS = 0.8;
 
 export async function GET(req: NextRequest) {
+  // Cloudflare quota counter — in-memory batched, per-request DB write nahi hota
+  trackApiRequest("game_poll");
   const auth = await requireAuth(req);
   if (!auth.ok) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
@@ -42,6 +45,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: "room_id is required" }, { status: 400 });
     }
 
+    // Presence — users.last_seen (60s self-throttle, capacity/active counts)
+    if (auth.userId) touchUserPresence(auth.userId);
     const supabase = createAdminClient();
     const userId   = auth.userId!;
     const now      = Date.now();

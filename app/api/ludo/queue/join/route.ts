@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getSettings } from "@/lib/settings";
+import { checkJoinCapacity } from "@/lib/capacity";
+import { trackApiRequest, touchUserPresence } from "@/lib/usage-tracker";
 
 const ALLOWED_STAKES = [50, 100, 200, 500, 1000, 2000, 5000];
 
 export async function POST(req: NextRequest) {
+  // Cloudflare quota counter — in-memory batched, per-request DB write nahi hota
+  trackApiRequest("match_action");
   const auth = await requireAuth(req);
   if (!auth.ok) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
@@ -19,6 +24,22 @@ export async function POST(req: NextRequest) {
 
     const supabase = createAdminClient();
     const userId   = auth.userId!;
+
+    // Presence — users.last_seen (60s self-throttle)
+    if (auth.userId) touchUserPresence(auth.userId);
+
+    // ── 0. Capacity guard (System / Bot Health) ──────────────────────────────
+    // Block mode ON + live-match limit ya queue capacity cross → join reject.
+    // (Warn mode me kuch nahi hota — sirf admin panel me red alert.)
+    const settings = await getSettings(supabase);
+    const joinCap = await checkJoinCapacity(supabase, settings);
+    if (joinCap.blocked) {
+      return NextResponse.json({
+        success: false,
+        error: "server_full",
+        message: joinCap.message,
+      }, { status: 503 });
+    }
 
     console.log(`[LUDO MATCHMAKER] Queue Join: user=${userId} stake=${stake}`);
 

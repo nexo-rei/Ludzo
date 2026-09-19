@@ -8,6 +8,7 @@ import LudzoLogo from "@/components/layout/LudzoLogo";
 import { ToastContainer } from "@/components/ui/Toast";
 import { useAdminUser, isModeratorUser } from "@/hooks/useAdminUser";
 import {
+  ActivityIcon,
   ArrowDownCircleIcon,
   ArrowUpCircleIcon,
   CheckSquareIcon,
@@ -38,6 +39,7 @@ const NAV_ITEMS = [
   { label: "Withdrawals", href: "/admin/withdrawals", icon: ArrowUpCircleIcon },
   { label: "Announcements", href: "/admin/announcements", icon: MegaphoneIcon },
   { label: "Moderators", href: "/admin/moderators", icon: ShieldIcon },
+  { label: "System", href: "/admin/system", icon: ActivityIcon },
   { label: "Settings", href: "/admin/settings", icon: SettingsNavIcon },
   { label: "Logs", href: "/admin/logs", icon: ScrollIcon },
 ];

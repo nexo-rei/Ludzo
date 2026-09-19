@@ -25,6 +25,14 @@ export const SETTING_DEFAULTS: AppSettings = {
   streak_day_7: 10,
   maintenance_mode: false,
   maintenance_message: "We are performing scheduled maintenance. Back soon!",
+  // Capacity controls — sql/11_system_health.sql seed values ke saath sync.
+  // Default 'warn' = sirf admin panel me red alert, koi user block nahi hota.
+  max_concurrent_users: 200,
+  max_concurrent_matches: 100,
+  max_queue_capacity: 500,
+  capacity_enforcement: "warn",
+  server_full_message:
+    "LUDZO servers are at full capacity right now. Please try again in a few minutes!",
 };
 
 /** Admin panel historically saved aliased keys (min_deposit_usdt, site_name). */

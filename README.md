@@ -175,6 +175,11 @@ sql/09_min_deposit_three_usd.sql
 -- 10. Moderator role — admin_users me role/is_active columns + CHECK.
 --     Moderators /admin/moderators se bante hain (limited-access staff).
 sql/10_moderators.sql
+
+-- 11. REQUIRED — System / Bot Health (/admin/system): users.last_seen presence,
+--     Cloudflare 100k/day quota counter (usage_daily/usage_minute + RPCs),
+--     DB health RPCs, capacity settings seed
+sql/11_system_health.sql
 ```
 
 `05` ke bina: support tickets save nahi honge, channel/group task verify nahi hoga,
@@ -238,6 +243,7 @@ Admin features:
 - Maintenance mode toggle
 - Admin action logs
 - **Moderator team** (`/admin/moderators`) — create/disable/delete limited-access staff
+- **System / Bot Health** (`/admin/system`, full admin only) — live load (active users, queue, live matches, today's signups/matches/ad plays + peak-hours chart), Cloudflare FREE-plan 100k requests/day quota monitor with ETA, Supabase DB health (size vs 500 MB, connections, top tables), Telegram webhook health, aur capacity controls (max concurrent users/matches, queue capacity, block-vs-warn enforcement). SQL: `sql/11_system_health.sql`, verify: `npm run verify:system`.
 
 ### Moderator Role
 
@@ -249,7 +255,7 @@ Login page wahi hai (`/admin`) — account ki `role` decide karti hai kaunsa pan
 | Users | Manage, suspend, wallets | View only — Today / All / Active / Suspended filters |
 | Support | Full | Full (reply, status) — yahi moderator ka main kaam hai |
 | Withdrawals | Approve / reject / mark paid | **View only** (wallet address masked) |
-| Deposits, Tasks, Announcements, Broadcast, Settings, Logs, Moderators | ✅ | ❌ (403) |
+| Deposits, Tasks, Announcements, Broadcast, Settings, Logs, Moderators, System | ✅ | ❌ (403) |
 
 Moderators `/admin/moderators` page se bante hain (sirf full admin ko dikhta hai).
 SQL migration: `sql/10_moderators.sql`. Disable karte hi moderator ka token turant

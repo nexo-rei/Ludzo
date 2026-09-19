@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { trackApiRequest } from "@/lib/usage-tracker";
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ paymentId: string }> }
 ) {
+  // Cloudflare quota counter — in-memory batched, per-request DB write nahi hota
+  trackApiRequest("api");
   const auth = await requireAuth(req);
   if (!auth.ok)
     return NextResponse.json({ success: false, error: auth.error }, { status: 401 });

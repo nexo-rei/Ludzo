@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveTaskChatRef } from "@/lib/telegram-chat";
+import { trackApiRequest } from "@/lib/usage-tracker";
 
 // Start a task (sets status to in_progress)
 export async function POST(req: NextRequest) {
+  // Cloudflare quota counter — in-memory batched, per-request DB write nahi hota
+  trackApiRequest("api");
   const auth = await requireAuth(req);
   if (!auth.ok)
     return NextResponse.json(

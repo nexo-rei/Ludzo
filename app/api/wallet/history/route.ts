@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { trackApiRequest } from "@/lib/usage-tracker";
 
 // BUGS FIXED:
 // 1. User lookup was .eq("telegram_id", auth.userId!) — corrected to .eq("id", auth.userId!)
@@ -9,6 +10,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 //    referral_commission) to the correct DB queries.
 
 export async function GET(req: NextRequest) {
+  // Cloudflare quota counter — in-memory batched, per-request DB write nahi hota
+  trackApiRequest("api");
   const auth = await requireAuth(req);
   if (!auth.ok)
     return NextResponse.json(

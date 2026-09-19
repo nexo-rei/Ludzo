@@ -3,12 +3,17 @@ import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSettings } from "@/lib/settings";
 import { startOfDay } from "date-fns";
+import { trackApiRequest, touchUserPresence } from "@/lib/usage-tracker";
 
 export async function GET(req: NextRequest) {
+  // Cloudflare quota counter — in-memory batched, per-request DB write nahi hota
+  trackApiRequest("api");
   const auth = await requireAuth(req);
   if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: 401 });
 
   try {
+    // Presence — users.last_seen (60s self-throttle, capacity/active counts)
+    if (auth.userId) touchUserPresence(auth.userId);
     const supabase = createAdminClient();
     const settings = await getSettings(supabase);
 

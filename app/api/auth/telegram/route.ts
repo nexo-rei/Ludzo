@@ -3,12 +3,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { validateTelegramInitData } from "@/lib/telegram";
 import { getSettings } from "@/lib/settings";
 import { isSupportedLanguage, normalizeLanguage } from "@/lib/i18n";
+import { trackApiRequest } from "@/lib/usage-tracker";
 
 // ---------------------------------------------------------------------------
 // Existing auth handler (POST) — NOT modified
 // ---------------------------------------------------------------------------
 
 export async function POST(req: NextRequest) {
+  // Cloudflare quota counter — in-memory batched, per-request DB write nahi hota
+  trackApiRequest("api");
   try {
     const body = await req.json();
     console.log("FULL BODY:", JSON.stringify(body));

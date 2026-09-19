@@ -37,6 +37,9 @@ export default function HomePage() {
       const json = await res.json();
       if (json.success) setData(json.data);
       else if (json.error === "maintenance") router.replace("/maintenance");
+      // Capacity limit (System / Bot Health → block mode) — naye users ko
+      // server-full maintenance screen pe bhej do.
+      else if (json.error === "server_full") router.replace("/maintenance");
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, [userId, router]);

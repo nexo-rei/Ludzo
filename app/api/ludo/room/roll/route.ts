@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { calcMovablePieces, MAX_CONSECUTIVE_SIXES, PIECES_PER_PLAYER } from "@/lib/ludo-engine";
+import { trackApiRequest, touchUserPresence } from "@/lib/usage-tracker";
 
 export async function POST(req: NextRequest) {
+  // Cloudflare quota counter — in-memory batched, per-request DB write nahi hota
+  trackApiRequest("match_action");
   const auth = await requireAuth(req);
   if (!auth.ok) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
@@ -17,6 +20,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "room_id is required" }, { status: 400 });
     }
 
+    // Presence — users.last_seen (60s self-throttle, capacity/active counts)
+    if (auth.userId) touchUserPresence(auth.userId);
     const supabase = createAdminClient();
     const userId   = auth.userId!;
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { trackApiRequest } from "@/lib/usage-tracker";
 
 // BUG FIXED: Was doing .eq("telegram_id", auth.userId!) but auth.userId
 // is a UUID (the user's row id), not a telegram_id numeric string.
@@ -9,6 +10,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 //rebuild
 
 export async function GET(req: NextRequest) {
+  // Cloudflare quota counter — in-memory batched, per-request DB write nahi hota
+  trackApiRequest("api");
   const auth = await requireAuth(req);
   if (!auth.ok)
     return NextResponse.json(

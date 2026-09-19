@@ -20,6 +20,18 @@ export interface AppSettings {
   streak_day_7: number;
   maintenance_mode: boolean;
   maintenance_message: string;
+  // ─── Capacity controls (/admin/system → System / Bot Health) ───────────────
+  /** 0 = unlimited. block mode me itne active users ke baad naye users ko
+   *  server-full screen milta hai. Default 'warn' — kuch block nahi hota. */
+  max_concurrent_users: number;
+  /** 0 = unlimited. Live rooms (countdown+active) ki ceiling. */
+  max_concurrent_matches: number;
+  /** 0 = unlimited. 'waiting' queue entries ki ceiling. */
+  max_queue_capacity: number;
+  /** 'block' = limits enforce karo, 'warn' = sirf admin panel me red alert. */
+  capacity_enforcement: "block" | "warn";
+  /** Block hone wale users ko dikhne wala message (maintenance screen). */
+  server_full_message: string;
 }
 
 // ─── Users ────────────────────────────────────────────────────────────────────

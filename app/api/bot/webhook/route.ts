@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildStartMessage, extractStartPayload, type StartPayload } from "@/lib/telegram-bot";
+import { trackApiRequest } from "@/lib/usage-tracker";
 
 // ---------------------------------------------------------------------------
 // Telegram Bot API helpers
@@ -99,6 +100,8 @@ async function handleStart(
 // ---------------------------------------------------------------------------
 
 export async function POST(req: NextRequest) {
+  // Cloudflare quota counter — in-memory batched, per-request DB write nahi hota
+  trackApiRequest("api");
   try {
     const body = await req.json().catch(() => null);
 
